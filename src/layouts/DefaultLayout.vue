@@ -28,17 +28,16 @@ const sidebarCollapsed = ref(false)
         <span v-if="!sidebarCollapsed" class="ml-2 font-semibold text-lg">利润工具</span>
       </div>
       <nav class="flex-1 py-2">
-        <ul class="menu menu-vertical px-2 gap-1">
+        <ul class="menu menu-vertical w-full">
           <li v-for="item in navItems" :key="item.path">
             <button
-              class="flex items-center"
-              :class="{ active: route.path === item.path }"
+              :class="{ 'menu-active': route.path === item.path }"
               @click="router.push(item.path)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="item.icon" />
               </svg>
-              <span v-if="!sidebarCollapsed" class="ml-2">{{ item.label }}</span>
+              <span v-if="!sidebarCollapsed">{{ item.label }}</span>
             </button>
           </li>
         </ul>
