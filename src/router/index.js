@@ -17,6 +17,11 @@ const routes = [
         component: () => import('@/pages/OptionPage.vue'),
       },
       {
+        path: 'field',
+        name: 'field',
+        component: () => import('@/pages/FieldPage.vue'),
+      },
+      {
         path: 'template',
         name: 'template',
         component: () => import('@/pages/TemplatePage.vue'),

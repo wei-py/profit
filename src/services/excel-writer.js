@@ -83,6 +83,7 @@ export function buildConfigWorkbook(config) {
         { key: 'item_label', prop: 'itemLabel' },
         { key: 'sort', prop: 'sort' },
         { key: 'enabled', prop: 'enabled' },
+        { key: 'remark', prop: 'remark' },
       ]
       wb.SheetNames.push('option_items')
       wb.Sheets.option_items = objectsToSheet(allItems, itemHeaders)

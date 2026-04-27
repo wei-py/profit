@@ -112,6 +112,64 @@ function handlePresetChange(e) {
           </div>
         </div>
 
+        <div class="card bg-base-100 border border-base-300">
+          <div class="card-body">
+            <h2 class="card-title text-lg">
+              基础信息
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="form-control w-full">
+                <label class="label py-1">
+                  <span class="label-text">名称</span>
+                </label>
+                <input
+                  v-model="createStore.basicInfo.name"
+                  type="text"
+                  class="input input-bordered w-full"
+                  placeholder="产品名称"
+                >
+              </div>
+              <div class="form-control w-full">
+                <label class="label py-1">
+                  <span class="label-text">款号</span>
+                </label>
+                <input
+                  v-model="createStore.basicInfo.sku"
+                  type="text"
+                  class="input input-bordered w-full"
+                  placeholder="SKU"
+                >
+              </div>
+              <div class="form-control w-full">
+                <label class="label py-1">
+                  <span class="label-text">成本</span>
+                  <span class="label-text-alt opacity-60">元</span>
+                </label>
+                <input
+                  v-model.number="createStore.basicInfo.cost"
+                  type="number"
+                  step="any"
+                  class="input input-bordered w-full"
+                  placeholder="0.00"
+                >
+              </div>
+              <div class="form-control w-full">
+                <label class="label py-1">
+                  <span class="label-text">重量</span>
+                  <span class="label-text-alt opacity-60">g</span>
+                </label>
+                <input
+                  v-model.number="createStore.basicInfo.weight"
+                  type="number"
+                  step="any"
+                  class="input input-bordered w-full"
+                  placeholder="0"
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div v-if="!showNoPreset" class="card bg-base-100 border border-base-300">
           <div class="card-body">
             <h2 class="card-title text-lg">
@@ -150,6 +208,43 @@ function handlePresetChange(e) {
                 计算
               </button>
             </div>
+          </div>
+        </div>
+
+        <div class="card bg-base-100 border border-base-300">
+          <div class="card-body">
+            <h2 class="card-title text-lg">
+              图片
+            </h2>
+            <textarea
+              v-model="createStore.images"
+              class="textarea textarea-bordered w-full"
+              rows="3"
+              placeholder="图片URL，多个请用逗号分隔"
+            />
+            <div v-if="createStore.images" class="mt-2 flex gap-2 flex-wrap">
+              <img
+                v-for="(img, i) in createStore.images.split(',').map(s => s.trim()).filter(Boolean)"
+                :key="i"
+                :src="img"
+                class="w-20 h-20 object-cover rounded border"
+                @error="($event.target).style.display = 'none'"
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="card bg-base-100 border border-base-300">
+          <div class="card-body">
+            <h2 class="card-title text-lg">
+              变体
+            </h2>
+            <textarea
+              v-model="createStore.variants"
+              class="textarea textarea-bordered w-full font-mono"
+              rows="4"
+              placeholder="JSON 格式，如 {&quot;颜色&quot;: [&quot;红&quot;,&quot;蓝&quot;], &quot;尺寸&quot;: [&quot;S&quot;,&quot;M&quot;,&quot;L&quot;]}"
+            />
           </div>
         </div>
       </div>

@@ -137,6 +137,7 @@ export function readConfigWorkbook(wb) {
         itemLabel: r.item_label ?? r.label ?? '',
         sort: parseNumber(r.sort) ?? 0,
         enabled: normalizeBoolean(r.enabled ?? true),
+        remark: r.remark ?? '',
       })
       if (!groupMap.has(gid))
         groupMap.set(gid, arr)

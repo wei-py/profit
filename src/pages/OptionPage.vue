@@ -25,6 +25,7 @@ const itemColumns = [
   { key: 'itemValue', prop: 'itemValue', label: '值' },
   { key: 'sort', prop: 'sort', label: '排序', type: 'number' },
   { key: 'enabled', prop: 'enabled', label: '启用', type: 'boolean' },
+  { key: 'remark', prop: 'remark', label: '备注' },
 ]
 
 function openNewGroup() {
@@ -80,6 +81,7 @@ function handleItemAdd() {
     itemLabel: '',
     sort: (selectedGroup.value.items || []).length + 1,
     enabled: true,
+    remark: '',
   }
   selectedGroup.value.items.push(newItem)
 }
@@ -123,7 +125,7 @@ function handleItemDelete(row) {
 
     <div v-if="showNoConfig" class="text-center py-20 text-base-content/50">
       <p class="mb-4">
-          请先打开配置 Excel 文件以开始使用。
+        请先打开配置 Excel 文件以开始使用。
       </p>
       <button class="btn btn-primary" @click="openConfigExcel">
         打开配置 Excel

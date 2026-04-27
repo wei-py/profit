@@ -195,7 +195,7 @@ function removeInputMapEntry(key) {
               :value="key"
               type="text"
               class="input input-bordered input-sm w-32"
-                placeholder="列名"
+              placeholder="列名"
               @change="updateInputMapKey(key, $event.target.value)"
             >
             <span class="text-sm"> &larr; </span>

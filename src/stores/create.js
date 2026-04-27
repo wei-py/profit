@@ -9,6 +9,9 @@ export const useCreateStore = defineStore('create', () => {
   const results = ref({})
   const errors = ref([])
   const calculating = ref(false)
+  const basicInfo = ref({ name: '', sku: '', cost: '', weight: '' })
+  const images = ref('')
+  const variants = ref('')
 
   const configStore = useConfigStore()
 
@@ -29,6 +32,9 @@ export const useCreateStore = defineStore('create', () => {
     userInputs.value = {}
     results.value = {}
     errors.value = []
+    basicInfo.value = { name: '', sku: '', cost: '', weight: '' }
+    images.value = ''
+    variants.value = ''
 
     const preset = configStore.config.presets.find(p => p.presetId === presetId)
     if (preset && preset.params) {
@@ -66,8 +72,11 @@ export const useCreateStore = defineStore('create', () => {
 
   function getRecord() {
     return {
+      ...basicInfo.value,
       ...userInputs.value,
       ...results.value,
+      images: images.value,
+      variants: variants.value,
     }
   }
 
@@ -76,6 +85,9 @@ export const useCreateStore = defineStore('create', () => {
     userInputs.value = {}
     results.value = {}
     errors.value = []
+    basicInfo.value = { name: '', sku: '', cost: '', weight: '' }
+    images.value = ''
+    variants.value = ''
   }
 
   return {
@@ -84,6 +96,9 @@ export const useCreateStore = defineStore('create', () => {
     results,
     errors,
     calculating,
+    basicInfo,
+    images,
+    variants,
     selectedPreset,
     currentRules,
     selectPreset,

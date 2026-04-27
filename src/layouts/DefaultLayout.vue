@@ -1,13 +1,17 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useTheme } from '@/composables/useTheme'
 
 const router = useRouter()
 const route = useRoute()
 
+const { theme, isDark, toggleTheme } = useTheme()
+
 const navItems = [
   { path: '/preset', label: '预设', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
   { path: '/option', label: '选项', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
+  { path: '/field', label: '字段', icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01' },
   { path: '/template', label: '模板', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
   { path: '/create', label: '新建', icon: 'M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z' },
   { path: '/list', label: '列表', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
@@ -42,6 +46,17 @@ const sidebarCollapsed = ref(false)
           </li>
         </ul>
       </nav>
+      <div class="py-2 border-t border-base-300">
+        <button class="btn btn-ghost w-full justify-start rounded-none" @click="toggleTheme()">
+          <svg v-if="isDark" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+          <span v-if="!sidebarCollapsed" class="ml-2">{{ isDark ? '浅色' : '深色' }}</span>
+        </button>
+      </div>
     </aside>
     <main class="flex-1 overflow-auto">
       <div class="p-6">

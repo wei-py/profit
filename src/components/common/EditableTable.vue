@@ -113,7 +113,7 @@ function isEditing(row) {
         </tr>
         <tr v-if="rows.length === 0">
           <td :colspan="columns.length + (editable ? 1 : 0)" class="text-center text-base-content/50 py-6">
-             暂无数据
+            暂无数据
           </td>
         </tr>
       </tbody>

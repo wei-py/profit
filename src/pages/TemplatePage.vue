@@ -433,7 +433,7 @@ function deleteLookup(table) {
 
     <div v-if="showNoConfig" class="text-center py-20 text-base-content/50">
       <p class="mb-4">
-          请先打开配置 Excel 文件以开始使用。
+        请先打开配置 Excel 文件以开始使用。
       </p>
       <button class="btn btn-primary" @click="openConfigExcel">
         打开配置 Excel

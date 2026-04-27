@@ -76,7 +76,7 @@ function hasImages(record) {
 
     <div v-if="showNoFile" class="text-center py-20 text-base-content/50">
       <p class="mb-4">
-          当前未加载列表，请先打开或创建列表 Excel 文件。
+        当前未加载列表，请先打开或创建列表 Excel 文件。
       </p>
       <button class="btn btn-primary" @click="openListExcel">
         打开列表 Excel
