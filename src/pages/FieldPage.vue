@@ -83,7 +83,7 @@ function handleFieldDelete(row) {
       </button>
     </div>
 
-    <div v-else class="card bg-base-100 border border-base-300">
+    <div v-else class="card bg-base-100 border border-base-300" data-tour="field-table">
       <div class="card-body">
         <EditableTable
           :columns="fieldColumns"

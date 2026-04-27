@@ -146,7 +146,7 @@ function handleFillDefaults() {
       <h1 class="text-2xl font-bold">
         预设
       </h1>
-      <div class="flex gap-2">
+      <div class="flex gap-2" data-tour="preset-toolbar">
         <button v-if="showNoConfig" class="btn btn-primary btn-sm" @click="openConfigExcel">
           打开配置
         </button>
@@ -170,10 +170,11 @@ function handleFillDefaults() {
 
     <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="lg:col-span-1">
-        <div class="card bg-base-100 border border-base-300">
+        <div class="card bg-base-100 border border-base-300" data-tour="preset-list">
           <div class="card-body">
             <input
               v-model="searchQuery"
+              data-tour="preset-search"
               type="text"
               class="input input-bordered input-sm w-full"
               placeholder="搜索预设..."
@@ -205,7 +206,7 @@ function handleFillDefaults() {
           </div>
         </div>
 
-        <div v-else class="card bg-base-100 border border-base-300">
+        <div v-else class="card bg-base-100 border border-base-300" data-tour="preset-param-table">
           <div class="card-body">
             <div class="flex items-center justify-between mb-4">
               <div>

@@ -2,11 +2,18 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
+import { useTour } from '@/composables/useTour'
 
 const router = useRouter()
 const route = useRoute()
 
-const { theme, isDark, toggleTheme } = useTheme()
+const { isDark, toggleTheme } = useTheme()
+const { startTour } = useTour()
+
+function getTourPageName() {
+  const name = typeof route.name === 'string' ? route.name : ''
+  return name === '/' ? 'preset' : name
+}
 
 const navItems = [
   { path: '/preset', label: '预设', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
@@ -24,14 +31,14 @@ const sidebarCollapsed = ref(false)
   <div class="flex h-screen bg-base-200">
     <aside class="flex flex-col bg-base-100 border-r border-base-300 transition-all duration-300" :class="sidebarCollapsed ? 'w-16' : 'w-56'">
       <div class="flex items-center h-14 px-4 border-b border-base-300">
-        <button class="btn btn-ghost btn-sm btn-square" @click="sidebarCollapsed = !sidebarCollapsed">
+        <button class="btn btn-ghost btn-sm btn-square" data-tour="sidebar-collapse" @click="sidebarCollapsed = !sidebarCollapsed">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
         <span v-if="!sidebarCollapsed" class="ml-2 font-semibold text-lg">利润工具</span>
       </div>
-      <nav class="flex-1 py-2">
+      <nav class="flex-1 py-2" data-tour="sidebar-nav">
         <ul class="menu menu-vertical w-full">
           <li v-for="item in navItems" :key="item.path">
             <button
@@ -47,7 +54,7 @@ const sidebarCollapsed = ref(false)
         </ul>
       </nav>
       <div class="py-2 border-t border-base-300">
-        <button class="btn btn-ghost w-full justify-start rounded-none" @click="toggleTheme()">
+        <button class="btn btn-ghost w-full justify-start rounded-none" data-tour="theme-toggle" @click="toggleTheme()">
           <svg v-if="isDark" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
@@ -55,6 +62,12 @@ const sidebarCollapsed = ref(false)
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
           </svg>
           <span v-if="!sidebarCollapsed" class="ml-2">{{ isDark ? '浅色' : '深色' }}</span>
+        </button>
+        <button class="btn btn-ghost w-full justify-start rounded-none mt-1" @click="startTour(getTourPageName())">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span v-if="!sidebarCollapsed" class="ml-2">帮助</span>
         </button>
       </div>
     </aside>

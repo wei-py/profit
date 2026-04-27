@@ -442,7 +442,7 @@ function deleteLookup(table) {
 
     <div v-else class="flex gap-6">
       <div class="w-64 flex-shrink-0 space-y-4">
-        <div class="card bg-base-100 border border-base-300">
+        <div class="card bg-base-100 border border-base-300" data-tour="template-ruleset-list">
           <div class="card-body p-3">
             <h3 class="font-medium text-sm mb-1">
               规则集
@@ -463,7 +463,7 @@ function deleteLookup(table) {
           </div>
         </div>
 
-        <div v-if="selectedRuleSetId" class="card bg-base-100 border border-base-300">
+        <div v-if="selectedRuleSetId" class="card bg-base-100 border border-base-300" data-tour="template-rule-list">
           <div class="card-body p-3">
             <div class="flex justify-between items-center mb-1">
               <h3 class="font-medium text-sm">
@@ -517,7 +517,7 @@ function deleteLookup(table) {
             </div>
           </div>
 
-          <div class="tabs tabs-bordered mb-4">
+          <div class="tabs tabs-bordered mb-4" data-tour="template-tabs">
             <button
               class="tab"
               :class="{ 'tab-active': selectedTab === 'rules' }"
@@ -535,7 +535,7 @@ function deleteLookup(table) {
           </div>
 
           <div v-if="selectedTab === 'rules'" class="space-y-6">
-            <div class="card bg-base-100 border border-base-300">
+            <div class="card bg-base-100 border border-base-300" data-tour="template-condition-tree">
               <div class="card-body">
                 <div class="flex justify-between items-center mb-3">
                   <h3 class="font-medium">
@@ -557,7 +557,7 @@ function deleteLookup(table) {
               </div>
             </div>
 
-            <div class="card bg-base-100 border border-base-300">
+            <div class="card bg-base-100 border border-base-300" data-tour="template-action-list">
               <div class="card-body">
                 <div class="flex justify-between items-center mb-3">
                   <h3 class="font-medium">
@@ -593,7 +593,7 @@ function deleteLookup(table) {
           <div v-if="selectedTab === 'lookups'" class="space-y-4">
             <div class="flex gap-6">
               <div class="w-64 flex-shrink-0">
-                <div class="card bg-base-100 border border-base-300">
+                <div class="card bg-base-100 border border-base-300" data-tour="template-lookup-list">
                   <div class="card-body p-3">
                     <div class="flex justify-between items-center mb-1">
                       <h3 class="font-medium text-sm">

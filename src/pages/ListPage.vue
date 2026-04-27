@@ -61,7 +61,7 @@ function hasImages(record) {
       <h1 class="text-2xl font-bold">
         列表
       </h1>
-      <div class="flex gap-2">
+      <div class="flex gap-2" data-tour="list-toolbar">
         <button v-if="showNoFile" class="btn btn-primary btn-sm" @click="openListExcel">
           打开列表 Excel
         </button>
@@ -92,7 +92,7 @@ function hasImages(record) {
         暂无记录，请前往“新建”页面添加记录。
       </div>
 
-      <div v-else class="overflow-x-auto">
+      <div v-else class="overflow-x-auto" data-tour="list-table">
         <table class="table table-sm">
           <thead>
             <tr>

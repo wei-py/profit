@@ -94,6 +94,7 @@ function handlePresetChange(e) {
               选择预设
             </h2>
             <select
+              data-tour="create-preset-select"
               class="select select-bordered w-full max-w-md"
               :value="createStore.selectedPresetId"
               @change="handlePresetChange"
@@ -112,7 +113,7 @@ function handlePresetChange(e) {
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300">
+        <div class="card bg-base-100 border border-base-300" data-tour="create-basic-info">
           <div class="card-body">
             <h2 class="card-title text-lg">
               基础信息
@@ -170,7 +171,7 @@ function handlePresetChange(e) {
           </div>
         </div>
 
-        <div v-if="!showNoPreset" class="card bg-base-100 border border-base-300">
+        <div v-if="!showNoPreset" class="card bg-base-100 border border-base-300" data-tour="create-params">
           <div class="card-body">
             <h2 class="card-title text-lg">
               输入参数
@@ -200,6 +201,7 @@ function handlePresetChange(e) {
 
             <div class="card-actions mt-4">
               <button
+                data-tour="create-calculate"
                 class="btn btn-primary"
                 :disabled="createStore.calculating"
                 @click="handleCalculate"
@@ -250,7 +252,7 @@ function handlePresetChange(e) {
       </div>
 
       <div class="space-y-6">
-        <div v-if="!showNoPreset" class="card bg-base-100 border border-base-300">
+        <div v-if="!showNoPreset" class="card bg-base-100 border border-base-300" data-tour="create-results">
           <div class="card-body">
             <h2 class="card-title text-lg">
               计算结果
