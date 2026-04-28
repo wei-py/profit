@@ -91,10 +91,39 @@ const selectedPresetCp = computed(() => {
 
 const paramColumns = [
   { key: 'paramName', prop: 'paramName', label: '名称' },
-  { key: 'type', prop: 'type', label: '类型' },
+  {
+    key: 'type', prop: 'type', label: '类型',
+    type: 'select',
+    options: [
+      { value: 'text', label: '文本' },
+      { value: 'number', label: '数字' },
+      { value: 'select', label: '下拉选择' },
+      { value: 'boolean', label: '布尔' },
+      { value: 'date', label: '日期' },
+    ],
+  },
   { key: 'unit', prop: 'unit', label: '单位' },
-  { key: 'optionGroupId', prop: 'optionGroupId', label: '选项组' },
-  { key: 'defaultValue', prop: 'defaultValue', label: '默认值' },
+  {
+    key: 'optionGroupId', prop: 'optionGroupId', label: '选项组',
+    type: 'select',
+    getOptions: () => configStore.config.optionGroups.map(g => ({
+      value: g.groupId,
+      label: g.groupName,
+    })),
+  },
+  {
+    key: 'defaultValue', prop: 'defaultValue', label: '默认值',
+    getType: (row) => row.type === 'select' ? 'select' : 'text',
+    getOptions: (row) => {
+      if (row.type !== 'select' || !row.optionGroupId) return []
+      const group = configStore.getOptionGroup(row.optionGroupId)
+      if (!group?.items) return []
+      return group.items.filter(i => i.enabled !== false).map(i => ({
+        value: i.itemValue,
+        label: i.itemLabel || i.itemValue,
+      }))
+    },
+  },
   { key: 'sort', prop: 'sort', label: '排序', type: 'number' },
   { key: 'isRequired', prop: 'isRequired', label: '必填', type: 'boolean' },
 ]

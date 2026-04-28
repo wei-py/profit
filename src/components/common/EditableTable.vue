@@ -19,6 +19,16 @@ function getValue(row, col) {
   return row[col.key]
 }
 
+function getEffectiveType(row, col) {
+  if (col.getType) return col.getType(row)
+  return col.type || 'text'
+}
+
+function getEffectiveOptions(row, col) {
+  if (col.getOptions) return col.getOptions(row) || []
+  return col.options || []
+}
+
 function startEdit(row) {
   editingRowId.value = row[props.idKey]
   editData.value = { ...row }
@@ -57,20 +67,21 @@ function isEditing(row) {
         <tr v-for="row in rows" :key="row[idKey]">
           <template v-if="isEditing(row)">
             <td v-for="col in columns" :key="col.key">
-              <template v-if="col.type === 'select' && col.options">
+              <template v-if="getEffectiveType(editData, col) === 'select'">
                 <select v-model="editData[col.prop || col.key]" class="select select-bordered select-sm w-full">
-                  <option v-for="opt in col.options" :key="opt.value" :value="opt.value">
+                  <option value=""></option>
+                  <option v-for="opt in getEffectiveOptions(editData, col)" :key="opt.value" :value="opt.value">
                     {{ opt.label }}
                   </option>
                 </select>
               </template>
-              <template v-else-if="col.type === 'boolean'">
+              <template v-else-if="getEffectiveType(editData, col) === 'boolean'">
                 <input v-model="editData[col.prop || col.key]" type="checkbox" class="toggle toggle-sm">
               </template>
-              <template v-else-if="col.type === 'number'">
+              <template v-else-if="getEffectiveType(editData, col) === 'number'">
                 <input v-model.number="editData[col.prop || col.key]" type="number" class="input input-bordered input-sm w-full">
               </template>
-              <template v-else-if="col.type === 'textarea'">
+              <template v-else-if="getEffectiveType(editData, col) === 'textarea'">
                 <textarea v-model="editData[col.prop || col.key]" class="textarea textarea-bordered textarea-sm w-full" rows="2" />
               </template>
               <template v-else>
@@ -94,6 +105,9 @@ function isEditing(row) {
                 <span :class="getValue(row, col) ? 'badge badge-success' : 'badge badge-ghost'">
                   {{ getValue(row, col) ? '是' : '否' }}
                 </span>
+              </template>
+              <template v-else-if="getEffectiveType(row, col) === 'select'">
+                {{ getEffectiveOptions(row, col).find(o => o.value === getValue(row, col))?.label || getValue(row, col) }}
               </template>
               <template v-else>
                 {{ getValue(row, col) }}
