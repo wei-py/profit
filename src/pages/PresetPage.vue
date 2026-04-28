@@ -92,7 +92,9 @@ const selectedPresetCp = computed(() => {
 const paramColumns = [
   { key: 'paramName', prop: 'paramName', label: '名称' },
   {
-    key: 'type', prop: 'type', label: '类型',
+    key: 'type',
+    prop: 'type',
+    label: '类型',
     type: 'select',
     options: [
       { value: 'text', label: '文本' },
@@ -104,7 +106,9 @@ const paramColumns = [
   },
   { key: 'unit', prop: 'unit', label: '单位' },
   {
-    key: 'optionGroupId', prop: 'optionGroupId', label: '选项组',
+    key: 'optionGroupId',
+    prop: 'optionGroupId',
+    label: '选项组',
     type: 'select',
     getOptions: () => configStore.config.optionGroups.map(g => ({
       value: g.groupId,
@@ -112,12 +116,16 @@ const paramColumns = [
     })),
   },
   {
-    key: 'defaultValue', prop: 'defaultValue', label: '默认值',
-    getType: (row) => row.type === 'select' ? 'select' : 'text',
+    key: 'defaultValue',
+    prop: 'defaultValue',
+    label: '默认值',
+    getType: row => row.type === 'select' ? 'select' : 'text',
     getOptions: (row) => {
-      if (row.type !== 'select' || !row.optionGroupId) return []
+      if (row.type !== 'select' || !row.optionGroupId)
+        return []
       const group = configStore.getOptionGroup(row.optionGroupId)
-      if (!group?.items) return []
+      if (!group?.items)
+        return []
       return group.items.filter(i => i.enabled !== false).map(i => ({
         value: i.itemValue,
         label: i.itemLabel || i.itemValue,
@@ -278,7 +286,7 @@ function cancelCpDelete() {
 </script>
 
 <template>
-  <div>
+  <div class="h-full flex flex-col overflow-hidden">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">
         预设
@@ -301,56 +309,62 @@ function cancelCpDelete() {
       </div>
     </div>
 
-    <div v-if="showNoConfig" class="text-center py-20 text-base-content/50">
-      <p class="mb-4">
-        请先打开配置 Excel 文件以开始使用。
-      </p>
-      <button class="btn btn-primary" @click="openConfigExcel">
-        打开配置 Excel
-      </button>
+    <div v-if="showNoConfig" class="flex-1 flex items-center justify-center text-base-content/50">
+      <div class="text-center">
+        <p class="mb-4">
+          请先打开配置 Excel 文件以开始使用。
+        </p>
+        <button class="btn btn-primary" @click="openConfigExcel">
+          打开配置 Excel
+        </button>
+      </div>
     </div>
 
-    <div v-else class="flex gap-6">
-      <div class="w-64 flex-shrink-0 space-y-4">
-        <div class="card bg-base-100 border border-base-300" data-tour="preset-list">
-          <div class="card-body p-3">
+    <div v-else class="flex-1 min-h-0 flex gap-3">
+      <div class="w-64 flex-shrink-0 min-h-0">
+        <div class="card card-sm bg-base-100 border border-base-300 h-full" data-tour="preset-list">
+          <div class="card-body flex-1 flex-col min-h-0 p-3">
             <input
               v-model="searchQuery"
               data-tour="preset-search"
               type="text"
-              class="input input-bordered input-sm w-full"
+              class="input input-bordered input-sm w-full flex-shrink-0"
               placeholder="搜索预设..."
             >
-            <ul class="menu menu-vertical gap-0.5 mt-2 max-h-96 overflow-auto w-full">
-              <li v-for="p in filteredPresets" :key="p.presetId">
-                <button
-                  :class="{ active: selectedPresetId === p.presetId }"
-                  @click="selectedPresetId = p.presetId"
-                >
-                  <div class="flex justify-between items-center w-full">
-                    <span>{{ p.presetName }}</span>
-                    <span class="text-xs opacity-60">{{ presetCpMap[p.presetId]?.country || '' }}</span>
-                  </div>
-                </button>
-              </li>
-              <li v-if="filteredPresets.length === 0">
-                <span class="text-base-content/50">未找到预设</span>
-              </li>
-            </ul>
+            <div class="flex-1 min-h-0 overflow-y-auto mt-2">
+              <ul class="menu menu-vertical gap-0.5 w-full">
+                <!-- <template v-for="i in 10"> -->
+                <li v-for="p in filteredPresets" :key="p.presetId">
+                  <button
+                    :class="{ active: selectedPresetId === p.presetId }"
+                    @click="selectedPresetId = p.presetId"
+                  >
+                    <div class="flex justify-between items-center w-full">
+                      <span>{{ p.presetName }}</span>
+                      <span class="text-xs opacity-60">{{ presetCpMap[p.presetId]?.country || '' }}</span>
+                    </div>
+                  </button>
+                </li>
+                <!-- </template> -->
+                <li v-if="filteredPresets.length === 0">
+                  <span class="text-base-content/50">未找到预设</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="flex-1 min-w-0">
-        <div v-if="!selectedPreset" class="card bg-base-100 border border-base-300">
+      <div class="flex-1 min-w-0 min-h-0 flex flex-col">
+        <div v-if="!selectedPreset" class="card card-sm bg-base-100 border border-base-300">
           <div class="card-body text-center py-20 text-base-content/50">
             请从左侧选择一个预设，或新建一个预设。
           </div>
         </div>
 
-        <div v-else class="card bg-base-100 border border-base-300" data-tour="preset-param-table">
-          <div class="card-body">
-            <div data-tour="preset-detail-header" class="flex items-center justify-between mb-4">
+        <div v-else class="card card-sm bg-base-100 border border-base-300 flex-1 min-h-0">
+          <div class="card-body flex-1 flex-col min-h-0">
+            <div data-tour="preset-detail-header" class="flex items-center justify-between mb-4 flex-shrink-0">
               <div>
                 <h2 class="text-lg font-bold">
                   {{ selectedPreset.presetName }}
@@ -374,7 +388,7 @@ function cancelCpDelete() {
               </div>
             </div>
 
-            <div class="flex justify-between items-center mb-2">
+            <div class="flex justify-between items-center mb-2 flex-shrink-0">
               <h3 class="font-medium">
                 参数
               </h3>
@@ -383,14 +397,16 @@ function cancelCpDelete() {
               </button>
             </div>
 
-            <EditableTable
-              :columns="paramColumns"
-              :rows="selectedPreset.params"
-              id-key="paramId"
-              @add="handleParamAdd"
-              @update="handleParamUpdate"
-              @delete="handleParamDelete"
-            />
+            <div class="flex-1 min-h-0">
+              <EditableTable
+                :columns="paramColumns"
+                :rows="selectedPreset.params"
+                id-key="paramId"
+                @add="handleParamAdd"
+                @update="handleParamUpdate"
+                @delete="handleParamDelete"
+              />
+            </div>
           </div>
         </div>
       </div>

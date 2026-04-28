@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import EditableTable from '@/components/common/EditableTable.vue'
 import { useFileIO } from '@/composables/useFileIO'
 import { useConfigStore } from '@/stores/config'
@@ -18,14 +18,25 @@ const showNoConfig = computed(() => !configStore.loaded)
 
 const CACHE_GROUP_KEY = 'profit-selected-group-id'
 
-onMounted(() => {
-  if (!configStore.loaded)
+function ensureUids() {
+  for (const group of configStore.config.optionGroups) {
+    for (const item of (group.items || [])) {
+      if (!item._uid) {
+        item._uid = `uid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      }
+    }
+  }
+}
+
+watch(() => configStore.loaded, (loaded) => {
+  if (!loaded)
     return
+  ensureUids()
   const cached = localStorage.getItem(CACHE_GROUP_KEY)
   if (cached && configStore.config.optionGroups.some(g => g.groupId === cached)) {
     selectedGroupId.value = cached
   }
-})
+}, { immediate: true })
 
 watch(selectedGroupId, (val) => {
   localStorage.setItem(CACHE_GROUP_KEY, val)
@@ -91,6 +102,7 @@ function handleItemAdd() {
   if (!selectedGroup.value)
     return
   const newItem = {
+    _uid: `uid_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     groupId: selectedGroupId.value,
     itemValue: '',
     itemLabel: '',
@@ -104,7 +116,7 @@ function handleItemAdd() {
 function handleItemUpdate(row) {
   if (!selectedGroup.value)
     return
-  const idx = selectedGroup.value.items.findIndex(i => i.itemValue === row.itemValue && i.groupId === row.groupId)
+  const idx = selectedGroup.value.items.findIndex(i => i._uid === row._uid)
   if (idx !== -1) {
     selectedGroup.value.items[idx] = row
   }
@@ -113,14 +125,12 @@ function handleItemUpdate(row) {
 function handleItemDelete(row) {
   if (!selectedGroup.value)
     return
-  selectedGroup.value.items = selectedGroup.value.items.filter(i =>
-    !(i.itemValue === row.itemValue && i.groupId === row.groupId),
-  )
+  selectedGroup.value.items = selectedGroup.value.items.filter(i => i._uid !== row._uid)
 }
 </script>
 
 <template>
-  <div>
+  <div class="h-full flex flex-col overflow-hidden">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">
         选项
@@ -138,49 +148,55 @@ function handleItemDelete(row) {
       </div>
     </div>
 
-    <div v-if="showNoConfig" class="text-center py-20 text-base-content/50">
-      <p class="mb-4">
-        请先打开配置 Excel 文件以开始使用。
-      </p>
-      <button class="btn btn-primary" @click="openConfigExcel">
-        打开配置 Excel
-      </button>
+    <div v-if="showNoConfig" class="flex-1 flex items-center justify-center text-base-content/50">
+      <div class="text-center">
+        <p class="mb-4">
+          请先打开配置 Excel 文件以开始使用。
+        </p>
+        <button class="btn btn-primary" @click="openConfigExcel">
+          打开配置 Excel
+        </button>
+      </div>
     </div>
 
-    <div v-else class="flex gap-6">
-      <div class="w-64 flex-shrink-0 space-y-4">
-        <div class="card bg-base-100 border border-base-300" data-tour="option-group-list">
-          <div class="card-body p-3">
-            <h3 class="font-medium text-sm mb-1">
+    <div v-else class="flex-1 min-h-0 flex gap-6">
+      <div class="w-64 flex-shrink-0 min-h-0">
+        <div class="card bg-base-100 border border-base-300 h-full" data-tour="option-group-list">
+          <div class="card-body flex-1 flex-col min-h-0 p-3">
+            <h3 class="font-medium text-sm mb-1 flex-shrink-0">
               分组
             </h3>
-            <ul class="menu menu-vertical gap-0.5 max-h-96 overflow-auto w-full">
-              <li v-for="g in configStore.config.optionGroups" :key="g.groupId">
-                <button
-                  :class="{ active: selectedGroupId === g.groupId }"
-                  @click="selectedGroupId = g.groupId"
-                >
-                  <span>{{ g.groupName }}</span>
-                </button>
-              </li>
-              <li v-if="configStore.config.optionGroups.length === 0">
-                <span class="text-base-content/50">暂无分组</span>
-              </li>
-            </ul>
+            <div class="flex-1 min-h-0 overflow-y-auto">
+              <ul class="menu menu-vertical gap-0.5 w-full">
+                <!-- <template v-for="i in 10"> -->
+                <li v-for="g in configStore.config.optionGroups" :key="g.groupId">
+                  <button
+                    :class="{ active: selectedGroupId === g.groupId }"
+                    @click="selectedGroupId = g.groupId"
+                  >
+                    <span>{{ g.groupName }}</span>
+                  </button>
+                </li>
+                <!-- </template> -->
+                <li v-if="configStore.config.optionGroups.length === 0">
+                  <span class="text-base-content/50">暂无分组</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="flex-1 min-w-0">
+      <div class="flex-1 min-w-0 min-h-0 flex flex-col">
         <div v-if="!selectedGroup" class="card bg-base-100 border border-base-300">
           <div class="card-body text-center py-20 text-base-content/50">
             请选择一个分组，或新建一个分组。
           </div>
         </div>
 
-        <div v-else class="card bg-base-100 border border-base-300" data-tour="option-item-table">
-          <div class="card-body">
-            <div data-tour="option-detail-header" class="flex items-center justify-between mb-4">
+        <div v-else class="card bg-base-100 border border-base-300 flex-1 min-h-0">
+          <div class="card-body flex-1 flex-col min-h-0">
+            <div data-tour="option-detail-header" class="flex items-center justify-between mb-4 flex-shrink-0">
               <div>
                 <h2 class="text-lg font-bold">
                   {{ selectedGroup.groupName }}
@@ -199,14 +215,16 @@ function handleItemDelete(row) {
               </div>
             </div>
 
-            <EditableTable
-              :columns="itemColumns"
-              :rows="selectedGroup.items || []"
-              id-key="itemValue"
-              @add="handleItemAdd"
-              @update="handleItemUpdate"
-              @delete="handleItemDelete"
-            />
+            <div class="flex-1 min-h-0">
+              <EditableTable
+                :columns="itemColumns"
+                :rows="selectedGroup.items || []"
+                id-key="_uid"
+                @add="handleItemAdd"
+                @update="handleItemUpdate"
+                @delete="handleItemDelete"
+              />
+            </div>
           </div>
         </div>
       </div>

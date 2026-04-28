@@ -83,14 +83,22 @@ const sidebarCollapsed = ref(false)
             <span v-if="!sidebarCollapsed" class="ml-2">帮助</span>
           </button>
           <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow border border-base-300">
-            <li><button @click="startTour(getTourPageName())">当前页面引导</button></li>
-            <li><button @click="startTour('overview')">应用概览</button></li>
+            <li>
+              <button @click="startTour(getTourPageName())">
+                当前页面引导
+              </button>
+            </li>
+            <li>
+              <button @click="startTour('overview')">
+                应用概览
+              </button>
+            </li>
           </ul>
         </div>
       </div>
     </aside>
-    <main class="flex-1 overflow-auto">
-      <div class="p-6">
+    <main class="flex-1 overflow-hidden">
+      <div class="py-3 px-6 h-full">
         <router-view />
       </div>
     </main>

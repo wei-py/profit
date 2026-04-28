@@ -99,9 +99,9 @@ const selectedPresetCp = computed(() => {
       </button>
     </div>
 
-    <div v-else class="flex gap-6">
+    <div v-else class="flex gap-3">
       <div class="flex-1 min-w-0 space-y-6">
-        <div class="card bg-base-100 border border-base-300">
+        <div class="card card-sm bg-base-100 border border-base-300">
           <div class="card-body">
             <h2 class="card-title text-lg">
               选择预设
@@ -126,7 +126,7 @@ const selectedPresetCp = computed(() => {
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300" data-tour="create-basic-info">
+        <div class="card card-sm bg-base-100 border border-base-300" data-tour="create-basic-info">
           <div class="card-body">
             <h2 class="card-title text-lg">
               基础信息
@@ -184,7 +184,7 @@ const selectedPresetCp = computed(() => {
           </div>
         </div>
 
-        <div v-if="!showNoPreset" class="card bg-base-100 border border-base-300" data-tour="create-params">
+        <div v-if="!showNoPreset" class="card card-sm bg-base-100 border border-base-300" data-tour="create-params">
           <div class="card-body">
             <h2 class="card-title text-lg">
               输入参数
@@ -226,7 +226,7 @@ const selectedPresetCp = computed(() => {
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300" data-tour="create-images">
+        <div class="card card-sm bg-base-100 border border-base-300" data-tour="create-images">
           <div class="card-body">
             <h2 class="card-title text-lg">
               图片
@@ -249,7 +249,7 @@ const selectedPresetCp = computed(() => {
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300" data-tour="create-variants">
+        <div class="card card-sm bg-base-100 border border-base-300" data-tour="create-variants">
           <div class="card-body">
             <h2 class="card-title text-lg">
               变体
@@ -265,7 +265,7 @@ const selectedPresetCp = computed(() => {
       </div>
 
       <div class="w-64 flex-shrink-0 space-y-6">
-        <div v-if="!showNoPreset" class="card bg-base-100 border border-base-300" data-tour="create-results">
+        <div v-if="!showNoPreset" class="card card-sm bg-base-100 border border-base-300" data-tour="create-results">
           <div class="card-body">
             <h2 class="card-title text-lg">
               计算结果
@@ -288,7 +288,7 @@ const selectedPresetCp = computed(() => {
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300" data-tour="create-preset-info">
+        <div class="card card-sm bg-base-100 border border-base-300" data-tour="create-preset-info">
           <div class="card-body">
             <h2 class="card-title text-lg">
               预设信息

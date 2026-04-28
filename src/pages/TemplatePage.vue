@@ -455,7 +455,7 @@ function deleteLookup(table) {
 </script>
 
 <template>
-  <div>
+  <div class="h-full flex flex-col overflow-hidden">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">
         模板
@@ -470,41 +470,47 @@ function deleteLookup(table) {
       </div>
     </div>
 
-    <div v-if="showNoConfig" class="text-center py-20 text-base-content/50">
-      <p class="mb-4">
-        请先打开配置 Excel 文件以开始使用。
-      </p>
-      <button class="btn btn-primary" @click="openConfigExcel">
-        打开配置 Excel
-      </button>
+    <div v-if="showNoConfig" class="flex-1 flex items-center justify-center text-base-content/50">
+      <div class="text-center">
+        <p class="mb-4">
+          请先打开配置 Excel 文件以开始使用。
+        </p>
+        <button class="btn btn-primary" @click="openConfigExcel">
+          打开配置 Excel
+        </button>
+      </div>
     </div>
 
-    <div v-else class="flex gap-6">
-      <div class="w-64 flex-shrink-0 space-y-4">
-        <div class="card bg-base-100 border border-base-300" data-tour="template-ruleset-list">
-          <div class="card-body p-3">
-            <h3 class="font-medium text-sm mb-1">
+    <div v-else class="flex-1 min-h-0 flex gap-3">
+      <div class="w-64 flex-shrink-0 min-h-0 flex flex-col gap-4">
+        <div class="card card-sm bg-base-100 border border-base-300 flex-1 min-h-0" data-tour="template-ruleset-list">
+          <div class="card-body flex-1 flex-col min-h-0 p-3">
+            <h3 class="font-medium text-sm mb-1 flex-shrink-0">
               规则集
             </h3>
-            <ul class="menu menu-vertical gap-0.5 w-full">
-              <li v-for="rs in configStore.config.ruleSets" :key="rs.ruleSetId">
-                <button
-                  :class="{ active: selectedRuleSetId === rs.ruleSetId }"
-                  @click="selectedRuleSetId = rs.ruleSetId; selectedRuleId = ''"
-                >
-                  {{ rs.name }}
-                </button>
-              </li>
-              <li v-if="configStore.config.ruleSets.length === 0">
-                <span class="text-base-content/50 text-xs">暂无规则集</span>
-              </li>
-            </ul>
+            <div class="flex-1 min-h-0 overflow-y-auto">
+              <ul class="menu menu-vertical gap-0.5 w-full">
+                <!-- <template v-for="i in 10"> -->
+                <li v-for="rs in configStore.config.ruleSets" :key="rs.ruleSetId">
+                  <button
+                    :class="{ active: selectedRuleSetId === rs.ruleSetId }"
+                    @click="selectedRuleSetId = rs.ruleSetId; selectedRuleId = ''"
+                  >
+                    {{ rs.name }}
+                  </button>
+                </li>
+                <!-- </template> -->
+                <li v-if="configStore.config.ruleSets.length === 0">
+                  <span class="text-base-content/50 text-xs">暂无规则集</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
-        <div v-if="selectedRuleSetId" class="card bg-base-100 border border-base-300" data-tour="template-rule-list">
-          <div class="card-body p-3">
-            <div class="flex justify-between items-center mb-1">
+        <div v-if="selectedRuleSetId" class="card card-sm bg-base-100 border border-base-300 flex-1 min-h-0" data-tour="template-rule-list">
+          <div class="card-body flex-1 flex-col min-h-0 p-3">
+            <div class="flex justify-between items-center mb-1 flex-shrink-0">
               <h3 class="font-medium text-sm">
                 规则
               </h3>
@@ -512,32 +518,36 @@ function deleteLookup(table) {
                 +
               </button>
             </div>
-            <ul class="menu menu-vertical gap-0.5 w-full">
-              <li v-for="r in ruleSetRules" :key="r.ruleId">
-                <button
-                  :class="{ active: selectedRuleId === r.ruleId }"
-                  @click="selectedRuleId = r.ruleId"
-                >
-                  <span class="text-xs">{{ r.description || r.ruleId }}</span>
-                </button>
-              </li>
-              <li v-if="ruleSetRules.length === 0">
-                <span class="text-base-content/50 text-xs">暂无规则</span>
-              </li>
-            </ul>
+            <div class="flex-1 min-h-0 overflow-y-auto">
+              <ul class="menu menu-vertical gap-0.5 w-full">
+                <!-- <template v-for="i in 10">  -->
+                <li v-for="r in ruleSetRules" :key="r.ruleId">
+                  <button
+                    :class="{ active: selectedRuleId === r.ruleId }"
+                    @click="selectedRuleId = r.ruleId"
+                  >
+                    <span class="text-xs">{{ r.description || r.ruleId }}</span>
+                  </button>
+                </li>
+                <!-- </template>  -->
+                <li v-if="ruleSetRules.length === 0">
+                  <span class="text-base-content/50 text-xs">暂无规则</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="flex-1 min-w-0">
-        <div v-if="!selectedRule" class="card bg-base-100 border border-base-300">
+      <div class="flex-1 min-w-0 min-h-0 flex flex-col">
+        <div v-if="!selectedRule" class="card card-sm bg-base-100 border border-base-300">
           <div class="card-body text-center py-20 text-base-content/50">
             请选择规则集和规则。
           </div>
         </div>
 
-        <div v-else>
-          <div data-tour="template-rule-detail" class="flex items-center justify-between mb-4">
+        <div v-else class="flex flex-col min-h-0 flex-1">
+          <div data-tour="template-rule-detail" class="flex items-center justify-between mb-4 flex-shrink-0">
             <div>
               <h2 class="text-lg font-bold">
                 {{ selectedRule.description || selectedRule.ruleId }}
@@ -556,7 +566,7 @@ function deleteLookup(table) {
             </div>
           </div>
 
-          <div class="tabs tabs-bordered mb-4" data-tour="template-tabs">
+          <div class="tabs tabs-bordered mb-4 flex-shrink-0" data-tour="template-tabs">
             <button
               class="tab"
               :class="{ 'tab-active': selectedTab === 'rules' }"
@@ -573,8 +583,8 @@ function deleteLookup(table) {
             </button>
           </div>
 
-          <div v-if="selectedTab === 'rules'" class="space-y-6">
-            <div class="card bg-base-100 border border-base-300" data-tour="template-condition-tree">
+          <div v-if="selectedTab === 'rules'" class="flex-1 min-h-0 overflow-y-auto space-y-6">
+            <div class="card card-sm bg-base-100 border border-base-300" data-tour="template-condition-tree">
               <div class="card-body">
                 <div class="flex justify-between items-center mb-3">
                   <h3 class="font-medium">
@@ -598,7 +608,7 @@ function deleteLookup(table) {
               </div>
             </div>
 
-            <div class="card bg-base-100 border border-base-300" data-tour="template-action-list">
+            <div class="card card-sm bg-base-100 border border-base-300" data-tour="template-action-list">
               <div class="card-body">
                 <div class="flex justify-between items-center mb-3">
                   <h3 class="font-medium">
@@ -631,10 +641,10 @@ function deleteLookup(table) {
             </div>
           </div>
 
-          <div v-if="selectedTab === 'lookups'" class="space-y-4">
-            <div class="flex gap-6">
-              <div class="w-64 flex-shrink-0">
-                <div class="card bg-base-100 border border-base-300" data-tour="template-lookup-list">
+          <div v-if="selectedTab === 'lookups'" class="flex-1 min-h-0">
+            <div class="flex gap-3 h-full">
+              <div class="w-64 flex-shrink-0 min-h-0 overflow-y-auto">
+                <div class="card card-sm bg-base-100 border border-base-300" data-tour="template-lookup-list">
                   <div class="card-body p-3">
                     <div class="flex justify-between items-center mb-1">
                       <h3 class="font-medium text-sm">
@@ -657,15 +667,15 @@ function deleteLookup(table) {
                   </div>
                 </div>
               </div>
-              <div class="flex-1">
-                <div v-if="!selectedLookupTable" class="card bg-base-100 border border-base-300">
+              <div class="flex-1 flex flex-col min-h-0">
+                <div v-if="!selectedLookupTable" class="card card-sm bg-base-100 border border-base-300">
                   <div class="card-body text-center py-20 text-base-content/50">
                     请选择一个查找表。
                   </div>
                 </div>
-                <div v-else class="card bg-base-100 border border-base-300">
-                  <div class="card-body">
-                    <div class="flex justify-between items-center mb-3">
+                <div v-else class="card card-sm bg-base-100 border border-base-300 flex-1 min-h-0">
+                  <div class="card-body flex-1 flex-col min-h-0">
+                    <div class="flex justify-between items-center mb-3 flex-shrink-0">
                       <div>
                         <h3 class="font-medium">
                           {{ selectedLookupTable.tableName }}
@@ -686,11 +696,11 @@ function deleteLookup(table) {
                     <div v-if="!selectedLookupTable.rows || selectedLookupTable.rows.length === 0" class="text-base-content/50 text-sm">
                       暂无数据行。
                     </div>
-                    <div v-else class="overflow-x-auto">
+                    <div v-else class="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
                       <table class="table table-sm">
                         <thead>
                           <tr>
-                            <th v-for="key in Object.keys(selectedLookupTable.rows[0])" :key="key">
+                            <th v-for="key in Object.keys(selectedLookupTable.rows[0])" :key="key" class="sticky top-0 bg-base-100 z-10">
                               {{ key }}
                             </th>
                           </tr>
