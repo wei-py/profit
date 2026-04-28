@@ -99,8 +99,8 @@ function performLookup(config, lookupTable, userInputs, results) {
     else if (mode === 'range') {
       let allInRange = true
       for (const [colPrefix, sourceField] of Object.entries(inputMap)) {
-        const minKey = `${colPrefix}_min`
-        const maxKey = `${colPrefix}_max`
+        const minKey = `${colPrefix}下限`
+        const maxKey = `${colPrefix}上限`
         const inputVal = sourceField in results
           ? results[sourceField]
           : sourceField in userInputs

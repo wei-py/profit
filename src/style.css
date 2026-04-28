@@ -94,3 +94,15 @@ body {
 * {
   box-sizing: border-box;
 }
+
+.driver-popover {
+  font-family: inherit;
+}
+.driver-popover button {
+  font-family: inherit;
+}
+
+.menu li > button.active {
+  border-left: 3px solid var(--color-primary);
+  padding-left: calc(0.75rem - 3px);
+}

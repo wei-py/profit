@@ -84,7 +84,7 @@ function hasImages(record) {
     </div>
 
     <div v-else>
-      <div v-if="listStore.filePath" class="text-sm text-base-content/60 mb-4">
+      <div v-if="listStore.filePath" data-tour="list-filepath" class="text-sm text-base-content/60 mb-4">
         文件：{{ listStore.filePath }}
       </div>
 
@@ -128,7 +128,7 @@ function hasImages(record) {
       </div>
     </div>
 
-    <div v-if="showDetailModal" class="modal modal-open">
+    <div v-if="showDetailModal" class="modal modal-open" data-tour="list-detail-modal">
       <div class="modal-box max-w-3xl">
         <h3 class="text-lg font-bold mb-4">
           记录详情

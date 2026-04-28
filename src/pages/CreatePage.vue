@@ -62,6 +62,19 @@ function handlePresetChange(e) {
   createStore.selectPreset(e.target.value)
   validationErrors.value = []
 }
+
+function formatPresetLabel(p) {
+  const cp = configStore.getCountryPlatform(p.cpId)
+  if (!cp)
+    return ''
+  return `(${cp.country} - ${cp.platform})`
+}
+
+const selectedPresetCp = computed(() => {
+  if (!createStore.selectedPreset?.cpId)
+    return null
+  return configStore.getCountryPlatform(createStore.selectedPreset.cpId)
+})
 </script>
 
 <template>
@@ -86,8 +99,8 @@ function handlePresetChange(e) {
       </button>
     </div>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-2 space-y-6">
+    <div v-else class="flex gap-6">
+      <div class="flex-1 min-w-0 space-y-6">
         <div class="card bg-base-100 border border-base-300">
           <div class="card-body">
             <h2 class="card-title text-lg">
@@ -107,7 +120,7 @@ function handlePresetChange(e) {
                 :key="p.presetId"
                 :value="p.presetId"
               >
-                {{ p.presetName }} {{ p.country ? `(${p.country})` : '' }} {{ p.platform ? `- ${p.platform}` : '' }}
+                {{ p.presetName }} {{ formatPresetLabel(p) }}
               </option>
             </select>
           </div>
@@ -213,7 +226,7 @@ function handlePresetChange(e) {
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300">
+        <div class="card bg-base-100 border border-base-300" data-tour="create-images">
           <div class="card-body">
             <h2 class="card-title text-lg">
               图片
@@ -236,7 +249,7 @@ function handlePresetChange(e) {
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300">
+        <div class="card bg-base-100 border border-base-300" data-tour="create-variants">
           <div class="card-body">
             <h2 class="card-title text-lg">
               变体
@@ -251,7 +264,7 @@ function handlePresetChange(e) {
         </div>
       </div>
 
-      <div class="space-y-6">
+      <div class="w-64 flex-shrink-0 space-y-6">
         <div v-if="!showNoPreset" class="card bg-base-100 border border-base-300" data-tour="create-results">
           <div class="card-body">
             <h2 class="card-title text-lg">
@@ -275,7 +288,7 @@ function handlePresetChange(e) {
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-300">
+        <div class="card bg-base-100 border border-base-300" data-tour="create-preset-info">
           <div class="card-body">
             <h2 class="card-title text-lg">
               预设信息
@@ -286,11 +299,11 @@ function handlePresetChange(e) {
             <div v-else-if="createStore.selectedPreset">
               <div class="text-sm space-y-1">
                 <div><strong>名称：</strong> {{ createStore.selectedPreset.presetName }}</div>
-                <div v-if="createStore.selectedPreset.country">
-                  <strong>国家：</strong> {{ createStore.selectedPreset.country }}
+                <div v-if="selectedPresetCp">
+                  <strong>国家：</strong> {{ selectedPresetCp.country }}
                 </div>
-                <div v-if="createStore.selectedPreset.platform">
-                  <strong>平台：</strong> {{ createStore.selectedPreset.platform }}
+                <div v-if="selectedPresetCp">
+                  <strong>平台：</strong> {{ selectedPresetCp.platform }}
                 </div>
                 <div><strong>规则集：</strong> {{ configStore.getRuleSet(createStore.selectedPreset.ruleSetId)?.name || createStore.selectedPreset.ruleSetId }}</div>
               </div>

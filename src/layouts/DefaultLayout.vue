@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import { useTour } from '@/composables/useTour'
@@ -10,6 +10,19 @@ const route = useRoute()
 const { isDark, toggleTheme } = useTheme()
 const { startTour } = useTour()
 
+const tooltipMap = {
+  preset: '预设管理：创建和管理利润计算预设，定义参数列表',
+  option: '选项分组：为选择型字段提供下拉选项，如颜色、尺寸',
+  template: '规则模板：配置条件树与动作，管理查找表',
+  create: '新建记录：选择预设填写参数，一键计算利润',
+  list: '记录列表：查看、编辑和删除已保存的记录',
+}
+
+const pageTooltip = computed(() => {
+  const name = typeof route.name === 'string' ? route.name : ''
+  return tooltipMap[name] || '利润工具：管理产品利润计算的配置与记录'
+})
+
 function getTourPageName() {
   const name = typeof route.name === 'string' ? route.name : ''
   return name === '/' ? 'preset' : name
@@ -18,7 +31,6 @@ function getTourPageName() {
 const navItems = [
   { path: '/preset', label: '预设', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
   { path: '/option', label: '选项', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
-  { path: '/field', label: '字段', icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01' },
   { path: '/template', label: '模板', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
   { path: '/create', label: '新建', icon: 'M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z' },
   { path: '/list', label: '列表', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
@@ -63,12 +75,18 @@ const sidebarCollapsed = ref(false)
           </svg>
           <span v-if="!sidebarCollapsed" class="ml-2">{{ isDark ? '浅色' : '深色' }}</span>
         </button>
-        <button class="btn btn-ghost w-full justify-start rounded-none mt-1" @click="startTour(getTourPageName())">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span v-if="!sidebarCollapsed" class="ml-2">帮助</span>
-        </button>
+        <div class="dropdown dropdown-top mt-1 w-full">
+          <button tabindex="0" role="button" class="btn btn-ghost w-full justify-start rounded-none">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span v-if="!sidebarCollapsed" class="ml-2">帮助</span>
+          </button>
+          <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[9999] w-52 p-2 shadow border border-base-300">
+            <li><button @click="startTour(getTourPageName())">当前页面引导</button></li>
+            <li><button @click="startTour('overview')">应用概览</button></li>
+          </ul>
+        </div>
       </div>
     </aside>
     <main class="flex-1 overflow-auto">
@@ -76,5 +94,11 @@ const sidebarCollapsed = ref(false)
         <router-view />
       </div>
     </main>
+
+    <div class="tooltip tooltip-left fixed bottom-4 right-4 z-50" :data-tip="pageTooltip">
+      <button class="btn btn-circle btn-primary btn-sm text-lg font-bold">
+        ?
+      </button>
+    </div>
   </div>
 </template>

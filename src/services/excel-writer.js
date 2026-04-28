@@ -22,8 +22,7 @@ export function buildConfigWorkbook(config) {
     const presetHeaders = [
       { key: 'preset_id', prop: 'presetId' },
       { key: 'preset_name', prop: 'presetName' },
-      { key: 'country', prop: 'country' },
-      { key: 'platform', prop: 'platform' },
+      { key: 'cp_id', prop: 'cpId' },
       { key: 'rule_set_id', prop: 'ruleSetId' },
       { key: 'enabled', prop: 'enabled' },
     ]
@@ -57,6 +56,18 @@ export function buildConfigWorkbook(config) {
       wb.SheetNames.push(name)
       wb.Sheets[name] = objectsToSheet(allParams, paramHeaders)
     }
+  }
+
+  if (config.countryPlatforms && config.countryPlatforms.length > 0) {
+    const cpHeaders = [
+      { key: 'cp_id', prop: 'cpId' },
+      { key: 'country', prop: 'country' },
+      { key: 'platform', prop: 'platform' },
+      { key: 'currency', prop: 'currency' },
+      { key: 'enabled', prop: 'enabled' },
+    ]
+    wb.SheetNames.push('country_platforms')
+    wb.Sheets.country_platforms = objectsToSheet(config.countryPlatforms, cpHeaders)
   }
 
   if (config.optionGroups && config.optionGroups.length > 0) {

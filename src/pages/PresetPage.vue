@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import EditableTable from '@/components/common/EditableTable.vue'
 import { useFileIO } from '@/composables/useFileIO'
 import { useConfigStore } from '@/stores/config'
@@ -12,30 +12,87 @@ const searchQuery = ref('')
 const selectedPresetId = ref('')
 const showPresetModal = ref(false)
 const editingPreset = ref(null)
-const presetForm = ref({ presetName: '', country: '', platform: '', ruleSetId: '', enabled: true })
+const presetForm = ref({ presetName: '', cpId: '', ruleSetId: '', enabled: true })
 const presetErrors = ref([])
+
+const showCpModal = ref(false)
+
+const cpColumns = [
+  { key: 'country', prop: 'country', label: '国家' },
+  { key: 'platform', prop: 'platform', label: '平台' },
+  { key: 'currency', prop: 'currency', label: '货币' },
+  { key: 'enabled', prop: 'enabled', label: '启用', type: 'boolean' },
+]
 
 const showNoConfig = computed(() => !configStore.loaded)
 
+const CACHE_PRESET_KEY = 'profit-selected-preset-id'
+
+onMounted(() => {
+  if (!configStore.loaded)
+    return
+  const cached = localStorage.getItem(CACHE_PRESET_KEY)
+  if (cached && configStore.config.presets.some(p => p.presetId === cached)) {
+    selectedPresetId.value = cached
+  }
+})
+
+watch(selectedPresetId, (val) => {
+  localStorage.setItem(CACHE_PRESET_KEY, val)
+})
+
+const cpOptions = computed(() =>
+  configStore.enabledCountryPlatforms.map(cp => ({
+    value: cp.cpId,
+    label: `${cp.country} (${cp.platform})`,
+  })),
+)
+
+const presetCpMap = computed(() => {
+  const map = {}
+  for (const p of configStore.config.presets) {
+    if (p.cpId) {
+      const cp = configStore.getCountryPlatform(p.cpId)
+      if (cp) {
+        map[p.presetId] = cp
+      }
+    }
+  }
+  return map
+})
+
 const filteredPresets = computed(() => {
   const q = searchQuery.value.toLowerCase()
-  return configStore.config.presets.filter(p =>
-    !q
-    || p.presetName.toLowerCase().includes(q)
-    || (p.country || '').toLowerCase().includes(q)
-    || (p.platform || '').toLowerCase().includes(q),
-  )
+  if (!q)
+    return configStore.config.presets
+  return configStore.config.presets.filter((p) => {
+    if (p.presetName.toLowerCase().includes(q))
+      return true
+    const cp = presetCpMap.value[p.presetId]
+    if (cp) {
+      if (cp.country.toLowerCase().includes(q))
+        return true
+      if (cp.platform.toLowerCase().includes(q))
+        return true
+    }
+    return false
+  })
 })
 
 const selectedPreset = computed(() =>
   configStore.config.presets.find(p => p.presetId === selectedPresetId.value),
 )
 
+const selectedPresetCp = computed(() => {
+  if (!selectedPreset.value?.cpId)
+    return null
+  return configStore.getCountryPlatform(selectedPreset.value.cpId)
+})
+
 const paramColumns = [
   { key: 'paramName', prop: 'paramName', label: '名称' },
   { key: 'type', prop: 'type', label: '类型' },
   { key: 'unit', prop: 'unit', label: '单位' },
-  { key: 'fieldKey', prop: 'fieldKey', label: '字段键' },
   { key: 'optionGroupId', prop: 'optionGroupId', label: '选项组' },
   { key: 'defaultValue', prop: 'defaultValue', label: '默认值' },
   { key: 'sort', prop: 'sort', label: '排序', type: 'number' },
@@ -44,14 +101,19 @@ const paramColumns = [
 
 function openNewPreset() {
   editingPreset.value = null
-  presetForm.value = { presetName: '', country: '', platform: '', ruleSetId: '', enabled: true }
+  presetForm.value = { presetName: '', cpId: '', ruleSetId: '', enabled: true }
   presetErrors.value = []
   showPresetModal.value = true
 }
 
 function openEditPreset(preset) {
   editingPreset.value = preset
-  presetForm.value = { ...preset }
+  presetForm.value = {
+    presetName: preset.presetName,
+    cpId: preset.cpId || '',
+    ruleSetId: preset.ruleSetId,
+    enabled: preset.enabled,
+  }
   presetErrors.value = []
   showPresetModal.value = true
 }
@@ -64,13 +126,19 @@ function savePreset() {
   }
 
   if (editingPreset.value) {
-    Object.assign(editingPreset.value, presetForm.value)
+    editingPreset.value.presetName = presetForm.value.presetName
+    editingPreset.value.cpId = presetForm.value.cpId
+    editingPreset.value.ruleSetId = presetForm.value.ruleSetId
+    editingPreset.value.enabled = presetForm.value.enabled
   }
   else {
     const id = `preset_${Date.now()}`
     configStore.config.presets.push({
       presetId: id,
-      ...presetForm.value,
+      presetName: presetForm.value.presetName,
+      cpId: presetForm.value.cpId,
+      ruleSetId: presetForm.value.ruleSetId,
+      enabled: presetForm.value.enabled,
       params: [],
     })
   }
@@ -138,6 +206,46 @@ function handleFillDefaults() {
     }
   }
 }
+
+function openCpModal() {
+  showCpModal.value = true
+}
+
+function handleCpAdd() {
+  const id = `cp_${String(configStore.config.countryPlatforms.length + 1).padStart(3, '0')}`
+  configStore.config.countryPlatforms.push({
+    cpId: id,
+    country: '',
+    platform: '',
+    currency: '',
+    enabled: true,
+  })
+}
+
+function handleCpUpdate(row) {
+  const idx = configStore.config.countryPlatforms.findIndex(cp => cp.cpId === row.cpId)
+  if (idx !== -1) {
+    configStore.config.countryPlatforms[idx] = row
+  }
+}
+
+const cpDeleteConfirm = ref(null)
+
+function handleCpDelete(row) {
+  cpDeleteConfirm.value = row
+}
+
+function confirmCpDelete() {
+  if (!cpDeleteConfirm.value)
+    return
+  const row = cpDeleteConfirm.value
+  configStore.config.countryPlatforms = configStore.config.countryPlatforms.filter(cp => cp.cpId !== row.cpId)
+  cpDeleteConfirm.value = null
+}
+
+function cancelCpDelete() {
+  cpDeleteConfirm.value = null
+}
 </script>
 
 <template>
@@ -150,12 +258,17 @@ function handleFillDefaults() {
         <button v-if="showNoConfig" class="btn btn-primary btn-sm" @click="openConfigExcel">
           打开配置
         </button>
-        <button v-else class="btn btn-primary btn-sm" @click="openNewPreset">
-          + 新建预设
-        </button>
-        <button v-if="!showNoConfig" class="btn btn-ghost btn-sm" @click="saveConfigExcel">
-          保存配置
-        </button>
+        <template v-else>
+          <button class="btn btn-ghost btn-sm" @click="openCpModal">
+            国家平台
+          </button>
+          <button class="btn btn-primary btn-sm" @click="openNewPreset">
+            + 新建预设
+          </button>
+          <button class="btn btn-ghost btn-sm" @click="saveConfigExcel">
+            保存配置
+          </button>
+        </template>
       </div>
     </div>
 
@@ -168,10 +281,10 @@ function handleFillDefaults() {
       </button>
     </div>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-1">
+    <div v-else class="flex gap-6">
+      <div class="w-64 flex-shrink-0 space-y-4">
         <div class="card bg-base-100 border border-base-300" data-tour="preset-list">
-          <div class="card-body">
+          <div class="card-body p-3">
             <input
               v-model="searchQuery"
               data-tour="preset-search"
@@ -179,7 +292,7 @@ function handleFillDefaults() {
               class="input input-bordered input-sm w-full"
               placeholder="搜索预设..."
             >
-            <ul class="menu menu-vertical gap-0.5 mt-2 max-h-96 overflow-auto">
+            <ul class="menu menu-vertical gap-0.5 mt-2 max-h-96 overflow-auto w-full">
               <li v-for="p in filteredPresets" :key="p.presetId">
                 <button
                   :class="{ active: selectedPresetId === p.presetId }"
@@ -187,7 +300,7 @@ function handleFillDefaults() {
                 >
                   <div class="flex justify-between items-center w-full">
                     <span>{{ p.presetName }}</span>
-                    <span class="text-xs opacity-60">{{ p.country }}</span>
+                    <span class="text-xs opacity-60">{{ presetCpMap[p.presetId]?.country || '' }}</span>
                   </div>
                 </button>
               </li>
@@ -199,7 +312,7 @@ function handleFillDefaults() {
         </div>
       </div>
 
-      <div class="lg:col-span-2">
+      <div class="flex-1 min-w-0">
         <div v-if="!selectedPreset" class="card bg-base-100 border border-base-300">
           <div class="card-body text-center py-20 text-base-content/50">
             请从左侧选择一个预设，或新建一个预设。
@@ -208,13 +321,18 @@ function handleFillDefaults() {
 
         <div v-else class="card bg-base-100 border border-base-300" data-tour="preset-param-table">
           <div class="card-body">
-            <div class="flex items-center justify-between mb-4">
+            <div data-tour="preset-detail-header" class="flex items-center justify-between mb-4">
               <div>
                 <h2 class="text-lg font-bold">
                   {{ selectedPreset.presetName }}
                 </h2>
                 <p class="text-sm text-base-content/60">
-                  {{ selectedPreset.country }} / {{ selectedPreset.platform }}
+                  <template v-if="selectedPresetCp">
+                    {{ selectedPresetCp.country }} / {{ selectedPresetCp.platform }}
+                  </template>
+                  <template v-else>
+                    未设置国家平台
+                  </template>
                 </p>
               </div>
               <div class="flex gap-1">
@@ -231,7 +349,7 @@ function handleFillDefaults() {
               <h3 class="font-medium">
                 参数
               </h3>
-              <button class="btn btn-ghost btn-xs" @click="handleFillDefaults">
+              <button data-tour="preset-fill-defaults" class="btn btn-ghost btn-xs" @click="handleFillDefaults">
                 补全默认参数
               </button>
             </div>
@@ -249,7 +367,7 @@ function handleFillDefaults() {
       </div>
     </div>
 
-    <div v-if="showPresetModal" class="modal modal-open">
+    <div v-if="showPresetModal" class="modal modal-open" data-tour="preset-edit-modal">
       <div class="modal-box">
         <h3 class="text-lg font-bold mb-4">
           {{ editingPreset ? '编辑' : '新建' }}预设
@@ -262,14 +380,20 @@ function handleFillDefaults() {
             <label class="label text-xs pb-1">名称</label>
             <input v-model="presetForm.presetName" type="text" class="input input-bordered w-full">
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="label text-xs pb-1">国家</label>
-              <input v-model="presetForm.country" type="text" class="input input-bordered w-full">
-            </div>
-            <div>
-              <label class="label text-xs pb-1">平台</label>
-              <input v-model="presetForm.platform" type="text" class="input input-bordered w-full">
+          <div>
+            <label class="label text-xs pb-1">国家平台</label>
+            <div class="flex gap-1">
+              <select v-model="presetForm.cpId" class="select select-bordered flex-1">
+                <option value="">
+                  -- 请选择 --
+                </option>
+                <option v-for="opt in cpOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+              <button class="btn btn-ghost btn-sm" title="新建国家平台" @click="openCpModal">
+                +
+              </button>
             </div>
           </div>
           <div>
@@ -298,6 +422,48 @@ function handleFillDefaults() {
         </div>
       </div>
       <div class="modal-backdrop" @click="showPresetModal = false" />
+    </div>
+
+    <div v-if="showCpModal" class="modal modal-open">
+      <div class="modal-box max-w-lg">
+        <h3 class="text-lg font-bold mb-4">
+          国家平台管理
+        </h3>
+        <EditableTable
+          :columns="cpColumns"
+          :rows="configStore.config.countryPlatforms"
+          id-key="cpId"
+          @add="handleCpAdd"
+          @update="handleCpUpdate"
+          @delete="handleCpDelete"
+        />
+        <div class="modal-action">
+          <button class="btn btn-ghost btn-sm" @click="showCpModal = false">
+            关闭
+          </button>
+        </div>
+
+        <div v-if="cpDeleteConfirm" class="modal modal-open">
+          <div class="modal-box">
+            <h3 class="text-lg font-bold mb-4">
+              确认删除
+            </h3>
+            <p class="text-sm">
+              有 {{ configStore.config.presets.filter(p => p.cpId === cpDeleteConfirm.cpId).length }} 个预设引用了「{{ cpDeleteConfirm.country }} ({{ cpDeleteConfirm.platform }})」，删除后这些预设的国家平台将变为空。确认删除？
+            </p>
+            <div class="modal-action">
+              <button class="btn btn-ghost btn-sm" @click="cancelCpDelete">
+                取消
+              </button>
+              <button class="btn btn-error btn-sm" @click="confirmCpDelete">
+                确认删除
+              </button>
+            </div>
+          </div>
+          <div class="modal-backdrop" @click="cancelCpDelete" />
+        </div>
+      </div>
+      <div class="modal-backdrop" @click="showCpModal = false" />
     </div>
   </div>
 </template>

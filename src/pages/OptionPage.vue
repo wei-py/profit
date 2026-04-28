@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import EditableTable from '@/components/common/EditableTable.vue'
 import { useFileIO } from '@/composables/useFileIO'
 import { useConfigStore } from '@/stores/config'
@@ -15,6 +15,21 @@ const groupForm = ref({ groupName: '', description: '' })
 const groupErrors = ref([])
 
 const showNoConfig = computed(() => !configStore.loaded)
+
+const CACHE_GROUP_KEY = 'profit-selected-group-id'
+
+onMounted(() => {
+  if (!configStore.loaded)
+    return
+  const cached = localStorage.getItem(CACHE_GROUP_KEY)
+  if (cached && configStore.config.optionGroups.some(g => g.groupId === cached)) {
+    selectedGroupId.value = cached
+  }
+})
+
+watch(selectedGroupId, (val) => {
+  localStorage.setItem(CACHE_GROUP_KEY, val)
+})
 
 const selectedGroup = computed(() =>
   configStore.config.optionGroups.find(g => g.groupId === selectedGroupId.value),
@@ -132,14 +147,14 @@ function handleItemDelete(row) {
       </button>
     </div>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="lg:col-span-1">
+    <div v-else class="flex gap-6">
+      <div class="w-64 flex-shrink-0 space-y-4">
         <div class="card bg-base-100 border border-base-300" data-tour="option-group-list">
-          <div class="card-body">
-            <h2 class="card-title text-base mb-2">
+          <div class="card-body p-3">
+            <h3 class="font-medium text-sm mb-1">
               分组
-            </h2>
-            <ul class="menu menu-vertical gap-0.5 max-h-96 overflow-auto">
+            </h3>
+            <ul class="menu menu-vertical gap-0.5 max-h-96 overflow-auto w-full">
               <li v-for="g in configStore.config.optionGroups" :key="g.groupId">
                 <button
                   :class="{ active: selectedGroupId === g.groupId }"
@@ -156,7 +171,7 @@ function handleItemDelete(row) {
         </div>
       </div>
 
-      <div class="lg:col-span-2">
+      <div class="flex-1 min-w-0">
         <div v-if="!selectedGroup" class="card bg-base-100 border border-base-300">
           <div class="card-body text-center py-20 text-base-content/50">
             请选择一个分组，或新建一个分组。
@@ -165,7 +180,7 @@ function handleItemDelete(row) {
 
         <div v-else class="card bg-base-100 border border-base-300" data-tour="option-item-table">
           <div class="card-body">
-            <div class="flex items-center justify-between mb-4">
+            <div data-tour="option-detail-header" class="flex items-center justify-between mb-4">
               <div>
                 <h2 class="text-lg font-bold">
                   {{ selectedGroup.groupName }}
@@ -197,7 +212,7 @@ function handleItemDelete(row) {
       </div>
     </div>
 
-    <div v-if="showGroupModal" class="modal modal-open">
+    <div v-if="showGroupModal" class="modal modal-open" data-tour="option-edit-modal">
       <div class="modal-box">
         <h3 class="text-lg font-bold mb-4">
           {{ editingGroup ? '编辑' : '新建' }}分组

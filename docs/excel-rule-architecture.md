@@ -176,18 +176,17 @@ sequenceDiagram
 
 示例业务：
 
-1. `listing_type = premium`
-2. `sale_price` 在 `150 ~ 700`
-3. `category = beauty or personal_care`
+1. `刊登类型 = premium`
+2. `售价` 在 `150 ~ 700`
+3. `类目 = beauty or personal_care`
 
 ```mermaid
 flowchart TD
     ROOT[AND 根组]
-    C1[listing_type = premium]
-    C2[sale_price between 150 and 700]
-    OR1[OR 子组]
-    C3[category = beauty]
-    C4[category = personal_care]
+    C1[刊登类型 = premium]
+    C2[售价 between 150 and 700]
+    C3[类目 = beauty]
+    C4[类目 = personal_care]
 
     ROOT --> C1
     ROOT --> C2
@@ -238,10 +237,10 @@ flowchart LR
 
 理解方式：
 
-1. 输入 `listing_type`
-2. 输入 `category`
+1. 输入 `刊登类型`
+2. 输入 `类目`
 3. 去 `commission_table` 命中一行
-4. 输出 `commission_rate`
+4. 输出 `销售费率`
 
 ### 例子 2：运费
 
@@ -253,10 +252,10 @@ flowchart LR
 
 理解方式：
 
-1. 输入 `sale_price`
-2. 输入 `shipping_weight`
+1. 输入 `售价`
+2. 输入 `重量`
 3. 去 `shipping_cost_table` 找区间
-4. 输出 `shipping_fee`
+4. 输出 `运费`
 
 ### 例子 3：卖家支付运费
 
@@ -268,7 +267,7 @@ flowchart LR
 
 理解方式：
 
-1. 如果 `is_free_shipping = true`
+1. 如果 `是否包邮 = true`
 2. 直接输出 `0`
 3. 否则去 `shipping_cost_table` 查值
 

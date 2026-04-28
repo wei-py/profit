@@ -187,13 +187,13 @@
 
 1. 费率可以来自表
 2. 适合等值匹配
-3. 可以按 `listing_type + category` 这类维度查值
+3. 可以按 `刊登类型 + 类目` 这类维度查值
 
 示例列可以是：
 
-1. `listing_type`
-2. `category`
-3. `output_value`
+1. `刊登类型`
+2. `类目`
+3. `输出值`
 4. `note`
 
 ### `shipping_cost_table`
@@ -204,15 +204,15 @@
 
 1. 运费可以来自表
 2. 适合区间匹配
-3. 可以按 `sale_price + shipping_weight` 这类维度查值
+3. 可以按 `售价 + 重量` 这类维度查值
 
 示例列可以是：
 
-1. `range_1_min`
-2. `range_1_max`
-3. `range_2_min`
-4. `range_2_max`
-5. `output_value`
+1. `范围1下限`
+2. `范围1上限`
+3. `范围2下限`
+4. `范围2上限`
+5. `输出值`
 6. `note`
 
 ## 3 个例子到底怎么跑
@@ -235,8 +235,8 @@
 
 1. 命中规则
 2. 执行 `lookup`
-3. 用 `listing_type` 和 `category` 查表
-4. 把结果写到 `commission_rate`
+3. 用 `刊登类型` 和 `类目` 查表
+4. 把结果写到 `销售费率`
 
 ### 例子 2：运费
 
@@ -256,8 +256,8 @@
 
 1. 命中规则
 2. 执行 `lookup`
-3. 用 `sale_price` 和 `shipping_weight` 找区间
-4. 把结果写到 `shipping_fee`
+3. 用 `售价` 和 `重量` 找区间
+4. 把结果写到 `运费`
 
 ### 例子 3：卖家支付运费
 
@@ -287,10 +287,10 @@
 
 业务意思：
 
-1. `listing_type = premium`
-2. `sale_price` 在 `150 ~ 700`
-3. `category = beauty or personal_care`
-4. 命中后设置 `fixed_additional_fee = 6.25`
+1. `刊登类型 = premium`
+2. `售价` 在 `150 ~ 700`
+3. `类目 = beauty or personal_care`
+4. 命中后设置 `固定附加费 = 6.25`
 
 它对应：
 

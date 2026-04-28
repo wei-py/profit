@@ -16,6 +16,7 @@ export const useConfigStore = defineStore('config', () => {
     ruleSets: [],
     rules: [],
     lookupTables: [],
+    countryPlatforms: [],
   })
 
   const loaded = computed(() => workbook.value !== null)
@@ -52,6 +53,45 @@ export const useConfigStore = defineStore('config', () => {
     return config.value.rules.filter(r => r.ruleSetId === String(ruleSetId))
   }
 
+  function getCountryPlatform(cpId) {
+    return config.value.countryPlatforms.find(cp => cp.cpId === String(cpId))
+  }
+
+  const enabledCountryPlatforms = computed(() =>
+    config.value.countryPlatforms.filter(cp => cp.enabled),
+  )
+
+  function migratePresetCountries() {
+    const presetsWithCountry = config.value.presets.filter(p => p.country && !p.cpId)
+    if (presetsWithCountry.length === 0)
+      return
+
+    const seen = new Map()
+    for (const cp of config.value.countryPlatforms) {
+      seen.set(`${cp.country}||${cp.platform}`, cp.cpId)
+    }
+
+    let nextIdx = config.value.countryPlatforms.length
+    for (const p of presetsWithCountry) {
+      const key = `${p.country}||${p.platform}`
+      let cpId = seen.get(key)
+      if (!cpId) {
+        cpId = `cp_${String(++nextIdx).padStart(3, '0')}`
+        config.value.countryPlatforms.push({
+          cpId,
+          country: p.country,
+          platform: p.platform,
+          currency: '',
+          enabled: true,
+        })
+        seen.set(key, cpId)
+      }
+      p.cpId = cpId
+      delete p.country
+      delete p.platform
+    }
+  }
+
   function loadFromBuffer(buffer, path) {
     loading.value = true
     error.value = ''
@@ -60,6 +100,7 @@ export const useConfigStore = defineStore('config', () => {
       config.value = data
       filePath.value = path || ''
       workbook.value = buffer
+      migratePresetCountries()
     }
     catch (e) {
       error.value = e.message || '加载配置失败'
@@ -89,6 +130,7 @@ export const useConfigStore = defineStore('config', () => {
       ruleSets: [],
       rules: [],
       lookupTables: [],
+      countryPlatforms: [],
     }
   }
 
@@ -103,13 +145,16 @@ export const useConfigStore = defineStore('config', () => {
     outputFields,
     enabledPresets,
     enabledRules,
+    enabledCountryPlatforms,
     getOptionGroup,
     getField,
     getRuleSet,
     getRulesByRuleSet,
+    getCountryPlatform,
     loadFromBuffer,
     getExportBuffer,
     setFilePath,
     clear,
+    migratePresetCountries,
   }
 })

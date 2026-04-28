@@ -20,6 +20,8 @@ export function validatePreset(preset) {
     errs.push('预设名称不能为空')
   if (!preset.ruleSetId)
     errs.push('规则集不能为空')
+  if (!preset.cpId)
+    errs.push('国家平台不能为空')
   return errs
 }
 

@@ -109,6 +109,7 @@ export function readConfigWorkbook(wb) {
     ruleSets: [],
     rules: [],
     lookupTables: [],
+    countryPlatforms: [],
   }
 
   const opGroupsWs = findSheet(wb, ['option_groups', 'optionGroups'])
@@ -246,6 +247,17 @@ export function readConfigWorkbook(wb) {
     })
   }
 
+  const countryPlatformsWs = findSheet(wb, ['country_platforms', 'countryPlatforms'])
+  if (countryPlatformsWs) {
+    result.countryPlatforms = sheetToObjects(countryPlatformsWs).map(r => ({
+      cpId: String(r.cp_id ?? ''),
+      country: r.country || '',
+      platform: r.platform || '',
+      currency: r.currency || '',
+      enabled: normalizeBoolean(r.enabled ?? true),
+    }))
+  }
+
   const presetsWs = findSheet(wb, ['presets'])
   const presetParamsWs = findSheet(wb, ['preset_params', 'presetParams'])
 
@@ -272,6 +284,7 @@ export function readConfigWorkbook(wb) {
       return {
         presetId: pid,
         presetName: r.preset_name || '',
+        cpId: r.cp_id ? String(r.cp_id) : '',
         country: r.country || '',
         platform: r.platform || '',
         ruleSetId: String(r.rule_set_id ?? ''),

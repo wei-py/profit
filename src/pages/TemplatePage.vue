@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import ActionEditor from '@/components/common/ActionEditor.vue'
 import TreeView from '@/components/common/TreeView.vue'
 import { useFileIO } from '@/composables/useFileIO'
@@ -15,6 +15,45 @@ const selectedRuleId = ref('')
 
 const selectedTab = ref('rules')
 const selectedLookupTableId = ref('')
+
+const CACHE_RULESET_KEY = 'profit-selected-rule-set-id'
+const CACHE_RULE_KEY = 'profit-selected-rule-id'
+const CACHE_TAB_KEY = 'profit-selected-tab'
+const CACHE_LOOKUP_KEY = 'profit-selected-lookup-table-id'
+
+onMounted(() => {
+  if (!configStore.loaded)
+    return
+  const cachedRuleSetId = localStorage.getItem(CACHE_RULESET_KEY)
+  if (cachedRuleSetId && configStore.config.ruleSets.some(rs => rs.ruleSetId === cachedRuleSetId)) {
+    selectedRuleSetId.value = cachedRuleSetId
+  }
+  const cachedRuleId = localStorage.getItem(CACHE_RULE_KEY)
+  if (cachedRuleId && configStore.config.rules.some(r => r.ruleId === cachedRuleId)) {
+    selectedRuleId.value = cachedRuleId
+  }
+  const cachedTab = localStorage.getItem(CACHE_TAB_KEY)
+  if (cachedTab === 'rules' || cachedTab === 'lookups') {
+    selectedTab.value = cachedTab
+  }
+  const cachedLookupId = localStorage.getItem(CACHE_LOOKUP_KEY)
+  if (cachedLookupId && configStore.config.lookupTables.some(t => t.tableId === cachedLookupId)) {
+    selectedLookupTableId.value = cachedLookupId
+  }
+})
+
+watch(selectedRuleSetId, (val) => {
+  localStorage.setItem(CACHE_RULESET_KEY, val)
+})
+watch(selectedRuleId, (val) => {
+  localStorage.setItem(CACHE_RULE_KEY, val)
+})
+watch(selectedTab, (val) => {
+  localStorage.setItem(CACHE_TAB_KEY, val)
+})
+watch(selectedLookupTableId, (val) => {
+  localStorage.setItem(CACHE_LOOKUP_KEY, val)
+})
 
 const showRuleModal = ref(false)
 const editingRule = ref(null)
@@ -447,7 +486,7 @@ function deleteLookup(table) {
             <h3 class="font-medium text-sm mb-1">
               规则集
             </h3>
-            <ul class="menu menu-vertical gap-0.5">
+            <ul class="menu menu-vertical gap-0.5 w-full">
               <li v-for="rs in configStore.config.ruleSets" :key="rs.ruleSetId">
                 <button
                   :class="{ active: selectedRuleSetId === rs.ruleSetId }"
@@ -473,7 +512,7 @@ function deleteLookup(table) {
                 +
               </button>
             </div>
-            <ul class="menu menu-vertical gap-0.5">
+            <ul class="menu menu-vertical gap-0.5 w-full">
               <li v-for="r in ruleSetRules" :key="r.ruleId">
                 <button
                   :class="{ active: selectedRuleId === r.ruleId }"
@@ -498,7 +537,7 @@ function deleteLookup(table) {
         </div>
 
         <div v-else>
-          <div class="flex items-center justify-between mb-4">
+          <div data-tour="template-rule-detail" class="flex items-center justify-between mb-4">
             <div>
               <h2 class="text-lg font-bold">
                 {{ selectedRule.description || selectedRule.ruleId }}
@@ -545,15 +584,17 @@ function deleteLookup(table) {
                     + 根分组
                   </button>
                 </div>
-                <TreeView
-                  :tree="buildTreeFromGroups(selectedRule.conditionGroups, selectedRule.allConditions)"
-                  :editable="true"
-                  @edit-group="openEditGroup"
-                  @edit-condition="openEditCondition"
-                  @add-child="openNewGroup"
-                  @delete-group="deleteGroup"
-                  @delete-condition="deleteCondition"
-                />
+                <div data-tour="template-condition-detail">
+                  <TreeView
+                    :tree="buildTreeFromGroups(selectedRule.conditionGroups, selectedRule.allConditions)"
+                    :editable="true"
+                    @edit-group="openEditGroup"
+                    @edit-condition="openEditCondition"
+                    @add-child="openNewGroup"
+                    @delete-group="deleteGroup"
+                    @delete-condition="deleteCondition"
+                  />
+                </div>
               </div>
             </div>
 
@@ -570,7 +611,7 @@ function deleteLookup(table) {
                 <div v-if="selectedRule.actions.length === 0" class="text-base-content/50 text-sm py-2">
                   暂无动作
                 </div>
-                <div v-else class="space-y-3">
+                <div v-else class="space-y-3" data-tour="template-action-detail">
                   <div v-for="action in selectedRule.actions" :key="action.actionId">
                     <div class="flex items-center gap-2 mb-1">
                       <span class="badge badge-outline">{{ actionTypeLabel(action.actionType) }}</span>
@@ -603,7 +644,7 @@ function deleteLookup(table) {
                         +
                       </button>
                     </div>
-                    <ul class="menu menu-vertical gap-0.5">
+                    <ul class="menu menu-vertical gap-0.5 w-full">
                       <li v-for="t in configStore.config.lookupTables" :key="t.tableId">
                         <button
                           :class="{ active: selectedLookupTableId === t.tableId }"
