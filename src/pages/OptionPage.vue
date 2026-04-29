@@ -22,6 +22,8 @@ const groupErrors = ref([])
 /** 是否显示无配置提示 */
 const showNoConfig = computed(() => !configStore.loaded)
 
+const CACHE_GROUP_KEY = 'profit-selected-group-id'
+
 /**
  * 为所有选项项补充 _uid 唯一标识。
  */
