@@ -38,13 +38,14 @@ export function useFileIO() {
           const bytes = await readFile(path)
           configStore.loadFromBuffer(bytes, path)
         }
-        catch {
+        catch (e) {
+          console.error('restoreLastPath: failed to read file', path, e)
           configStore.setFilePath(path)
         }
       }
     }
-    catch {
-      // ignore if store not available
+    catch (e) {
+      console.error('restoreLastPath: store unavailable', e)
     }
   }
 
@@ -66,49 +67,61 @@ export function useFileIO() {
 
   /**
    * 打开系统文件对话框选择配置 Excel 并加载。
-   * @returns {Promise<boolean>} 是否成功
+   * @returns {Promise<{ success: boolean, error?: string }>} 操作结果
    */
   async function openConfigExcel() {
-    const selected = await open({
-      title: '打开配置 Excel',
-      filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
-      multiple: false,
-    })
+    try {
+      const selected = await open({
+        title: '打开配置 Excel',
+        filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
+        multiple: false,
+      })
 
-    if (!selected)
-      return false
+      if (!selected)
+        return { success: false }
 
-    const path = typeof selected === 'string' ? selected : selected.path
-    const bytes = await readFile(path)
-    configStore.loadFromBuffer(bytes, path)
-    await saveLastPath(path)
-    return true
+      const path = typeof selected === 'string' ? selected : selected.path
+      const bytes = await readFile(path)
+      configStore.loadFromBuffer(bytes, path)
+      await saveLastPath(path)
+      return { success: true }
+    }
+    catch (e) {
+      console.error('openConfigExcel failed:', e)
+      return { success: false, error: String(e) }
+    }
   }
 
   /**
    * 保存配置 Excel，若未设置路径则弹出保存对话框。
-   * @returns {Promise<boolean>} 是否成功
+   * @returns {Promise<{ success: boolean, error?: string }>} 操作结果
    */
   async function saveConfigExcel() {
     if (!configStore.loaded)
-      return false
+      return { success: false, error: '没有已加载的配置' }
 
-    let path = configStore.filePath
-    if (!path) {
-      const selected = await save({
-        title: '保存配置 Excel',
-        filters: [{ name: 'Excel', extensions: ['xlsx'] }],
-      })
-      if (!selected)
-        return false
-      path = selected
+    try {
+      let path = configStore.filePath
+      if (!path) {
+        const selected = await save({
+          title: '保存配置 Excel',
+          filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+        })
+        if (!selected)
+          return { success: false }
+        path = selected
+      }
+
+      const buffer = configStore.getExportBuffer()
+      await writeFile(path, buffer)
+      configStore.setFilePath(path)
+      await saveLastPath(path)
+      return { success: true }
     }
-
-    const buffer = configStore.getExportBuffer()
-    await writeFile(path, buffer)
-    configStore.setFilePath(path)
-    await saveLastPath(path)
-    return true
+    catch (e) {
+      console.error('saveConfigExcel failed:', e)
+      return { success: false, error: String(e) }
+    }
   }
 
   /**

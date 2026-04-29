@@ -159,6 +159,15 @@ function openNewPreset() {
   showPresetModal.value = true
 }
 
+/** 保存配置并显示操作结果反馈。 */
+async function handleSaveConfig() {
+  const result = await saveConfigExcel()
+  if (!result.success) {
+    // eslint-disable-next-line no-alert
+    alert(`保存失败${result.error ? `: ${result.error}` : ''}`)
+  }
+}
+
 /**
  * 打开编辑预设弹窗。
  * @param {object} preset - 待编辑的预设对象
@@ -350,7 +359,7 @@ function cancelCpDelete() {
           <button class="btn btn-primary btn-sm" @click="openNewPreset">
             + 新建预设
           </button>
-          <button class="btn btn-ghost btn-sm" @click="saveConfigExcel">
+          <button class="btn btn-ghost btn-sm" @click="handleSaveConfig">
             保存配置
           </button>
         </template>

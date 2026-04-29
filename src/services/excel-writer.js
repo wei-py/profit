@@ -190,12 +190,12 @@ export function buildConfigWorkbook(config) {
     }
     if (allActions.length > 0) {
       const actHeaders = [
-        { key: 'action_id', prop: 'action_id' },
-        { key: 'rule_id', prop: 'rule_id' },
+        { key: 'action_id', prop: 'actionId' },
+        { key: 'rule_id', prop: 'ruleId' },
         { key: 'sort', prop: 'sort' },
-        { key: 'action_type', prop: 'action_type' },
-        { key: 'target_field', prop: 'target_field' },
-        { key: 'config_json', prop: 'config_json' },
+        { key: 'action_type', prop: 'actionType' },
+        { key: 'target_field', prop: 'targetField' },
+        { key: 'config_json', prop: 'configJson' },
       ]
       wb.SheetNames.push('rule_actions')
       wb.Sheets.rule_actions = objectsToSheet(allActions, actHeaders)
