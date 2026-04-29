@@ -117,6 +117,7 @@ const paramColumns = [
       { value: 'select', label: '下拉选择' },
       { value: 'boolean', label: '布尔' },
       { value: 'date', label: '日期' },
+      { value: 'rule', label: '规则' },
     ],
   },
   { key: 'unit', prop: 'unit', label: '单位' },

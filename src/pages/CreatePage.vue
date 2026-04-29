@@ -95,7 +95,7 @@ const selectedPresetCp = computed(() => {
 </script>
 
 <template>
-  <div>
+  <div class="h-full flex flex-col overflow-hidden">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">
         新建
@@ -116,7 +116,7 @@ const selectedPresetCp = computed(() => {
       </button>
     </div>
 
-    <div v-else class="flex gap-3">
+    <div v-else class="flex-1 min-h-0 overflow-y-auto flex gap-3">
       <div class="flex-1 min-w-0 space-y-6">
         <div class="card card-sm bg-base-100 border border-base-300">
           <div class="card-body">
