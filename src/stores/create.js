@@ -53,9 +53,15 @@ export const useCreateStore = defineStore('create', () => {
 
     const preset = configStore.config.presets.find(p => p.presetId === presetId)
     if (preset && preset.params) {
+      const skipped = []
       for (const param of preset.params) {
+        if (!param.fieldKey) {
+          skipped.push(param.paramName || param.paramId)
+          continue
+        }
         userInputs.value[param.fieldKey] = param.defaultValue ?? ''
       }
+      if (skipped.length > 0) {}
     }
   }
 
@@ -116,6 +122,24 @@ export const useCreateStore = defineStore('create', () => {
     variants.value = ''
   }
 
+  /** 将 userInputs 重置为当前预设默认值，清空 results/errors，保留基础信息和预设选中。 */
+  function resetToDefaults() {
+    results.value = {}
+    errors.value = []
+    const preset = configStore.config.presets.find(p => p.presetId === selectedPresetId.value)
+    if (preset && preset.params) {
+      const skipped = []
+      for (const param of preset.params) {
+        if (!param.fieldKey) {
+          skipped.push(param.paramName || param.paramId)
+          continue
+        }
+        userInputs.value[param.fieldKey] = param.defaultValue ?? ''
+      }
+      if (skipped.length > 0) {}
+    }
+  }
+
   return {
     selectedPresetId,
     userInputs,
@@ -132,5 +156,6 @@ export const useCreateStore = defineStore('create', () => {
     calculate,
     getRecord,
     reset,
+    resetToDefaults,
   }
 })

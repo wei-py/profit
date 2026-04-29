@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import FieldInput from '@/components/common/FieldInput.vue'
 import { useFileIO } from '@/composables/useFileIO'
 import { useConfigStore } from '@/stores/config'
@@ -30,7 +30,7 @@ const presetParams = computed(() => {
 
 /** 参数增强后的字段列表，合并了字段定义中的信息 */
 const paramFields = computed(() => {
-  return presetParams.value.map((param) => {
+  const mapped = presetParams.value.map((param) => {
     const field = configStore.getField(param.fieldKey)
     return {
       ...param,
@@ -41,6 +41,15 @@ const paramFields = computed(() => {
       required: param.isRequired,
     }
   })
+
+  return mapped.filter(f => !!f.fieldKey)
+})
+
+/** 被跳过的空 fieldKey 参数列表 */
+const skippedParams = computed(() => {
+  if (!presetParams.value.length)
+    return []
+  return presetParams.value.filter(p => !p.fieldKey)
 })
 
 /** 校验输入并执行规则计算。 */
@@ -58,6 +67,33 @@ function handleCalculate() {
 
   createStore.calculate()
 }
+
+/** 重置输入值为预设默认值。 */
+function handleReset() {
+  createStore.resetToDefaults()
+  validationErrors.value = []
+}
+
+let calcTimer = null
+
+watch(
+  createStore.userInputs,
+  () => {
+    if (!createStore.selectedPresetId)
+      return
+    clearTimeout(calcTimer)
+    calcTimer = setTimeout(() => {
+      validationErrors.value = []
+      const errs = validateUserInputs(createStore.userInputs, paramFields.value)
+      if (errs.length > 0) {
+        validationErrors.value = errs
+        return
+      }
+      createStore.calculate()
+    }, 400)
+  },
+  { deep: true },
+)
 
 /** 将当前计算结果保存到记录列表。 */
 function handleSaveToList() {
@@ -206,6 +242,10 @@ const selectedPresetCp = computed(() => {
             <h2 class="card-title text-lg">
               输入参数
             </h2>
+            <div v-if="skippedParams.length > 0" class="alert alert-warning py-2 text-sm mb-4">
+              <span>当前预设共 {{ presetParams.length }} 个参数，其中 {{ skippedParams.length }} 个缺少字段键（fieldKey），已隐藏。请到<router-link to="/preset" class="link link-hover font-bold">「预设」页面</router-link>为参数补充字段键并<b>保存配置</b>，之后重新选择该预设即可看到所有输入框。</span>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FieldInput
                 v-for="param in paramFields"
@@ -238,6 +278,9 @@ const selectedPresetCp = computed(() => {
               >
                 <span v-if="createStore.calculating" class="loading loading-spinner loading-xs mr-1" />
                 计算
+              </button>
+              <button class="btn btn-ghost btn-sm" @click="handleReset">
+                重置
               </button>
             </div>
           </div>

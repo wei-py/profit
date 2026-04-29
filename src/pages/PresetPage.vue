@@ -105,6 +105,11 @@ const selectedPresetCp = computed(() => {
 
 /** 参数表格列定义 */
 const paramColumns = [
+  {
+    key: 'fieldKey',
+    prop: 'fieldKey',
+    label: '字段键',
+  },
   { key: 'paramName', prop: 'paramName', label: '名称' },
   {
     key: 'type',
@@ -135,8 +140,14 @@ const paramColumns = [
     key: 'defaultValue',
     prop: 'defaultValue',
     label: '默认值',
-    getType: row => row.type === 'select' ? 'select' : 'text',
+    getType: row => (row.type === 'select' || row.type === 'boolean') ? 'select' : 'text',
     getOptions: (row) => {
+      if (row.type === 'boolean') {
+        return [
+          { value: 'true', label: '是' },
+          { value: 'false', label: '否' },
+        ]
+      }
       if (row.type !== 'select' || !row.optionGroupId)
         return []
       const group = configStore.getOptionGroup(row.optionGroupId)
