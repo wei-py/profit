@@ -1,5 +1,11 @@
 import * as XLSX from 'xlsx'
 
+/**
+ * 将数据数组和列头定义转换为 xlsx 工作表。
+ * @param {Array<object>} data - 数据行数组
+ * @param {Array<{ key: string, prop: string }>} headers - 列头映射
+ * @returns {object} xlsx 工作表对象
+ */
 function objectsToSheet(data, headers) {
   const headerRow = headers.map(h => h.key)
   const ws = XLSX.utils.aoa_to_sheet([headerRow])
@@ -15,6 +21,11 @@ function objectsToSheet(data, headers) {
   return ws
 }
 
+/**
+ * 将配置对象序列化为 xlsx 工作簿。
+ * @param {object} config - 配置对象
+ * @returns {object} xlsx 工作簿对象
+ */
 export function buildConfigWorkbook(config) {
   const wb = XLSX.utils.book_new()
 
@@ -217,12 +228,23 @@ export function buildConfigWorkbook(config) {
   return wb
 }
 
+/**
+ * 将配置对象序列化为 xlsx 二进制 Uint8Array。
+ * @param {object} config - 配置对象
+ * @returns {Uint8Array} xlsx 文件二进制数据
+ */
 export function buildWorkbookBuffer(config) {
   const wb = buildConfigWorkbook(config)
   const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
   return new Uint8Array(buf)
 }
 
+/**
+ * 将记录列表和列头构建为 xlsx 工作簿。
+ * @param {Array<object>} records - 数据记录列表
+ * @param {Array<{ key: string, prop: string }>} headers - 列头映射
+ * @returns {object} xlsx 工作簿对象
+ */
 export function buildListWorkbook(records, headers) {
   const wb = XLSX.utils.book_new()
   const ws = objectsToSheet(records, headers)
@@ -231,6 +253,12 @@ export function buildListWorkbook(records, headers) {
   return wb
 }
 
+/**
+ * 将记录列表和列头构建为 xlsx 二进制 Uint8Array。
+ * @param {Array<object>} records - 数据记录列表
+ * @param {Array<{ key: string, prop: string }>} headers - 列头映射
+ * @returns {Uint8Array} xlsx 文件二进制数据
+ */
 export function buildListWorkbookBuffer(records, headers) {
   const wb = buildListWorkbook(records, headers)
   const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })

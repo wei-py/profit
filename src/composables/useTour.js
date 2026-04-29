@@ -1,8 +1,10 @@
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 
+/** @type {object | null} driver.js 实例 */
 let driverObj = null
 
+/** 概览引导步骤配置 */
 const overviewSteps = [
   {
     element: '[data-tour="sidebar-nav"]',
@@ -30,6 +32,7 @@ const overviewSteps = [
   },
 ]
 
+/** 各页面引导步骤配置 */
 const tourSteps = {
   preset: [
     { element: '[data-tour="preset-toolbar"]', popover: { title: '操作按钮', description: '"打开配置"加载Excel配置文件；"新建预设"创建新预设；"保存配置"将修改写回Excel。' } },
@@ -82,6 +85,10 @@ const tourSteps = {
 }
 
 export function useTour() {
+  /**
+   * 启动引导，停止当前引导后按类型选择步骤。
+   * @param {string} type - 引导类型（'overview' 或页面名）
+   */
   function startTour(type) {
     stopTour()
 
@@ -106,6 +113,7 @@ export function useTour() {
     driverObj.drive()
   }
 
+  /** 停止并销毁当前引导实例。 */
   function stopTour() {
     if (driverObj) {
       driverObj.destroy()

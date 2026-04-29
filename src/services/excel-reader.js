@@ -1,11 +1,21 @@
 import * as XLSX from 'xlsx'
 
+/**
+ * 将 xlsx 工作表转换为对象数组。
+ * @param {object} ws - xlsx 工作表对象
+ * @returns {Array<object>} 行数据数组
+ */
 function sheetToObjects(ws) {
   if (!ws)
     return []
   return XLSX.utils.sheet_to_json(ws, { defval: '' })
 }
 
+/**
+ * 安全地解析 JSON 字符串，失败时返回空对象。
+ * @param {string} raw - JSON 字符串
+ * @returns {object} 解析后的对象
+ */
 function safeParseJSON(raw) {
   if (!raw || typeof raw !== 'string')
     return {}
@@ -17,6 +27,11 @@ function safeParseJSON(raw) {
   }
 }
 
+/**
+ * 解析数值，空值或非数字返回 null。
+ * @param {*} val - 待解析的值
+ * @returns {number|null} 解析后的数值
+ */
 function parseNumber(val) {
   if (val === '' || val === undefined || val === null)
     return null
@@ -24,6 +39,11 @@ function parseNumber(val) {
   return Number.isNaN(n) ? null : n
 }
 
+/**
+ * 标准化布尔值，支持字符串 'true'/'false'、数字 1/0 等。
+ * @param {*} val - 待标准化的值
+ * @returns {boolean} 标准化后的布尔值
+ */
 function normalizeBoolean(val) {
   if (typeof val === 'boolean')
     return val
@@ -34,6 +54,12 @@ function normalizeBoolean(val) {
   return !!val
 }
 
+/**
+ * 从工作簿中按候选名称顺序查找工作表。
+ * @param {object} wb - xlsx 工作簿对象
+ * @param {string[]} names - 工作表候选名称列表
+ * @returns {object | null} 匹配的工作表，未找到返回 null
+ */
 function findSheet(wb, names) {
   for (const name of names) {
     if (wb.SheetNames.includes(name))
@@ -42,6 +68,12 @@ function findSheet(wb, names) {
   return null
 }
 
+/**
+ * 根据条件分组和条件数据构建树形条件结构。
+ * @param {Array} groups - 条件分组原始数据
+ * @param {Array} conditions - 条件原始数据
+ * @returns {Array} 根级条件组节点数组
+ */
 function buildConditionTree(groups, conditions) {
   const groupMap = new Map()
   const conditionMap = new Map()
@@ -101,6 +133,11 @@ function buildConditionTree(groups, conditions) {
   return roots
 }
 
+/**
+ * 从配置工作簿中读取所有数据并构建配置对象。
+ * @param {object} wb - xlsx 工作簿对象
+ * @returns {{ presets: Array, optionGroups: Array, fields: Array, ruleSets: Array, rules: Array, lookupTables: Array, countryPlatforms: Array }} 解析后的配置对象
+ */
 export function readConfigWorkbook(wb) {
   const result = {
     presets: [],
@@ -297,6 +334,13 @@ export function readConfigWorkbook(wb) {
   return result
 }
 
+/**
+ * 判断分组是否为指定祖先的后代节点。
+ * @param {object} group - 待检查的分组
+ * @param {object} ancestor - 祖先分组
+ * @param {Array} allGroups - 全部分组列表
+ * @returns {boolean} 是否为后代
+ */
 function isDescendantOf(group, ancestor, allGroups) {
   let current = group
   const visited = new Set()
@@ -311,6 +355,11 @@ function isDescendantOf(group, ancestor, allGroups) {
   return false
 }
 
+/**
+ * 从 ArrayBuffer 读取 xlsx 文件并解析为配置对象。
+ * @param {ArrayBuffer} buffer - xlsx 文件二进制数据
+ * @returns {object} 解析后的配置对象
+ */
 export function readWorkbookBuffer(buffer) {
   const wb = XLSX.read(buffer, { type: 'array' })
   return readConfigWorkbook(wb)

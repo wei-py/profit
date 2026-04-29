@@ -1,15 +1,31 @@
 <script setup>
 import { ref } from 'vue'
 
+/**
+ * @property {Array} [tree=[]] - 树节点数组
+ * @property {boolean} [editable=false] - 是否显示编辑按钮
+ */
 defineProps({
   tree: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
 })
 
+/**
+ * @event editGroup - 编辑分组
+ * @event editCondition - 编辑条件
+ * @event addChild - 添加子分组
+ * @event deleteGroup - 删除分组
+ * @event deleteCondition - 删除条件
+ */
 const emit = defineEmits(['editGroup', 'editCondition', 'addChild', 'deleteGroup', 'deleteCondition'])
 
+/** @type {import('vue').Ref<Set<string>>} 已折叠的节点 ID 集合 */
 const collapsed = ref(new Set())
 
+/**
+ * 切换节点的折叠/展开状态。
+ * @param {string} id - 节点 ID
+ */
 function toggle(id) {
   if (collapsed.value.has(id)) {
     collapsed.value.delete(id)
@@ -19,10 +35,20 @@ function toggle(id) {
   }
 }
 
+/**
+ * 判断节点是否处于折叠状态。
+ * @param {string} id - 节点 ID
+ * @returns {boolean} 是否已折叠
+ */
 function isCollapsed(id) {
   return collapsed.value.has(id)
 }
 
+/**
+ * 获取运算符的可读标签。
+ * @param {string} op - 运算符代码
+ * @returns {string} 中文运算符标签
+ */
 function operatorLabel(op) {
   if (!op)
     return '='

@@ -1,3 +1,9 @@
+/**
+ * 评估单个条件的匹配结果。
+ * @param {{ fieldKey: string, operator: string, value: *, valueEnd: * }} condition - 条件对象
+ * @param {object} userInputs - 用户输入键值对
+ * @returns {boolean} 条件是否满足
+ */
 function evaluateCondition(condition, userInputs) {
   const { fieldKey, operator, value, valueEnd } = condition
   const inputVal = userInputs[fieldKey]
@@ -36,6 +42,12 @@ function evaluateCondition(condition, userInputs) {
   }
 }
 
+/**
+ * 递归评估条件组树，计算整体匹配结果。
+ * @param {{ logic: string, conditions: Array, children: Array }} group - 条件组节点
+ * @param {object} userInputs - 用户输入键值对
+ * @returns {boolean} 条件组是否满足
+ */
 function evaluateGroup(group, userInputs) {
   if (!group || !group.conditions)
     return true
@@ -59,6 +71,12 @@ function evaluateGroup(group, userInputs) {
   return results.every(r => r === true)
 }
 
+/**
+ * 判断规则是否与用户输入匹配。
+ * @param {{ enabled: boolean, conditionTree: Array }} rule - 规则对象
+ * @param {object} userInputs - 用户输入键值对
+ * @returns {boolean} 规则是否匹配
+ */
 function ruleMatches(rule, userInputs) {
   if (!rule.enabled)
     return false
@@ -67,10 +85,24 @@ function ruleMatches(rule, userInputs) {
   return rule.conditionTree.some(tree => evaluateGroup(tree, userInputs))
 }
 
+/**
+ * 根据 ID 查找对应的查找表。
+ * @param {Array} lookupTables - 查找表列表
+ * @param {string} tableId - 查找表 ID
+ * @returns {object | undefined} 匹配的查找表
+ */
 function findLookupTable(lookupTables, tableId) {
   return lookupTables.find(t => t.tableId === tableId || t.tableId === String(tableId))
 }
 
+/**
+ * 在查找表中执行精确匹配或区间匹配，返回输出列的值。
+ * @param {{input_map: object, output_column: string, match_mode: string}} config - 查找配置
+ * @param {{ rows: Array, matchMode: string }} lookupTable - 查找表对象
+ * @param {object} userInputs - 用户输入键值对
+ * @param {object} results - 已计算的结果键值对
+ * @returns {*|null} 匹配到的值，未匹配则返回 null
+ */
 function performLookup(config, lookupTable, userInputs, results) {
   const { input_map: inputMap, output_column: outputColumn, match_mode: matchMode } = config
   if (!lookupTable || !lookupTable.rows || lookupTable.rows.length === 0)
@@ -128,6 +160,16 @@ function performLookup(config, lookupTable, userInputs, results) {
   return null
 }
 
+/**
+ * 执行单个动作（set / lookup / branch），将结果写入 results 或错误写入 errors。
+ * @param {{actionType: string, targetField: string, configJson: object, actionId: string}} action - 动作对象
+ * @param {object} rule - 所属规则
+ * @param {Array} allRules - 所有规则列表
+ * @param {Array} lookupTables - 查找表列表
+ * @param {object} userInputs - 用户输入键值对
+ * @param {object} results - 计算结果输出对象
+ * @param {string[]} errors - 错误信息数组
+ */
 function executeAction(action, rule, allRules, lookupTables, userInputs, results, errors) {
   const { actionType, targetField, configJson } = action
 
@@ -202,6 +244,14 @@ function executeAction(action, rule, allRules, lookupTables, userInputs, results
   }
 }
 
+/**
+ * 执行规则引擎主流程：按优先级顺序匹配规则，执行动作后返回结果与错误。
+ * @param {Array} fields - 字段定义列表
+ * @param {Array} rules - 规则列表
+ * @param {Array} lookupTables - 查找表列表
+ * @param {object} userInputs - 用户输入键值对
+ * @returns {{results: object, errors: string[]}} 计算结果与错误信息
+ */
 export function execute(fields, rules, lookupTables, userInputs) {
   const results = {}
   const errors = []

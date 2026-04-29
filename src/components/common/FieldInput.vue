@@ -1,14 +1,23 @@
 <script setup>
 import { computed } from 'vue'
 
+/**
+ * @property {object} field - 字段定义 { fieldKey, fieldName, type, optionGroupId, unit, required, description }
+ * @property {*} [modelValue=''] - 绑定的值
+ * @property {Array} [optionGroups=[]] - 选项分组列表
+ */
 const props = defineProps({
   field: { type: Object, required: true },
   modelValue: { default: '' },
   optionGroups: { type: Array, default: () => [] },
 })
 
+/**
+ * @event update:modelValue - 值变更
+ */
 const emit = defineEmits(['update:modelValue'])
 
+/** 当前字段的下拉选项列表 */
 const options = computed(() => {
   if (!props.field.optionGroupId)
     return []
@@ -21,15 +30,27 @@ const options = computed(() => {
   }))
 })
 
+/**
+ * 文本/下拉变更处理。
+ * @param {Event} e - 输入事件
+ */
 function onInput(e) {
   emit('update:modelValue', e.target.value)
 }
 
+/**
+ * 数字输入变更处理，空字符串保持为 ''，否则转为 Number。
+ * @param {Event} e - 输入事件
+ */
 function onNumberInput(e) {
   const val = e.target.value
   emit('update:modelValue', val === '' ? '' : Number(val))
 }
 
+/**
+ * 布尔值切换处理。
+ * @param {Event} e - checkbox 变更事件
+ */
 function onBoolChange(e) {
   emit('update:modelValue', e.target.checked)
 }

@@ -6,19 +6,29 @@ import { useListStore } from '@/stores/list'
 const listStore = useListStore()
 const { openListExcel, saveListExcel } = useFileIO()
 
+/** @type {import('vue').Ref<string>} 当前选中的记录 ID */
 const selectedRecordId = ref('')
+/** @type {import('vue').Ref<boolean>} 是否显示详情弹窗 */
 const showDetailModal = ref(false)
+/** @type {import('vue').Ref<object | null>} 正在编辑的记录 */
 const editingRecord = ref(null)
+/** @type {import('vue').Ref<object>} 编辑表单数据 */
 const editForm = ref({})
 
+/** 是否显示空文件提示 */
 const showNoFile = computed(() => !listStore.filePath && listStore.records.length === 0)
 
+/** 从第一条记录提取的列头列表（排除 id） */
 const headers = computed(() => {
   if (listStore.records.length === 0)
     return []
   return Object.keys(listStore.records[0]).filter(k => k !== 'id')
 })
 
+/**
+ * 删除指定记录。
+ * @param {string} id - 记录 ID
+ */
 function handleDelete(id) {
   // eslint-disable-next-line no-alert
   if (window.confirm('确定删除这条记录吗？')) {
@@ -29,11 +39,19 @@ function handleDelete(id) {
   }
 }
 
+/**
+ * 打开记录详情弹窗。
+ * @param {object} record - 记录对象
+ */
 function openDetail(record) {
   selectedRecordId.value = record.id
   showDetailModal.value = true
 }
 
+/**
+ * 打开记录编辑模式。
+ * @param {object} record - 记录对象
+ */
 function openEdit(record) {
   selectedRecordId.value = record.id
   editingRecord.value = record
@@ -41,6 +59,7 @@ function openEdit(record) {
   showDetailModal.value = true
 }
 
+/** 保存编辑并关闭弹窗。 */
 function saveEdit() {
   if (editingRecord.value) {
     listStore.updateRecord(editingRecord.value.id, editForm.value)
@@ -50,6 +69,11 @@ function saveEdit() {
   showDetailModal.value = false
 }
 
+/**
+ * 判断记录是否包含图片。
+ * @param {object} record - 记录对象
+ * @returns {boolean} 是否有图片
+ */
 function hasImages(record) {
   return record.images && typeof record.images === 'string' && record.images.trim() !== ''
 }

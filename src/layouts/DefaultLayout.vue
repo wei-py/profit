@@ -10,6 +10,7 @@ const route = useRoute()
 const { isDark, toggleTheme } = useTheme()
 const { startTour } = useTour()
 
+/** 各页面的 tooltip 描述映射 */
 const tooltipMap = {
   preset: '预设管理：创建和管理利润计算预设，定义参数列表',
   option: '选项分组：为选择型字段提供下拉选项，如颜色、尺寸',
@@ -18,16 +19,22 @@ const tooltipMap = {
   list: '记录列表：查看、编辑和删除已保存的记录',
 }
 
+/** 当前页面对应的 tooltip 文本 */
 const pageTooltip = computed(() => {
   const name = typeof route.name === 'string' ? route.name : ''
   return tooltipMap[name] || '利润工具：管理产品利润计算的配置与记录'
 })
 
+/**
+ * 获取当前路由对应的引导页面名称。
+ * @returns {string} 页面引导 key
+ */
 function getTourPageName() {
   const name = typeof route.name === 'string' ? route.name : ''
   return name === '/' ? 'preset' : name
 }
 
+/** 侧边栏导航项定义 */
 const navItems = [
   { path: '/preset', label: '预设', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
   { path: '/option', label: '选项', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
@@ -36,6 +43,7 @@ const navItems = [
   { path: '/list', label: '列表', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
 ]
 
+/** @type {import('vue').Ref<boolean>} 侧边栏是否折叠 */
 const sidebarCollapsed = ref(false)
 </script>
 

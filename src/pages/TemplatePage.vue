@@ -8,12 +8,17 @@ import { useConfigStore } from '@/stores/config'
 const configStore = useConfigStore()
 const { openConfigExcel, saveConfigExcel } = useFileIO()
 
+/** 是否显示无配置提示 */
 const showNoConfig = computed(() => !configStore.loaded)
 
+/** @type {import('vue').Ref<string>} 当前选中的规则集 ID */
 const selectedRuleSetId = ref('')
+/** @type {import('vue').Ref<string>} 当前选中的规则 ID */
 const selectedRuleId = ref('')
 
+/** @type {import('vue').Ref<string>} 当前选中的 tab（'rules' / 'lookups'） */
 const selectedTab = ref('rules')
+/** @type {import('vue').Ref<string>} 当前选中的查找表 ID */
 const selectedLookupTableId = ref('')
 
 const CACHE_RULESET_KEY = 'profit-selected-rule-set-id'
@@ -21,6 +26,7 @@ const CACHE_RULE_KEY = 'profit-selected-rule-id'
 const CACHE_TAB_KEY = 'profit-selected-tab'
 const CACHE_LOOKUP_KEY = 'profit-selected-lookup-table-id'
 
+/** 从 localStorage 恢复上次选中的规则集/规则/Tab/查找表 */
 onMounted(() => {
   if (!configStore.loaded)
     return
@@ -55,8 +61,11 @@ watch(selectedLookupTableId, (val) => {
   localStorage.setItem(CACHE_LOOKUP_KEY, val)
 })
 
+/** @type {import('vue').Ref<boolean>} 是否显示规则编辑弹窗 */
 const showRuleModal = ref(false)
+/** @type {import('vue').Ref<object | null>} 正在编辑的规则 */
 const editingRule = ref(null)
+/** @type {import('vue').Ref<object>} 规则表单数据 */
 const ruleForm = ref({
   ruleId: '',
   ruleSetId: '',
@@ -65,14 +74,21 @@ const ruleForm = ref({
   rootGroupId: '',
   description: '',
 })
+/** @type {import('vue').Ref<string[]>} 规则表单校验错误 */
 const ruleErrors = ref([])
 
+/** @type {import('vue').Ref<boolean>} 是否显示分组编辑弹窗 */
 const showGroupModal = ref(false)
+/** @type {import('vue').Ref<object | null>} 正在编辑的分组 */
 const editingGroup = ref(null)
+/** @type {import('vue').Ref<object>} 分组表单数据 */
 const groupForm = ref({ groupId: '', ruleId: '', parentGroupId: '', logic: 'and', sort: 1, description: '' })
 
+/** @type {import('vue').Ref<boolean>} 是否显示条件编辑弹窗 */
 const showConditionModal = ref(false)
+/** @type {import('vue').Ref<object | null>} 正在编辑的条件 */
 const editingCondition = ref(null)
+/** @type {import('vue').Ref<object>} 条件表单数据 */
 const conditionForm = ref({
   conditionId: '',
   groupId: '',
@@ -85,8 +101,11 @@ const conditionForm = ref({
   description: '',
 })
 
+/** @type {import('vue').Ref<boolean>} 是否显示动作编辑弹窗 */
 const showActionModal = ref(false)
+/** @type {import('vue').Ref<object | null>} 正在编辑的动作 */
 const editingAction = ref(null)
+/** @type {import('vue').Ref<object>} 动作表单数据 */
 const actionForm = ref({
   actionId: '',
   ruleId: '',
@@ -96,8 +115,11 @@ const actionForm = ref({
   configJson: {},
 })
 
+/** @type {import('vue').Ref<boolean>} 是否显示查找表编辑弹窗 */
 const showLookupModal = ref(false)
+/** @type {import('vue').Ref<object | null>} 正在编辑的查找表 */
 const editingLookup = ref(null)
+/** @type {import('vue').Ref<object>} 查找表表单数据 */
 const lookupForm = ref({
   tableId: '',
   tableName: '',
@@ -106,18 +128,26 @@ const lookupForm = ref({
   description: '',
 })
 
+/** 当前规则集下的规则列表 */
 const ruleSetRules = computed(() =>
   configStore.getRulesByRuleSet(selectedRuleSetId.value),
 )
 
+/** 当前选中的规则对象 */
 const selectedRule = computed(() =>
   configStore.config.rules.find(r => r.ruleId === selectedRuleId.value),
 )
 
+/** 当前选中的查找表对象 */
 const selectedLookupTable = computed(() =>
   configStore.config.lookupTables.find(t => t.tableId === selectedLookupTableId.value),
 )
 
+/**
+ * 获取动作类型的中文标签。
+ * @param {string} type - 动作类型
+ * @returns {string} 中文标签
+ */
 function actionTypeLabel(type) {
   const map = {
     set: '赋值',
@@ -127,6 +157,11 @@ function actionTypeLabel(type) {
   return map[type] || type
 }
 
+/**
+ * 获取匹配模式的中文标签。
+ * @param {string} mode - 匹配模式
+ * @returns {string} 中文标签
+ */
 function matchModeLabel(mode) {
   const map = {
     exact: '精确匹配',
@@ -135,6 +170,7 @@ function matchModeLabel(mode) {
   return map[mode] || mode
 }
 
+/** 打开新建规则弹窗。 */
 function openNewRule() {
   editingRule.value = null
   ruleForm.value = {
@@ -149,12 +185,17 @@ function openNewRule() {
   showRuleModal.value = true
 }
 
+/**
+ * 打开编辑规则弹窗。
+ * @param {object} rule - 待编辑的规则对象
+ */
 function openEditRule(rule) {
   editingRule.value = rule
   ruleForm.value = { ...rule }
   showRuleModal.value = true
 }
 
+/** 校验并保存规则（新建或更新）。 */
 function saveRule() {
   if (!ruleForm.value.ruleId)
     return
@@ -180,12 +221,20 @@ function saveRule() {
   showRuleModal.value = false
 }
 
+/**
+ * 删除指定规则。
+ * @param {object} rule - 待删除的规则对象
+ */
 function deleteRule(rule) {
   configStore.config.rules = configStore.config.rules.filter(r => r.ruleId !== rule.ruleId)
   if (selectedRuleId.value === rule.ruleId)
     selectedRuleId.value = ''
 }
 
+/**
+ * 打开新建分组弹窗。
+ * @param {object} [parent] - 父分组节点
+ */
 function openNewGroup(parent) {
   editingGroup.value = null
   groupForm.value = {
@@ -199,12 +248,17 @@ function openNewGroup(parent) {
   showGroupModal.value = true
 }
 
+/**
+ * 打开编辑分组弹窗。
+ * @param {object} group - 待编辑的分组对象
+ */
 function openEditGroup(group) {
   editingGroup.value = group
   groupForm.value = { ...group }
   showGroupModal.value = true
 }
 
+/** 保存分组（新建或更新），并重建条件树。 */
 function saveGroup() {
   if (!selectedRule.value)
     return
@@ -225,6 +279,10 @@ function saveGroup() {
   showGroupModal.value = false
 }
 
+/**
+ * 删除分组及其后代节点。
+ * @param {object} group - 待删除的分组节点
+ */
 function deleteGroup(group) {
   if (!selectedRule.value)
     return
@@ -255,6 +313,10 @@ function deleteGroup(group) {
   }
 }
 
+/**
+ * 打开编辑条件弹窗。
+ * @param {object} cond - 待编辑的条件对象
+ */
 function openEditCondition(cond) {
   editingCondition.value = cond
   conditionForm.value = {
@@ -271,6 +333,7 @@ function openEditCondition(cond) {
   showConditionModal.value = true
 }
 
+/** 保存条件（新建或更新），并重建条件树。 */
 function saveCondition() {
   if (!selectedRule.value)
     return
@@ -298,6 +361,10 @@ function saveCondition() {
   showConditionModal.value = false
 }
 
+/**
+ * 删除条件。
+ * @param {object} cond - 待删除的条件对象
+ */
 function deleteCondition(cond) {
   if (!selectedRule.value)
     return
@@ -307,6 +374,7 @@ function deleteCondition(cond) {
   rebuildConditionTree()
 }
 
+/** 根据原始分组和条件数据重建条件树。 */
 function rebuildConditionTree() {
   if (!selectedRule.value)
     return
@@ -316,6 +384,12 @@ function rebuildConditionTree() {
   )
 }
 
+/**
+ * 将原始分组和条件数据构建为树形结构。
+ * @param {Array} groups - 分组原始数据
+ * @param {Array} conditions - 条件原始数据
+ * @returns {Array} 根级条件组节点数组
+ */
 function buildTreeFromGroups(groups, conditions) {
   const groupMap = new Map()
   const condMap = new Map()
@@ -371,6 +445,7 @@ function buildTreeFromGroups(groups, conditions) {
   return roots
 }
 
+/** 打开新建动作弹窗。 */
 function openNewAction() {
   editingAction.value = null
   actionForm.value = {
@@ -384,12 +459,17 @@ function openNewAction() {
   showActionModal.value = true
 }
 
+/**
+ * 打开编辑动作弹窗。
+ * @param {object} action - 待编辑的动作对象
+ */
 function openEditAction(action) {
   editingAction.value = action
   actionForm.value = { ...action }
   showActionModal.value = true
 }
 
+/** 保存动作（新建或更新），并按排序重排。 */
 function saveAction() {
   if (!selectedRule.value)
     return
@@ -409,12 +489,17 @@ function saveAction() {
   showActionModal.value = false
 }
 
+/**
+ * 删除动作。
+ * @param {object} action - 待删除的动作对象
+ */
 function deleteAction(action) {
   if (!selectedRule.value)
     return
   selectedRule.value.actions = selectedRule.value.actions.filter(a => a.actionId !== action.actionId)
 }
 
+/** 打开新建查找表弹窗。 */
 function openNewLookup() {
   editingLookup.value = null
   lookupForm.value = {
@@ -427,12 +512,17 @@ function openNewLookup() {
   showLookupModal.value = true
 }
 
+/**
+ * 打开编辑查找表弹窗。
+ * @param {object} table - 待编辑的查找表对象
+ */
 function openEditLookup(table) {
   editingLookup.value = table
   lookupForm.value = { ...table }
   showLookupModal.value = true
 }
 
+/** 保存查找表（新建或更新）。 */
 function saveLookup() {
   if (editingLookup.value) {
     Object.assign(editingLookup.value, lookupForm.value)
@@ -447,6 +537,10 @@ function saveLookup() {
   showLookupModal.value = false
 }
 
+/**
+ * 删除查找表。
+ * @param {object} table - 待删除的查找表对象
+ */
 function deleteLookup(table) {
   configStore.config.lookupTables = configStore.config.lookupTables.filter(t => t.tableId !== table.tableId)
   if (selectedLookupTableId.value === table.tableId)

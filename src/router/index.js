@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+/** 路由配置数组 */
 const routes = [
   {
     path: '/',
@@ -35,6 +36,7 @@ const routes = [
   },
 ]
 
+/** Vue Router 实例 */
 const router = createRouter({
   history: createWebHistory(),
   routes,

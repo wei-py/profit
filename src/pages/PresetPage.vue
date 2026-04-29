@@ -8,15 +8,23 @@ import { validatePreset } from '@/utils/validate'
 const configStore = useConfigStore()
 const { openConfigExcel, saveConfigExcel } = useFileIO()
 
+/** @type {import('vue').Ref<string>} 搜索关键词 */
 const searchQuery = ref('')
+/** @type {import('vue').Ref<string>} 当前选中的预设 ID */
 const selectedPresetId = ref('')
+/** @type {import('vue').Ref<boolean>} 是否显示预设编辑弹窗 */
 const showPresetModal = ref(false)
+/** @type {import('vue').Ref<object | null>} 正在编辑的预设对象 */
 const editingPreset = ref(null)
+/** @type {import('vue').Ref<object>} 预设表单数据 */
 const presetForm = ref({ presetName: '', cpId: '', ruleSetId: '', enabled: true })
+/** @type {import('vue').Ref<string[]>} 预设表单校验错误 */
 const presetErrors = ref([])
 
+/** @type {import('vue').Ref<boolean>} 是否显示国家平台弹窗 */
 const showCpModal = ref(false)
 
+/** 国家平台表格列定义 */
 const cpColumns = [
   { key: 'country', prop: 'country', label: '国家' },
   { key: 'platform', prop: 'platform', label: '平台' },
@@ -24,6 +32,7 @@ const cpColumns = [
   { key: 'enabled', prop: 'enabled', label: '启用', type: 'boolean' },
 ]
 
+/** 是否显示无配置提示 */
 const showNoConfig = computed(() => !configStore.loaded)
 
 const CACHE_PRESET_KEY = 'profit-selected-preset-id'
@@ -41,6 +50,7 @@ watch(selectedPresetId, (val) => {
   localStorage.setItem(CACHE_PRESET_KEY, val)
 })
 
+/** 国家平台下拉选项 */
 const cpOptions = computed(() =>
   configStore.enabledCountryPlatforms.map(cp => ({
     value: cp.cpId,
@@ -48,6 +58,7 @@ const cpOptions = computed(() =>
   })),
 )
 
+/** 预设 ID -> 国家平台对象的映射 */
 const presetCpMap = computed(() => {
   const map = {}
   for (const p of configStore.config.presets) {
@@ -61,6 +72,7 @@ const presetCpMap = computed(() => {
   return map
 })
 
+/** 按搜索关键词过滤后的预设列表 */
 const filteredPresets = computed(() => {
   const q = searchQuery.value.toLowerCase()
   if (!q)
@@ -79,16 +91,19 @@ const filteredPresets = computed(() => {
   })
 })
 
+/** 当前选中的预设对象 */
 const selectedPreset = computed(() =>
   configStore.config.presets.find(p => p.presetId === selectedPresetId.value),
 )
 
+/** 当前选中预设关联的国家平台 */
 const selectedPresetCp = computed(() => {
   if (!selectedPreset.value?.cpId)
     return null
   return configStore.getCountryPlatform(selectedPreset.value.cpId)
 })
 
+/** 参数表格列定义 */
 const paramColumns = [
   { key: 'paramName', prop: 'paramName', label: '名称' },
   {
@@ -136,6 +151,7 @@ const paramColumns = [
   { key: 'isRequired', prop: 'isRequired', label: '必填', type: 'boolean' },
 ]
 
+/** 打开新建预设弹窗。 */
 function openNewPreset() {
   editingPreset.value = null
   presetForm.value = { presetName: '', cpId: '', ruleSetId: '', enabled: true }
@@ -143,6 +159,10 @@ function openNewPreset() {
   showPresetModal.value = true
 }
 
+/**
+ * 打开编辑预设弹窗。
+ * @param {object} preset - 待编辑的预设对象
+ */
 function openEditPreset(preset) {
   editingPreset.value = preset
   presetForm.value = {
@@ -155,6 +175,7 @@ function openEditPreset(preset) {
   showPresetModal.value = true
 }
 
+/** 校验并保存预设（新建或更新）。 */
 function savePreset() {
   const errs = validatePreset(presetForm.value)
   if (errs.length > 0) {
@@ -182,6 +203,10 @@ function savePreset() {
   showPresetModal.value = false
 }
 
+/**
+ * 删除指定预设。
+ * @param {object} preset - 待删除的预设对象
+ */
 function deletePreset(preset) {
   configStore.config.presets = configStore.config.presets.filter(p => p.presetId !== preset.presetId)
   if (selectedPresetId.value === preset.presetId) {
@@ -189,6 +214,7 @@ function deletePreset(preset) {
   }
 }
 
+/** 为当前选中预设添加一条空参数。 */
 function handleParamAdd() {
   if (!selectedPreset.value)
     return
@@ -207,6 +233,10 @@ function handleParamAdd() {
   })
 }
 
+/**
+ * 更新参数行数据。
+ * @param {object} row - 更新后的行数据
+ */
 function handleParamUpdate(row) {
   if (!selectedPreset.value)
     return
@@ -216,12 +246,17 @@ function handleParamUpdate(row) {
   }
 }
 
+/**
+ * 删除参数行。
+ * @param {object} row - 待删除的行数据
+ */
 function handleParamDelete(row) {
   if (!selectedPreset.value)
     return
   selectedPreset.value.params = selectedPreset.value.params.filter(p => p.paramId !== row.paramId)
 }
 
+/** 从字段定义中补全缺失的参数到当前预设。 */
 function handleFillDefaults() {
   if (!selectedPreset.value)
     return
@@ -244,10 +279,12 @@ function handleFillDefaults() {
   }
 }
 
+/** 打开国家平台管理弹窗。 */
 function openCpModal() {
   showCpModal.value = true
 }
 
+/** 新增一条国家平台记录。 */
 function handleCpAdd() {
   const id = `cp_${String(configStore.config.countryPlatforms.length + 1).padStart(3, '0')}`
   configStore.config.countryPlatforms.push({
@@ -259,6 +296,10 @@ function handleCpAdd() {
   })
 }
 
+/**
+ * 更新国家平台记录。
+ * @param {object} row - 更新后的行数据
+ */
 function handleCpUpdate(row) {
   const idx = configStore.config.countryPlatforms.findIndex(cp => cp.cpId === row.cpId)
   if (idx !== -1) {
@@ -266,12 +307,18 @@ function handleCpUpdate(row) {
   }
 }
 
+/** @type {import('vue').Ref<object | null>} 待删除确认的国家平台 */
 const cpDeleteConfirm = ref(null)
 
+/**
+ * 弹出删除国家平台确认。
+ * @param {object} row - 待删除的行数据
+ */
 function handleCpDelete(row) {
   cpDeleteConfirm.value = row
 }
 
+/** 确认删除国家平台。 */
 function confirmCpDelete() {
   if (!cpDeleteConfirm.value)
     return
@@ -280,6 +327,7 @@ function confirmCpDelete() {
   cpDeleteConfirm.value = null
 }
 
+/** 取消删除国家平台。 */
 function cancelCpDelete() {
   cpDeleteConfirm.value = null
 }

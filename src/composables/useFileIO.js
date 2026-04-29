@@ -5,9 +5,15 @@ import { ref } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useListStore } from '@/stores/list'
 
+/** @type {import('vue').Ref<boolean>} store 是否已初始化 */
 const storeInitialized = ref(false)
+/** @type {object | null} Tauri Store 实例缓存 */
 let storeInstance = null
 
+/**
+ * 获取（懒初始化）Tauri Store 实例。
+ * @returns {Promise<object>} Store 实例
+ */
 async function getStore() {
   if (!storeInstance) {
     storeInstance = await load('settings.json', { autoSave: true })
@@ -19,6 +25,10 @@ export function useFileIO() {
   const configStore = useConfigStore()
   const listStore = useListStore()
 
+  /**
+   * 从持久化存储恢复上次打开的配置路径并加载文件。
+   * @returns {Promise<void>}
+   */
   async function restoreLastPath() {
     try {
       const store = await getStore()
@@ -38,6 +48,11 @@ export function useFileIO() {
     }
   }
 
+  /**
+   * 将当前配置路径保存到持久化存储。
+   * @param {string} path - 文件路径
+   * @returns {Promise<void>}
+   */
   async function saveLastPath(path) {
     try {
       const store = await getStore()
@@ -49,6 +64,10 @@ export function useFileIO() {
     }
   }
 
+  /**
+   * 打开系统文件对话框选择配置 Excel 并加载。
+   * @returns {Promise<boolean>} 是否成功
+   */
   async function openConfigExcel() {
     const selected = await open({
       title: '打开配置 Excel',
@@ -66,6 +85,10 @@ export function useFileIO() {
     return true
   }
 
+  /**
+   * 保存配置 Excel，若未设置路径则弹出保存对话框。
+   * @returns {Promise<boolean>} 是否成功
+   */
   async function saveConfigExcel() {
     if (!configStore.loaded)
       return false
@@ -88,6 +111,10 @@ export function useFileIO() {
     return true
   }
 
+  /**
+   * 打开系统文件对话框选择列表 Excel 并加载。
+   * @returns {Promise<boolean>} 是否成功
+   */
   async function openListExcel() {
     const selected = await open({
       title: '打开列表 Excel',
@@ -104,6 +131,11 @@ export function useFileIO() {
     return true
   }
 
+  /**
+   * 保存列表 Excel，若未设置路径则弹出保存对话框。
+   * @param {Array} [headers] - 列头映射
+   * @returns {Promise<boolean>} 是否成功
+   */
   async function saveListExcel(headers) {
     let path = listStore.filePath
     if (!path) {

@@ -8,16 +8,23 @@ import { validateOptionGroup } from '@/utils/validate'
 const configStore = useConfigStore()
 const { openConfigExcel, saveConfigExcel } = useFileIO()
 
+/** @type {import('vue').Ref<string>} 当前选中的分组 ID */
 const selectedGroupId = ref('')
+/** @type {import('vue').Ref<boolean>} 是否显示分组编辑弹窗 */
 const showGroupModal = ref(false)
+/** @type {import('vue').Ref<object | null>} 正在编辑的分组对象 */
 const editingGroup = ref(null)
+/** @type {import('vue').Ref<object>} 分组表单数据 */
 const groupForm = ref({ groupName: '', description: '' })
+/** @type {import('vue').Ref<string[]>} 分组表单校验错误 */
 const groupErrors = ref([])
 
+/** 是否显示无配置提示 */
 const showNoConfig = computed(() => !configStore.loaded)
 
-const CACHE_GROUP_KEY = 'profit-selected-group-id'
-
+/**
+ * 为所有选项项补充 _uid 唯一标识。
+ */
 function ensureUids() {
   for (const group of configStore.config.optionGroups) {
     for (const item of (group.items || [])) {
@@ -42,10 +49,12 @@ watch(selectedGroupId, (val) => {
   localStorage.setItem(CACHE_GROUP_KEY, val)
 })
 
+/** 当前选中的分组对象 */
 const selectedGroup = computed(() =>
   configStore.config.optionGroups.find(g => g.groupId === selectedGroupId.value),
 )
 
+/** 选项项表格列定义 */
 const itemColumns = [
   { key: 'itemLabel', prop: 'itemLabel', label: '显示名' },
   { key: 'itemValue', prop: 'itemValue', label: '值' },
@@ -54,6 +63,7 @@ const itemColumns = [
   { key: 'remark', prop: 'remark', label: '备注' },
 ]
 
+/** 打开新建分组弹窗。 */
 function openNewGroup() {
   editingGroup.value = null
   groupForm.value = { groupName: '', description: '' }
@@ -61,6 +71,10 @@ function openNewGroup() {
   showGroupModal.value = true
 }
 
+/**
+ * 打开编辑分组弹窗。
+ * @param {object} group - 待编辑的分组对象
+ */
 function openEditGroup(group) {
   editingGroup.value = group
   groupForm.value = { groupName: group.groupName, description: group.description }
@@ -68,6 +82,7 @@ function openEditGroup(group) {
   showGroupModal.value = true
 }
 
+/** 校验并保存分组（新建或更新）。 */
 function saveGroup() {
   const errs = validateOptionGroup(groupForm.value)
   if (errs.length > 0) {
@@ -91,6 +106,10 @@ function saveGroup() {
   showGroupModal.value = false
 }
 
+/**
+ * 删除指定分组。
+ * @param {object} group - 待删除的分组对象
+ */
 function deleteGroup(group) {
   configStore.config.optionGroups = configStore.config.optionGroups.filter(g => g.groupId !== group.groupId)
   if (selectedGroupId.value === group.groupId) {
@@ -98,6 +117,7 @@ function deleteGroup(group) {
   }
 }
 
+/** 为当前选中分组添加一条空选项项。 */
 function handleItemAdd() {
   if (!selectedGroup.value)
     return
@@ -113,6 +133,10 @@ function handleItemAdd() {
   selectedGroup.value.items.push(newItem)
 }
 
+/**
+ * 更新选项项行数据。
+ * @param {object} row - 更新后的行数据
+ */
 function handleItemUpdate(row) {
   if (!selectedGroup.value)
     return
@@ -122,6 +146,10 @@ function handleItemUpdate(row) {
   }
 }
 
+/**
+ * 删除选项项。
+ * @param {object} row - 待删除的行数据
+ */
 function handleItemDelete(row) {
   if (!selectedGroup.value)
     return

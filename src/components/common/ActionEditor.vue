@@ -1,15 +1,25 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 
+/**
+ * @property {object} modelValue - 动作对象
+ * @property {Array} [fields=[]] - 字段列表
+ * @property {Array} [lookupTables=[]] - 查找表列表
+ */
 const props = defineProps({
   modelValue: { type: Object, required: true },
   fields: { type: Array, default: () => [] },
   lookupTables: { type: Array, default: () => [] },
 })
 
+/**
+ * @event update:modelValue - 动作数据变更
+ */
 const emit = defineEmits(['update:modelValue'])
 
+/** @type {import('vue').Ref<object>} 编辑中的动作副本 */
 const action = ref({ ...props.modelValue })
+/** @type {import('vue').Ref<string>} configJson 的 JSON 字符串表示 */
 const configJsonStr = ref(JSON.stringify(props.modelValue.configJson || {}, null, 2))
 
 watch(() => props.modelValue, (val) => {
@@ -17,6 +27,7 @@ watch(() => props.modelValue, (val) => {
   configJsonStr.value = JSON.stringify(val.configJson || {}, null, 2)
 }, { deep: true })
 
+/** configJson 字符串的实时解析结果 */
 const parsedConfigJson = computed(() => {
   try {
     return JSON.parse(configJsonStr.value)
@@ -26,16 +37,27 @@ const parsedConfigJson = computed(() => {
   }
 })
 
+/** 同步动作数据到父组件。 */
 function update() {
   action.value.configJson = parsedConfigJson.value
   emit('update:modelValue', { ...action.value })
 }
 
+/**
+ * 更新动作的顶层字段。
+ * @param {string} field - 字段名
+ * @param {*} value - 新值
+ */
 function updateField(field, value) {
   action.value[field] = value
   update()
 }
 
+/**
+ * 更新 configJson 的一级字段。
+ * @param {string} key - 字段名
+ * @param {*} value - 新值
+ */
 function updateConfigJsonField(key, value) {
   const current = { ...parsedConfigJson.value }
   current[key] = value
@@ -43,6 +65,12 @@ function updateConfigJsonField(key, value) {
   update()
 }
 
+/**
+ * 更新 configJson 的嵌套字段。
+ * @param {string} path - 点号分隔的路径，如 'when.field'
+ * @param {*} value - 新值
+ * @returns {void}
+ */
 function updateNestedConfigJson(path, value) {
   const current = { ...parsedConfigJson.value }
   const parts = path.split('.')
@@ -57,9 +85,16 @@ function updateNestedConfigJson(path, value) {
   update()
 }
 
+/** 可选的动作类型列表 */
 const actionTypes = ['set', 'lookup', 'branch']
+/** 输出型字段列表 */
 const outputFields = computed(() => props.fields.filter(f => f.ruleMode === 'output'))
 
+/**
+ * 获取动作类型的中文标签。
+ * @param {string} type - 动作类型
+ * @returns {string} 中文标签
+ */
 function actionTypeLabel(type) {
   const map = {
     set: '赋值',
@@ -69,6 +104,7 @@ function actionTypeLabel(type) {
   return map[type] || type
 }
 
+/** 新增一组输入映射条目。 */
 function addInputMapEntry() {
   const current = { ...parsedConfigJson.value }
   if (!current.input_map)
@@ -79,6 +115,11 @@ function addInputMapEntry() {
   update()
 }
 
+/**
+ * 更新输入映射的键名。
+ * @param {string} oldKey - 旧键名
+ * @param {string} newKey - 新键名
+ */
 function updateInputMapKey(oldKey, newKey) {
   const current = { ...parsedConfigJson.value }
   if (!current.input_map)
@@ -90,10 +131,19 @@ function updateInputMapKey(oldKey, newKey) {
   update()
 }
 
+/**
+ * 更新输入映射的值。
+ * @param {string} key - 键名
+ * @param {*} value - 新值
+ */
 function updateInputMapValue(key, value) {
   updateNestedConfigJson(`input_map.${key}`, value)
 }
 
+/**
+ * 删除一组输入映射条目。
+ * @param {string} key - 键名
+ */
 function removeInputMapEntry(key) {
   const current = { ...parsedConfigJson.value }
   if (current.input_map) {

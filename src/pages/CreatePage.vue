@@ -12,11 +12,15 @@ const createStore = useCreateStore()
 const listStore = useListStore()
 const { openConfigExcel } = useFileIO()
 
+/** 是否显示无配置提示 */
 const showNoConfig = computed(() => !configStore.loaded)
+/** 是否未选择预设 */
 const showNoPreset = computed(() => !createStore.selectedPresetId)
 
+/** @type {import('vue').Ref<string[]>} 输入校验错误列表 */
 const validationErrors = ref([])
 
+/** 当前选中预设的参数列表 */
 const presetParams = computed(() => {
   const preset = createStore.selectedPreset
   if (!preset || !preset.params)
@@ -24,6 +28,7 @@ const presetParams = computed(() => {
   return preset.params
 })
 
+/** 参数增强后的字段列表，合并了字段定义中的信息 */
 const paramFields = computed(() => {
   return presetParams.value.map((param) => {
     const field = configStore.getField(param.fieldKey)
@@ -38,6 +43,7 @@ const paramFields = computed(() => {
   })
 })
 
+/** 校验输入并执行规则计算。 */
 function handleCalculate() {
   validationErrors.value = []
   const preset = createStore.selectedPreset
@@ -53,16 +59,26 @@ function handleCalculate() {
   createStore.calculate()
 }
 
+/** 将当前计算结果保存到记录列表。 */
 function handleSaveToList() {
   const record = createStore.getRecord()
   listStore.addRecord(record)
 }
 
+/**
+ * 处理预设下拉选择变更。
+ * @param {Event} e - change 事件
+ */
 function handlePresetChange(e) {
   createStore.selectPreset(e.target.value)
   validationErrors.value = []
 }
 
+/**
+ * 获取预设的国家平台标签。
+ * @param {object} p - 预设对象
+ * @returns {string} 形如 "(国家 - 平台)" 的标签
+ */
 function formatPresetLabel(p) {
   const cp = configStore.getCountryPlatform(p.cpId)
   if (!cp)
@@ -70,6 +86,7 @@ function formatPresetLabel(p) {
   return `(${cp.country} - ${cp.platform})`
 }
 
+/** 当前选中预设关联的国家平台 */
 const selectedPresetCp = computed(() => {
   if (!createStore.selectedPreset?.cpId)
     return null
