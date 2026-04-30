@@ -1,10 +1,13 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import ImageUploader from '@/components/common/ImageUploader.vue'
 import { useFileIO } from '@/composables/useFileIO'
+import { useImageHost } from '@/composables/useImageHost'
 import { useListStore } from '@/stores/list'
 
 const listStore = useListStore()
 const { openListExcel, saveListExcel } = useFileIO()
+const { getImageUrls } = useImageHost()
 
 /** @type {import('vue').Ref<string>} 当前选中的记录 ID */
 const selectedRecordId = ref('')
@@ -14,6 +17,8 @@ const showDetailModal = ref(false)
 const editingRecord = ref(null)
 /** @type {import('vue').Ref<object>} 编辑表单数据 */
 const editForm = ref({})
+/** @type {import('vue').Ref<string[]>} 查看模式下的图片预览 URL */
+const viewImageUrls = ref([])
 
 /** 是否显示空文件提示 */
 const showNoFile = computed(() => !listStore.filePath && listStore.records.length === 0)
@@ -77,6 +82,37 @@ function saveEdit() {
 function hasImages(record) {
   return record.images && typeof record.images === 'string' && record.images.trim() !== ''
 }
+
+function parseSkuData(record) {
+  try {
+    if (!record.skuData || typeof record.skuData !== 'string' || !record.skuData.trim())
+      return {}
+    const obj = JSON.parse(record.skuData)
+    if (typeof obj === 'object' && obj !== null && !Array.isArray(obj))
+      return obj
+    return {}
+  }
+  catch {
+    return {}
+  }
+}
+
+function hasSkuData(record) {
+  const sd = parseSkuData(record)
+  return Object.keys(sd).length > 0
+}
+
+watch(showDetailModal, async (val) => {
+  if (val && !editingRecord.value) {
+    const record = listStore.records.find(r => r.id === selectedRecordId.value)
+    if (record && hasImages(record)) {
+      viewImageUrls.value = await getImageUrls(record.images)
+    }
+    else {
+      viewImageUrls.value = []
+    }
+  }
+})
 </script>
 
 <template>
@@ -164,19 +200,10 @@ function hasImages(record) {
               <span class="label-text text-xs">{{ h }}</span>
             </label>
             <template v-if="h === 'images'">
-              <textarea v-model="editForm[h]" class="textarea textarea-bordered textarea-sm w-full" rows="2" />
-              <div v-if="hasImages(editForm)" class="mt-2 flex gap-2 flex-wrap">
-                <img
-                  v-for="(img, i) in editForm[h].split(',').map(s => s.trim()).filter(Boolean)"
-                  :key="i"
-                  :src="img"
-                  class="w-20 h-20 object-cover rounded border"
-                  @error="($event.target).style.display = 'none'"
-                >
-              </div>
+              <ImageUploader v-model="editForm[h]" />
             </template>
-            <template v-else-if="h === 'variants'">
-              <textarea v-model="editForm[h]" class="textarea textarea-bordered textarea-sm w-full" rows="2" />
+            <template v-else-if="h === 'variants' || h === 'skuData'">
+              <textarea v-model="editForm[h]" class="textarea textarea-bordered textarea-sm w-full" rows="4" />
             </template>
             <template v-else>
               <input v-model="editForm[h]" type="text" class="input input-bordered input-sm w-full">
@@ -187,16 +214,54 @@ function hasImages(record) {
         <div v-else class="space-y-2">
           <div v-for="h in headers" :key="h" class="flex">
             <span class="font-medium text-sm w-32 flex-shrink-0">{{ h }}:</span>
-            <template v-if="h === 'images' && hasImages(listStore.records.find(r => r.id === selectedRecordId))">
+            <template v-if="h === 'images' && viewImageUrls.length > 0">
               <div class="flex gap-2 flex-wrap">
                 <img
-                  v-for="(img, i) in listStore.records.find(r => r.id === selectedRecordId)?.[h].split(',').map(s => s.trim()).filter(Boolean)"
+                  v-for="(url, i) in viewImageUrls"
                   :key="i"
-                  :src="img"
+                  :src="url"
                   class="w-24 h-24 object-cover rounded border"
                   @error="($event.target).style.display = 'none'"
                 >
               </div>
+            </template>
+            <template v-else-if="h === 'skuData' && hasSkuData(listStore.records.find(r => r.id === selectedRecordId))">
+              <table class="table table-xs">
+                <thead>
+                  <tr>
+                    <th class="text-xs">
+                      组合
+                    </th>
+                    <th class="text-xs">
+                      SKU款号
+                    </th>
+                    <th class="text-xs">
+                      图片
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(sku, key) in parseSkuData(listStore.records.find(r => r.id === selectedRecordId))" :key="key">
+                    <td class="text-xs font-mono">
+                      {{ key }}
+                    </td>
+                    <td class="text-xs">
+                      {{ sku.sku || '-' }}
+                    </td>
+                    <td>
+                      <div class="flex gap-1 flex-wrap">
+                        <img
+                          v-for="(url, i) in (sku.images ? sku.images.split(',').map(s => s.trim()).filter(Boolean) : [])"
+                          :key="i"
+                          class="w-10 h-10 object-cover rounded border"
+                          :src="url"
+                          @error="($event.target).style.display = 'none'"
+                        >
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </template>
             <span v-else class="text-sm">{{ listStore.records.find(r => r.id === selectedRecordId)?.[h] }}</span>
           </div>

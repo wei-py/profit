@@ -20,8 +20,87 @@ export const useCreateStore = defineStore('create', () => {
   const images = ref('')
   /** @type {import('vue').Ref<string>} 变体 JSON 字符串 */
   const variants = ref('')
+  /** @type {import('vue').Ref<string>} SKU 数据 JSON（每变体组合的 sku/images/overrides） */
+  const skuData = ref('{}')
+  /** @type {import('vue').Ref<object>} 每 SKU 计算结果（内存态，不持久化） */
+  const skuResults = ref({})
+
+  let variantIdCounter = 0
+  let skuDataObj = {}
 
   const configStore = useConfigStore()
+
+  function parseVariantRows(json) {
+    if (!json || !json.trim())
+      return []
+    try {
+      const obj = JSON.parse(json)
+      if (typeof obj !== 'object' || obj === null || Array.isArray(obj))
+        return []
+      return Object.entries(obj).map(([key, val]) => ({
+        id: ++variantIdCounter,
+        key,
+        options: Array.isArray(val) ? val.join(',') : String(val),
+      }))
+    }
+    catch {
+      return []
+    }
+  }
+
+  function serializeVariantRows(rows) {
+    const obj = {}
+    for (const r of rows) {
+      if (r.key.trim()) {
+        obj[r.key.trim()] = r.options.split(',').map(s => s.trim()).filter(Boolean)
+      }
+    }
+    return Object.keys(obj).length ? JSON.stringify(obj, null, 2) : ''
+  }
+
+  /** @type {import('vue').Ref<Array<{ id: number, key: string, options: string }>>} */
+  const variantRows = ref(parseVariantRows(variants.value))
+
+  /** 从 variantRows 笛卡尔积生成所有变体组合 */
+  const generatedSkuCombos = computed(() => {
+    const rows = variantRows.value.filter(r => r.key.trim() && r.options.trim())
+    if (rows.length === 0)
+      return []
+    const arrays = rows.map(r => r.options.split(',').map(s => s.trim()).filter(Boolean))
+    if (arrays.some(a => a.length === 0))
+      return []
+    const result = []
+    function cartesian(idx, current) {
+      if (idx === arrays.length) {
+        const key = current.join(',')
+        const values = {}
+        rows.forEach((r, i) => {
+          values[r.key.trim()] = current[i]
+        })
+        result.push({ key, values })
+        return
+      }
+      for (const val of arrays[idx]) {
+        cartesian(idx + 1, [...current, val])
+      }
+    }
+    cartesian(0, [])
+    return result
+  })
+
+  /** 所有可在 SKU 层覆盖的字段键（basicInfo 字段 + preset param fieldKeys） */
+  const allOverrideFieldKeys = computed(() => {
+    const keys = ['cost', 'weight']
+    const preset = configStore.config.presets.find(p => p.presetId === selectedPresetId.value)
+    if (preset && preset.params) {
+      for (const param of preset.params) {
+        if (param.fieldKey && !keys.includes(param.fieldKey)) {
+          keys.push(param.fieldKey)
+        }
+      }
+    }
+    return keys
+  })
 
   /** 当前选中的预设对象 */
   const selectedPreset = computed(() =>
@@ -50,6 +129,11 @@ export const useCreateStore = defineStore('create', () => {
     basicInfo.value = { name: '', sku: '', cost: '', weight: '' }
     images.value = ''
     variants.value = ''
+    skuData.value = '{}'
+    skuDataObj = {}
+    skuResults.value = {}
+    variantIdCounter = 0
+    variantRows.value = []
 
     const preset = configStore.config.presets.find(p => p.presetId === presetId)
     if (preset && preset.params) {
@@ -61,7 +145,9 @@ export const useCreateStore = defineStore('create', () => {
         }
         userInputs.value[param.fieldKey] = param.defaultValue ?? ''
       }
-      if (skipped.length > 0) {}
+      if (skipped.length > 0) {
+        // some params lack fieldKey, already handled in UI
+      }
     }
   }
 
@@ -74,20 +160,52 @@ export const useCreateStore = defineStore('create', () => {
     userInputs.value[fieldKey] = value
   }
 
-  /** 执行规则引擎计算，将结果写入 results 和 errors。 */
+  /** 执行规则引擎计算，将结果写入 results 和 errors。有变体时逐 SKU 计算。 */
   function calculate() {
     calculating.value = true
     errors.value = []
 
     try {
-      const { results: engineResults, errors: engineErrors } = execute(
-        configStore.config.fields,
-        currentRules.value,
-        configStore.config.lookupTables,
-        userInputs.value,
-      )
-      results.value = engineResults
-      errors.value = engineErrors
+      const combos = generatedSkuCombos.value
+      const productDefaults = { ...basicInfo.value, ...userInputs.value }
+
+      if (combos.length > 0) {
+        const currentSkuData = parseSkuData(skuData.value)
+        const newSkuResults = {}
+        const newErrors = []
+
+        for (const combo of combos) {
+          const sku = currentSkuData[combo.key] || { overrides: {} }
+          const mergedInputs = { ...productDefaults, ...(sku.overrides || {}) }
+          try {
+            const { results: engineResults, errors: engineErrors } = execute(
+              configStore.config.fields,
+              currentRules.value,
+              configStore.config.lookupTables,
+              mergedInputs,
+            )
+            newSkuResults[combo.key] = engineResults
+            newErrors.push(...engineErrors.map(e => `[${combo.key}] ${e}`))
+          }
+          catch (e) {
+            newErrors.push(`[${combo.key}] ${e.message || '计算失败'}`)
+          }
+        }
+        skuResults.value = newSkuResults
+        results.value = {}
+        errors.value = newErrors
+      }
+      else {
+        const { results: engineResults, errors: engineErrors } = execute(
+          configStore.config.fields,
+          currentRules.value,
+          configStore.config.lookupTables,
+          productDefaults,
+        )
+        results.value = engineResults
+        errors.value = engineErrors
+        skuResults.value = {}
+      }
     }
     catch (e) {
       errors.value = [e.message || '计算失败']
@@ -95,6 +213,75 @@ export const useCreateStore = defineStore('create', () => {
     finally {
       calculating.value = false
     }
+  }
+
+  function addVariantRow() {
+    variantRows.value.push({ id: ++variantIdCounter, key: '', options: '' })
+    variants.value = serializeVariantRows(variantRows.value)
+    refreshSkuData()
+  }
+
+  function updateVariantRow(id, data) {
+    const idx = variantRows.value.findIndex(r => r.id === id)
+    if (idx !== -1) {
+      variantRows.value[idx] = { ...variantRows.value[idx], ...data }
+      variants.value = serializeVariantRows(variantRows.value)
+      refreshSkuData()
+    }
+  }
+
+  function deleteVariantRow(id) {
+    variantRows.value = variantRows.value.filter(r => r.id !== id)
+    variants.value = serializeVariantRows(variantRows.value)
+    refreshSkuData()
+  }
+
+  function parseSkuData(json) {
+    if (!json || !json.trim())
+      return {}
+    try {
+      const obj = JSON.parse(json)
+      if (typeof obj === 'object' && obj !== null && !Array.isArray(obj))
+        return obj
+      return {}
+    }
+    catch {
+      return {}
+    }
+  }
+
+  function initSkuData() {
+    skuDataObj = parseSkuData(skuData.value)
+  }
+  initSkuData()
+
+  function refreshSkuData() {
+    const combos = generatedSkuCombos.value
+    const current = parseSkuData(skuData.value)
+    const merged = {}
+    for (const combo of combos) {
+      merged[combo.key] = current[combo.key] || { sku: '', images: '', overrides: {} }
+    }
+    skuData.value = Object.keys(merged).length ? JSON.stringify(merged) : '{}'
+    skuDataObj = merged
+  }
+
+  function updateSkuField(comboKey, field, value) {
+    if (!skuDataObj[comboKey])
+      return
+    if (field === 'sku' || field === 'images') {
+      skuDataObj[comboKey][field] = value
+    }
+    else {
+      if (!skuDataObj[comboKey].overrides)
+        skuDataObj[comboKey].overrides = {}
+      skuDataObj[comboKey].overrides[field] = value
+    }
+    skuData.value = JSON.stringify(skuDataObj)
+  }
+
+  function updateSkuImages(comboKey, imagesString) {
+    updateSkuField(comboKey, 'images', imagesString)
   }
 
   /**
@@ -108,6 +295,7 @@ export const useCreateStore = defineStore('create', () => {
       ...results.value,
       images: images.value,
       variants: variants.value,
+      skuData: skuData.value,
     }
   }
 
@@ -120,6 +308,11 @@ export const useCreateStore = defineStore('create', () => {
     basicInfo.value = { name: '', sku: '', cost: '', weight: '' }
     images.value = ''
     variants.value = ''
+    skuData.value = '{}'
+    skuDataObj = {}
+    skuResults.value = {}
+    variantIdCounter = 0
+    variantRows.value = []
   }
 
   /** 将 userInputs 重置为当前预设默认值，清空 results/errors，保留基础信息和预设选中。 */
@@ -136,7 +329,9 @@ export const useCreateStore = defineStore('create', () => {
         }
         userInputs.value[param.fieldKey] = param.defaultValue ?? ''
       }
-      if (skipped.length > 0) {}
+      if (skipped.length > 0) {
+        // some params lack fieldKey, already handled in UI
+      }
     }
   }
 
@@ -149,6 +344,11 @@ export const useCreateStore = defineStore('create', () => {
     basicInfo,
     images,
     variants,
+    variantRows,
+    skuData,
+    skuResults,
+    generatedSkuCombos,
+    allOverrideFieldKeys,
     selectedPreset,
     currentRules,
     selectPreset,
@@ -157,5 +357,11 @@ export const useCreateStore = defineStore('create', () => {
     getRecord,
     reset,
     resetToDefaults,
+    addVariantRow,
+    updateVariantRow,
+    deleteVariantRow,
+    refreshSkuData,
+    updateSkuField,
+    updateSkuImages,
   }
 })

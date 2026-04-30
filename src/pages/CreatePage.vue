@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import FieldInput from '@/components/common/FieldInput.vue'
+import ImageUploader from '@/components/common/ImageUploader.vue'
+import SkuTable from '@/components/common/SkuTable.vue'
 import { useFileIO } from '@/composables/useFileIO'
 import { useConfigStore } from '@/stores/config'
 import { useCreateStore } from '@/stores/create'
@@ -128,13 +130,31 @@ const selectedPresetCp = computed(() => {
     return null
   return configStore.getCountryPlatform(createStore.selectedPreset.cpId)
 })
+
+const selectedSkuFieldKeys = ref(['cost', 'weight'])
+
+const skuDataParsed = computed(() => {
+  try {
+    const obj = JSON.parse(createStore.skuData)
+    if (typeof obj === 'object' && obj !== null && !Array.isArray(obj))
+      return obj
+    return {}
+  }
+  catch {
+    return {}
+  }
+})
+
+const skuDefaultValues = computed(() => {
+  return { ...createStore.basicInfo, ...createStore.userInputs }
+})
 </script>
 
 <template>
   <div class="h-full flex flex-col overflow-hidden">
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">
-        新建
+        新建 <span class="badge badge-sm badge-primary">SKU</span>
       </h1>
       <div v-if="showNoConfig" class="flex gap-2">
         <button class="btn btn-primary btn-sm" @click="openConfigExcel">
@@ -289,23 +309,9 @@ const selectedPresetCp = computed(() => {
         <div class="card card-sm bg-base-100 border border-base-300" data-tour="create-images">
           <div class="card-body">
             <h2 class="card-title text-lg">
-              图片
+              {{ createStore.generatedSkuCombos.length > 0 ? '图片（共享）' : '图片' }}
             </h2>
-            <textarea
-              v-model="createStore.images"
-              class="textarea textarea-bordered w-full"
-              rows="3"
-              placeholder="图片URL，多个请用逗号分隔"
-            />
-            <div v-if="createStore.images" class="mt-2 flex gap-2 flex-wrap">
-              <img
-                v-for="(img, i) in createStore.images.split(',').map(s => s.trim()).filter(Boolean)"
-                :key="i"
-                :src="img"
-                class="w-20 h-20 object-cover rounded border"
-                @error="($event.target).style.display = 'none'"
-              >
-            </div>
+            <ImageUploader v-model="createStore.images" />
           </div>
         </div>
 
@@ -314,18 +320,68 @@ const selectedPresetCp = computed(() => {
             <h2 class="card-title text-lg">
               变体
             </h2>
-            <textarea
-              v-model="createStore.variants"
-              class="textarea textarea-bordered w-full font-mono"
-              rows="4"
-              placeholder="JSON 格式，如 {&quot;颜色&quot;: [&quot;红&quot;,&quot;蓝&quot;], &quot;尺寸&quot;: [&quot;S&quot;,&quot;M&quot;,&quot;L&quot;]}"
+            <table v-if="createStore.variantRows.length" class="table table-sm">
+              <thead>
+                <tr>
+                  <th>
+                    属性名
+                  </th>
+                  <th>
+                    选项值（逗号分隔）
+                  </th>
+                  <th class="w-16">
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in createStore.variantRows" :key="row.id">
+                  <td>
+                    <input
+                      :value="row.key"
+                      class="input input-bordered input-sm w-full"
+                      placeholder="如：颜色"
+                      @input="createStore.updateVariantRow(row.id, { key: ($event.target).value })"
+                    >
+                  </td>
+                  <td>
+                    <input
+                      :value="row.options"
+                      class="input input-bordered input-sm w-full"
+                      placeholder="如：红,蓝,黑"
+                      @input="createStore.updateVariantRow(row.id, { options: ($event.target).value })"
+                    >
+                  </td>
+                  <td>
+                    <button class="btn btn-ghost btn-xs text-error" @click="createStore.deleteVariantRow(row.id)">
+                      删除
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <button class="btn btn-ghost btn-sm" @click="createStore.addVariantRow">
+              + 添加属性
+            </button>
+
+            <SkuTable
+              :sku-combos="createStore.generatedSkuCombos"
+              :sku-data="skuDataParsed"
+              :sku-results="createStore.skuResults"
+              :base-sku="createStore.basicInfo.sku"
+              :default-values="skuDefaultValues"
+              :all-field-keys="createStore.allOverrideFieldKeys"
+              :selected-field-keys="selectedSkuFieldKeys"
+              @update:selected-field-keys="selectedSkuFieldKeys = $event"
+              @update-sku-field="createStore.updateSkuField"
+              @update-sku-images="createStore.updateSkuImages"
             />
           </div>
         </div>
       </div>
 
       <div class="w-64 flex-shrink-0 space-y-6">
-        <div v-if="!showNoPreset" class="card card-sm bg-base-100 border border-base-300" data-tour="create-results">
+        <div v-if="!showNoPreset && createStore.generatedSkuCombos.length === 0" class="card card-sm bg-base-100 border border-base-300" data-tour="create-results">
           <div class="card-body">
             <h2 class="card-title text-lg">
               计算结果

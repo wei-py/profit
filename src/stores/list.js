@@ -22,6 +22,7 @@ export const useListStore = defineStore('list', () => {
     { key: 'weight', prop: 'weight' },
     { key: 'images', prop: 'images' },
     { key: 'variants', prop: 'variants' },
+    { key: 'skuData', prop: 'skuData' },
   ]
 
   /**
