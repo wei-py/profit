@@ -1,5 +1,7 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { driver } from 'driver.js'
+import 'driver.js/dist/driver.css'
 import { useConfigStore } from '@/stores/config'
 
 const store = useConfigStore()
@@ -283,6 +285,45 @@ function saveRule() {
 function deleteRuleFromSub() { if (editingRuleIdx.value >= 0) tplRulesLocal.value.splice(editingRuleIdx.value, 1); showRuleSubModal.value = false }
 function deleteRuleInline(i) { tplRulesLocal.value.splice(i, 1) }
 
+// ── 弹窗教学引导 ──
+function startTour(steps) {
+  const d = driver({ showProgress: true, animate: true, prevBtnText: '上一步', nextBtnText: '下一步', doneBtnText: '知道了', closeBtnText: '✕' })
+  d.setSteps(steps)
+  d.drive()
+}
+
+const countryEditSteps = [
+  { popover: { title: '编辑国家', description: '修改国家平台的基本信息。编号、国家、平台、货币等核心字段。自定义列也可以在这里编辑。' } },
+]
+
+const fieldEditSteps = [
+  { popover: { title: '字段编辑', description: '定义计算字段。字段键是唯一标识（中文），用于规则中的条件、公式引用。层级决定该字段在新建商品时的显示位置。' } },
+  { element: '[data-tour="field-type"]', popover: { title: '字段类型', description: '下拉=选择框（需关联选项组），布尔=是/否，数字和文本=输入框。' } },
+  { element: '[data-tour="field-level"]', popover: { title: '字段层级', description: '商品级=所有SKU共享（如刊登类型），SKU级=每个变体独立（如售价、重量）。' } },
+  { element: '[data-tour="field-default"]', popover: { title: '默认值', description: '新建商品时自动填入的值。布尔字段选是/否，下拉字段选选项值，其他字段直接输入。' } },
+]
+
+const optionEditSteps = [
+  { popover: { title: '编辑选项组', description: '选项组为下拉字段提供可选值。编号建议带国家前缀（如 br_刊登类型）。' } },
+  { element: '[data-tour="opt-items"]', popover: { title: '选项值', description: '选项值=存储值（code），显示名=用户看到的文本。启用=否则该选项不出现在下拉框中。' } },
+]
+
+const templateEditSteps = [
+  { popover: { title: '编辑模板', description: '计算模板定义一套费用计算方案，包含多条费用规则和查表数据。一个模板归属一个国家平台。' } },
+  { element: '[data-tour="tpl-rules"]', popover: { title: '费用规则', description: '按计算顺序执行。点击规则行可编辑详细条件与计算方式。同行多个条件默认AND，多行同输出字段默认OR。' } },
+  { element: '[data-tour="tpl-lookups"]', popover: { title: '查表数据', description: '新建或编辑费率表。规则中的"查表"计算方式会引用这些表。可自由增删行列，改表名。' } },
+]
+
+const ruleEditSteps = [
+  { popover: { title: '编辑规则', description: '每条规则执行一个计算步骤。输出字段键指定结果写入哪个字段。计算方式决定如何算出结果。' } },
+  { element: '[data-tour="rule-conds"]', popover: { title: '条件树', description: '组内条件按AND/OR组合。＋AND/＋OR添加条件（带上连接关系）。＋子组创建嵌套条件组。点击条件间的AND/OR标签可切换。' } },
+  { element: '[data-tour="rule-calc"]', popover: { title: '计算配置', description: '查表=从费率表取值。百分比=基数×比率（可用固定百分比值或引用前面的结果作为动态费率）。加总=累加多个字段。公式=算术表达式。' } },
+]
+
+const lookupEditSteps = [
+  { popover: { title: '查表编辑', description: '编辑费率表数据。表名可修改（同步更新所有规则中的引用）。＋行列增删行列。列头✕可删除整列。' } },
+]
+
 function condSummary(r) {
   const a = [1, 2].map(i => r['条件' + i + '字段'] ? `${r['条件' + i + '字段']} ${r['条件' + i + '运算符']||''} ${r['条件' + i + '值']}` : '').filter(Boolean).join(' AND ')
   const b = [3, 4].map(i => r['条件' + i + '字段'] ? `${r['条件' + i + '字段']} ${r['条件' + i + '运算符']||''} ${r['条件' + i + '值']}` : '').filter(Boolean).join(' AND ')
@@ -459,7 +500,7 @@ function delLookupCol(col) {
     <!-- ═══ 国家编辑弹窗 ═══ -->
     <dialog :open="showCountryModal" class="modal">
       <div class="modal-box max-w-lg">
-        <h3 class="text-lg font-bold mb-4">编辑国家</h3>
+        <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">编辑国家</h3><button class="btn btn-ghost btn-sm btn-circle" @click="startTour(countryEditSteps)">?</button></div>
         <div class="grid grid-cols-2 gap-3">
           <div v-for="k in allKeys" :key="k">
             <label class="label py-0 text-xs">{{ k }}</label>
@@ -478,18 +519,18 @@ function delLookupCol(col) {
     <!-- ═══ 字段弹窗 ═══ -->
     <dialog :open="showFieldModal" class="modal">
       <div class="modal-box max-w-lg">
-        <h3 class="text-lg font-bold mb-4">{{ editingFieldIdx >= 0 ? '编辑字段' : '新建字段' }}</h3>
+        <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">{{ editingFieldIdx >= 0 ? '编辑字段' : '新建字段' }}</h3><button class="btn btn-ghost btn-sm btn-circle" @click="startTour(fieldEditSteps)">?</button></div>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="label py-0 text-xs">字段键</label><input v-model="fieldForm.字段键" class="input input-bordered input-sm w-full"></div>
           <div><label class="label py-0 text-xs">字段名称</label><input v-model="fieldForm.字段名称" class="input input-bordered input-sm w-full"></div>
-          <div><label class="label py-0 text-xs">类型</label><select v-model="fieldForm.类型" class="select select-bordered select-sm w-full"><option>数字</option><option>文本</option><option>下拉</option><option>布尔</option></select></div>
-          <div><label class="label py-0 text-xs">层级</label><select v-model="fieldForm.层级" class="select select-bordered select-sm w-full"><option>商品级</option><option>SKU级</option></select></div>
+          <div data-tour="field-type"><label class="label py-0 text-xs">类型</label><select v-model="fieldForm.类型" class="select select-bordered select-sm w-full"><option>数字</option><option>文本</option><option>下拉</option><option>布尔</option></select></div>
+          <div data-tour="field-level"><label class="label py-0 text-xs">层级</label><select v-model="fieldForm.层级" class="select select-bordered select-sm w-full"><option>商品级</option><option>SKU级</option></select></div>
           <div><label class="label py-0 text-xs">输入/输出</label><select v-model="fieldForm.输入输出" class="select select-bordered select-sm w-full"><option>输入</option><option>输出</option></select></div>
           <div><label class="label py-0 text-xs">单位</label><input v-model="fieldForm.单位" class="input input-bordered input-sm w-full"></div>
           <div><label class="label py-0 text-xs">选项组编号</label><input v-model="fieldForm.选项组编号" class="input input-bordered input-sm w-full"></div>
           <div><label class="label py-0 text-xs">必填</label><select v-model="fieldForm.必填" class="select select-bordered select-sm w-full"><option>是</option><option>否</option></select></div>
         </div>
-        <div class="mt-2">
+        <div class="mt-2" data-tour="field-default">
           <label class="label py-0 text-xs">默认值</label>
           <select v-if="fieldForm.类型 === '布尔'" v-model="fieldForm.默认值" class="select select-bordered select-sm w-full">
             <option value="">—</option><option>是</option><option>否</option>
@@ -513,7 +554,7 @@ function delLookupCol(col) {
     <!-- ═══ 选项组弹窗 ═══ -->
     <dialog :open="showOptModal" class="modal">
       <div class="modal-box max-w-2xl max-h-[85vh] overflow-y-auto">
-        <h3 class="text-lg font-bold mb-4">{{ editingOptIdx >= 0 ? '编辑选项组' : '新建选项组' }}</h3>
+        <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">{{ editingOptIdx >= 0 ? '编辑选项组' : '新建选项组' }}</h3><button class="btn btn-ghost btn-sm btn-circle" @click="startTour(optionEditSteps)">?</button></div>
         <div class="grid grid-cols-3 gap-3 mb-4">
           <div><label class="label py-0 text-xs">编号</label><input v-model="optForm.编号" class="input input-bordered input-sm w-full"></div>
           <div><label class="label py-0 text-xs">名称</label><input v-model="optForm.名称" class="input input-bordered input-sm w-full"></div>
@@ -521,7 +562,7 @@ function delLookupCol(col) {
         </div>
         <div>
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold">选项值（{{ optItemsLocal.length }}）</span>
+            <span class="text-sm font-semibold" data-tour="opt-items">选项值（{{ optItemsLocal.length }}）</span>
             <button class="btn btn-xs btn-primary" @click="addOptItem">＋</button>
           </div>
           <table v-if="optItemsLocal.length" class="table table-xs">
@@ -549,7 +590,7 @@ function delLookupCol(col) {
     <!-- ═══ 模板弹窗 ═══ -->
     <dialog :open="showTplModal" class="modal">
       <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto">
-        <h3 class="text-lg font-bold mb-4">{{ editingTplIdx >= 0 ? '编辑模板' : '新建模板' }}</h3>
+        <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">{{ editingTplIdx >= 0 ? '编辑模板' : '新建模板' }}</h3><button class="btn btn-ghost btn-sm btn-circle" @click="startTour(templateEditSteps)">?</button></div>
         <div class="grid grid-cols-4 gap-3 mb-4">
           <div><label class="label py-0 text-xs">编号</label><input v-model="tplForm.编号" class="input input-bordered input-sm w-full"></div>
           <div><label class="label py-0 text-xs">名称</label><input v-model="tplForm.名称" class="input input-bordered input-sm w-full"></div>
@@ -608,7 +649,7 @@ function delLookupCol(col) {
     <!-- ═══ 规则编辑弹窗（动态条件） ═══ -->
     <dialog :open="showRuleSubModal" class="modal">
       <div class="modal-box w-11/12 max-w-3xl max-h-[85vh] overflow-y-auto">
-        <h3 class="text-lg font-bold mb-4">{{ editingRuleIdx >= 0 ? '编辑规则' : '新建规则' }}</h3>
+        <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">{{ editingRuleIdx >= 0 ? '编辑规则' : '新建规则' }}</h3><button class="btn btn-ghost btn-sm btn-circle" @click="startTour(ruleEditSteps)">?</button></div>
         <div class="grid grid-cols-4 gap-2 mb-4">
           <div><label class="label py-0 text-xs">编号</label><input v-model="ruleForm.编号" class="input input-bordered input-sm w-full"></div>
           <div><label class="label py-0 text-xs">费用名称</label><input v-model="ruleForm.费用名称" class="input input-bordered input-sm w-full"></div>
@@ -679,10 +720,7 @@ function delLookupCol(col) {
     <!-- ═══ 查表数据弹窗 ═══ -->
     <dialog :open="showLookupModal" class="modal">
       <div class="modal-box w-11/12 max-w-4xl max-h-[85vh] overflow-y-auto">
-        <div class="flex items-center gap-2 mb-4">
-          <h3 class="text-lg font-bold">查表：</h3>
-          <input v-model="lookupTableNewName" class="input input-bordered input-sm w-48 font-mono" @change="() => {}">
-        </div>
+        <div class="flex items-center gap-2 mb-4"><h3 class="text-lg font-bold">查表：</h3><input v-model="lookupTableNewName" class="input input-bordered input-sm w-48 font-mono"><button class="btn btn-ghost btn-sm btn-circle ml-auto" @click="startTour(lookupEditSteps)">?</button></div>
         <div class="flex gap-2 mb-3">
           <button class="btn btn-xs btn-ghost" @click="addLookupRow">＋ 行</button>
           <button class="btn btn-xs btn-ghost" @click="addLookupCol">＋ 列</button>
