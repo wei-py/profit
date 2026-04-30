@@ -1,273 +1,158 @@
 /**
- * 评估单个条件的匹配结果。
- * @param {{ fieldKey: string, operator: string, value: *, valueEnd: * }} condition - 条件对象
- * @param {object} userInputs - 用户输入键值对
- * @returns {boolean} 条件是否满足
+ * 执行费用计算。
+ * @param {object[]} feeRules - 费用规则列表（已按模板过滤）
+ * @param {object} lookupTables - { sheet名: 行数据[] }
+ * @param {object} userInputs - { 字段键: 值 }
+ * @returns {{ results: object, errors: string[] }}
  */
-function evaluateCondition(condition, userInputs) {
-  const { fieldKey, operator, value, valueEnd } = condition
-  const inputVal = userInputs[fieldKey]
-
-  if (inputVal === undefined || inputVal === null || inputVal === '') {
-    return false
-  }
-
-  switch (operator) {
-    case 'eq':
-      return String(inputVal) === String(value)
-    case 'neq':
-      return String(inputVal) !== String(value)
-    case 'gt':
-      return Number(inputVal) > Number(value)
-    case 'gte':
-      return Number(inputVal) >= Number(value)
-    case 'lt':
-      return Number(inputVal) < Number(value)
-    case 'lte':
-      return Number(inputVal) <= Number(value)
-    case 'between': {
-      const n = Number(inputVal)
-      return n >= Number(value) && n <= Number(valueEnd)
-    }
-    case 'in': {
-      const list = typeof value === 'string' ? value.split(',').map(s => s.trim()) : (Array.isArray(value) ? value : [value])
-      return list.some(item => String(inputVal) === String(item))
-    }
-    case 'not_in': {
-      const list = typeof value === 'string' ? value.split(',').map(s => s.trim()) : (Array.isArray(value) ? value : [value])
-      return !list.some(item => String(inputVal) === String(item))
-    }
-    default:
-      return false
-  }
-}
-
-/**
- * 递归评估条件组树，计算整体匹配结果。
- * @param {{ logic: string, conditions: Array, children: Array }} group - 条件组节点
- * @param {object} userInputs - 用户输入键值对
- * @returns {boolean} 条件组是否满足
- */
-function evaluateGroup(group, userInputs) {
-  if (!group || !group.conditions)
-    return true
-
-  const results = []
-
-  for (const cond of group.conditions) {
-    results.push(evaluateCondition(cond, userInputs))
-  }
-
-  for (const child of (group.children || [])) {
-    results.push(evaluateGroup(child, userInputs))
-  }
-
-  if (results.length === 0)
-    return true
-
-  if (group.logic === 'or') {
-    return results.includes(true)
-  }
-  return results.every(r => r === true)
-}
-
-/**
- * 判断规则是否与用户输入匹配。
- * @param {{ enabled: boolean, conditionTree: Array }} rule - 规则对象
- * @param {object} userInputs - 用户输入键值对
- * @returns {boolean} 规则是否匹配
- */
-function ruleMatches(rule, userInputs) {
-  if (!rule.enabled)
-    return false
-  if (!rule.conditionTree || rule.conditionTree.length === 0)
-    return true
-  return rule.conditionTree.some(tree => evaluateGroup(tree, userInputs))
-}
-
-/**
- * 根据 ID 查找对应的查找表。
- * @param {Array} lookupTables - 查找表列表
- * @param {string} tableId - 查找表 ID
- * @returns {object | undefined} 匹配的查找表
- */
-function findLookupTable(lookupTables, tableId) {
-  return lookupTables.find(t => t.tableId === tableId || t.tableId === String(tableId))
-}
-
-/**
- * 在查找表中执行精确匹配或区间匹配，返回输出列的值。
- * @param {{input_map: object, output_column: string, match_mode: string}} config - 查找配置
- * @param {{ rows: Array, matchMode: string }} lookupTable - 查找表对象
- * @param {object} userInputs - 用户输入键值对
- * @param {object} results - 已计算的结果键值对
- * @returns {*|null} 匹配到的值，未匹配则返回 null
- */
-function performLookup(config, lookupTable, userInputs, results) {
-  const { input_map: inputMap, output_column: outputColumn, match_mode: matchMode } = config
-  if (!lookupTable || !lookupTable.rows || lookupTable.rows.length === 0)
-    return null
-
-  const mode = matchMode || lookupTable.matchMode || 'exact'
-
-  for (const row of lookupTable.rows) {
-    if (mode === 'exact') {
-      let allMatch = true
-      for (const [colKey, sourceField] of Object.entries(inputMap)) {
-        const rowVal = row[colKey]
-        const inputVal = sourceField in results
-          ? results[sourceField]
-          : sourceField in userInputs
-            ? userInputs[sourceField]
-            : undefined
-        if (String(rowVal) !== String(inputVal)) {
-          allMatch = false
-          break
-        }
-      }
-      if (allMatch)
-        return row[outputColumn]
-    }
-    else if (mode === 'range') {
-      let allInRange = true
-      for (const [colPrefix, sourceField] of Object.entries(inputMap)) {
-        const minKey = `${colPrefix}下限`
-        const maxKey = `${colPrefix}上限`
-        const inputVal = sourceField in results
-          ? results[sourceField]
-          : sourceField in userInputs
-            ? userInputs[sourceField]
-            : undefined
-
-        if (inputVal === undefined || inputVal === null) {
-          allInRange = false
-          break
-        }
-
-        const n = Number(inputVal)
-        const min = row[minKey] !== undefined && row[minKey] !== '' ? Number(row[minKey]) : -Infinity
-        const max = row[maxKey] !== undefined && row[maxKey] !== '' ? Number(row[maxKey]) : Infinity
-
-        if (n < min || n > max) {
-          allInRange = false
-          break
-        }
-      }
-      if (allInRange)
-        return row[outputColumn]
-    }
-  }
-  return null
-}
-
-/**
- * 执行单个动作（set / lookup / branch），将结果写入 results 或错误写入 errors。
- * @param {{actionType: string, targetField: string, configJson: object, actionId: string}} action - 动作对象
- * @param {object} rule - 所属规则
- * @param {Array} allRules - 所有规则列表
- * @param {Array} lookupTables - 查找表列表
- * @param {object} userInputs - 用户输入键值对
- * @param {object} results - 计算结果输出对象
- * @param {string[]} errors - 错误信息数组
- */
-function executeAction(action, rule, allRules, lookupTables, userInputs, results, errors) {
-  const { actionType, targetField, configJson } = action
-
-  try {
-    switch (actionType) {
-      case 'set': {
-        const val = configJson.value
-        results[targetField] = val
-        break
-      }
-      case 'lookup': {
-        const tableId = configJson.table_id
-        const lookupTable = findLookupTable(lookupTables, tableId)
-        if (!lookupTable) {
-          errors.push(`动作 ${action.actionId} 未找到查找表“${tableId}”`)
-          break
-        }
-        const val = performLookup(configJson, lookupTable, userInputs, results)
-        if (val !== null && val !== undefined) {
-          results[targetField] = val
-        }
-        else {
-          errors.push(`动作 ${action.actionId} 在查找表“${tableId}”中未找到匹配行`)
-        }
-        break
-      }
-      case 'branch': {
-        const { when, then: thenAction, else: elseAction } = configJson
-        if (!when)
-          break
-
-        let conditionMet = false
-        if (when.field) {
-          conditionMet = evaluateCondition({
-            fieldKey: when.field,
-            operator: when.operator || 'eq',
-            value: when.value,
-            valueEnd: when.value_end,
-          }, userInputs)
-        }
-
-        const subAction = conditionMet ? thenAction : elseAction
-        if (!subAction)
-          break
-
-        if (subAction.type === 'set') {
-          results[targetField] = subAction.value
-        }
-        else if (subAction.type === 'lookup') {
-          const tableId = subAction.table_id
-          const lookupTable = findLookupTable(lookupTables, tableId)
-          if (!lookupTable) {
-            errors.push(`分支动作 ${action.actionId} 未找到查找表“${tableId}”`)
-            break
-          }
-          const val = performLookup(subAction, lookupTable, userInputs, results)
-          if (val !== null && val !== undefined) {
-            results[targetField] = val
-          }
-          else {
-            errors.push(`分支动作 ${action.actionId} 在查找表“${tableId}”中未找到匹配行`)
-          }
-        }
-        break
-      }
-      default:
-        errors.push(`动作 ${action.actionId} 的动作类型“${actionType}”无效`)
-    }
-  }
-  catch (e) {
-    errors.push(`执行动作 ${action.actionId} 时出错：${e.message}`)
-  }
-}
-
-/**
- * 执行规则引擎主流程：按优先级顺序匹配规则，执行动作后返回结果与错误。
- * @param {Array} fields - 字段定义列表
- * @param {Array} rules - 规则列表
- * @param {Array} lookupTables - 查找表列表
- * @param {object} userInputs - 用户输入键值对
- * @returns {{results: object, errors: string[]}} 计算结果与错误信息
- */
-export function execute(fields, rules, lookupTables, userInputs) {
+export function execute(feeRules, lookupTables, userInputs) {
   const results = {}
   const errors = []
 
-  const sortedRules = [...rules]
-    .filter(r => r.enabled)
-    .sort((a, b) => a.priority - b.priority)
+  const enabled = feeRules.filter(r => r.启用 === '是' || r.启用 === 'TRUE')
+  const sorted = enabled.sort((a, b) => Number(a.计算顺序) - Number(b.计算顺序))
 
-  for (const rule of sortedRules) {
-    if (ruleMatches(rule, userInputs)) {
-      const sortedActions = [...(rule.actions || [])].sort((a, b) => a.sort - b.sort)
-      for (const action of sortedActions) {
-        executeAction(action, rule, sortedRules, lookupTables, userInputs, results, errors)
+  // 所有可用字段键（输入 + 已计算结果），公式替换时用
+  const allKeys = [...new Set([
+    ...Object.keys(userInputs),
+    ...sorted.map(r => r.输出字段键).filter(Boolean),
+  ])]
+
+  for (const rule of sorted) {
+    try {
+      // 条件判断
+      if (rule.条件1字段) {
+        if (!matches(getVal(rule.条件1字段, userInputs, results), rule.条件1运算符, rule.条件1值, rule.条件1值2)) {
+          continue
+        }
       }
+      if (rule.条件2字段) {
+        if (!matches(getVal(rule.条件2字段, userInputs, results), rule.条件2运算符, rule.条件2值, rule.条件2值2)) {
+          continue
+        }
+      }
+
+      const key = rule.输出字段键
+      if (!key) continue
+
+      switch (rule.计算方式) {
+        case '查表':
+          results[key] = doLookup(rule, lookupTables, userInputs, results)
+          break
+        case '百分比':
+          results[key] = doPercent(rule, userInputs, results)
+          break
+        case '固定值':
+          results[key] = Number(rule.固定金额) || 0
+          break
+        case '加总':
+          results[key] = doSum(rule, userInputs, results)
+          break
+        case '公式':
+          results[key] = doFormula(rule, userInputs, results, allKeys)
+          break
+      }
+    }
+    catch (e) {
+      errors.push(`[${rule.编号}] ${e.message}`)
     }
   }
 
   return { results, errors }
+}
+
+// ── helpers ──
+
+function getVal(fieldKey, inputs, results) {
+  if (results[fieldKey] !== undefined && results[fieldKey] !== null) return results[fieldKey]
+  return inputs[fieldKey]
+}
+
+function matches(val, op, target, target2) {
+  const sVal = String(val ?? '')
+  const sTgt = String(target ?? '')
+  const nVal = Number(val)
+  const nTgt = Number(target)
+  switch (op) {
+    case '等于': return sVal === sTgt
+    case '不等于': return sVal !== sTgt
+    case '大于': return nVal > nTgt
+    case '大于等于': return nVal >= nTgt
+    case '小于': return nVal < nTgt
+    case '小于等于': return nVal <= nTgt
+    default: return false
+  }
+}
+
+function doLookup(rule, lookupTables, inputs, results) {
+  const table = lookupTables[rule.查表名称]
+  if (!table || !table.length) throw new Error(`费率表「${rule.查表名称}」不存在或为空`)
+
+  const mappings = parseMappings(rule.输入映射)
+  const isRange = rule.匹配方式 === '区间'
+
+  for (const row of table) {
+    let ok = true
+    for (const [fieldKey, colName] of mappings) {
+      const inputVal = getVal(fieldKey, inputs, results)
+      if (isRange) {
+        const v = Number(inputVal)
+        const lo = Number(row[colName + '下限'])
+        const hi = Number(row[colName + '上限'])
+        if (v < lo || v > hi) { ok = false; break }
+      }
+      else {
+        if (String(inputVal) !== String(row[colName])) { ok = false; break }
+      }
+    }
+    if (ok) return Number(row[rule.输出列]) || 0
+  }
+  throw new Error(`查表「${rule.查表名称}」未找到匹配行`)
+}
+
+function doPercent(rule, inputs, results) {
+  const base = Number(getVal(rule.百分比基数, inputs, results)) || 0
+  let rate
+  if (rule.百分比来源字段) {
+    rate = Number(getVal(rule.百分比来源字段, inputs, results)) || 0
+  }
+  else {
+    rate = Number(rule.百分比值) / 100 || 0
+  }
+  return base * rate
+}
+
+function doSum(rule, inputs, results) {
+  if (!rule.加总字段) return 0
+  return rule.加总字段.split(',').reduce((s, fk) => {
+    return s + (Number(getVal(fk.trim(), inputs, results)) || 0)
+  }, 0)
+}
+
+function doFormula(rule, inputs, results, allKeys) {
+  let expr = rule.公式
+  if (!expr) return 0
+
+  // 按字段键长度从长到短替换，避免短名误匹配
+  const sorted = [...allKeys].sort((a, b) => b.length - a.length)
+  for (const fk of sorted) {
+    const val = Number(getVal(fk, inputs, results)) || 0
+    expr = expr.replaceAll(fk, val)
+  }
+
+  // 安全校验
+  if (!/^[\d\s+\-*/().]+$/.test(expr)) {
+    throw new Error(`公式含非法字符：${rule.公式}`)
+  }
+
+  // eslint-disable-next-line no-new-func
+  return Function('"use strict"; return (' + expr + ')')()
+}
+
+function parseMappings(inputMap) {
+  if (!inputMap) return []
+  return inputMap.split(',').map(p => {
+    const parts = p.split('=').map(s => s.trim())
+    return [parts[0], parts[1]]
+  }).filter(m => m[0] && m[1])
 }

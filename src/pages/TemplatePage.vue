@@ -1,1075 +1,411 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import ActionEditor from '@/components/common/ActionEditor.vue'
-import TreeView from '@/components/common/TreeView.vue'
-import { useFileIO } from '@/composables/useFileIO'
+import { computed, reactive, ref } from 'vue'
+import EditableTable from '@/components/common/EditableTable.vue'
 import { useConfigStore } from '@/stores/config'
 
-const configStore = useConfigStore()
-const { openConfigExcel, saveConfigExcel } = useFileIO()
+const store = useConfigStore()
+const selectedCountryId = ref(store['国家平台'].find(c => c.启用 === '是')?.编号 || '')
+const selectedTemplateId = ref('')
 
-/** 是否显示无配置提示 */
-const showNoConfig = computed(() => !configStore.loaded)
+const enabledCountries = computed(() =>
+  store['国家平台'].filter(c => c.启用 === '是' || c.启用 === 'TRUE'),
+)
 
-/** @type {import('vue').Ref<string>} 当前选中的规则集 ID */
-const selectedRuleSetId = ref('')
-/** @type {import('vue').Ref<string>} 当前选中的规则 ID */
-const selectedRuleId = ref('')
+const countryTemplates = computed(() =>
+  store.getTemplatesByCountry(selectedCountryId.value),
+)
 
-/** @type {import('vue').Ref<string>} 当前选中的 tab（'rules' / 'lookups'） */
-const selectedTab = ref('rules')
-/** @type {import('vue').Ref<string>} 当前选中的查找表 ID */
-const selectedLookupTableId = ref('')
-
-const CACHE_RULESET_KEY = 'profit-selected-rule-set-id'
-const CACHE_RULE_KEY = 'profit-selected-rule-id'
-const CACHE_TAB_KEY = 'profit-selected-tab'
-const CACHE_LOOKUP_KEY = 'profit-selected-lookup-table-id'
-
-/** 从 localStorage 恢复上次选中的规则集/规则/Tab/查找表 */
-onMounted(() => {
-  if (!configStore.loaded)
-    return
-  const cachedRuleSetId = localStorage.getItem(CACHE_RULESET_KEY)
-  if (cachedRuleSetId && configStore.config.ruleSets.some(rs => rs.ruleSetId === cachedRuleSetId)) {
-    selectedRuleSetId.value = cachedRuleSetId
-  }
-  const cachedRuleId = localStorage.getItem(CACHE_RULE_KEY)
-  if (cachedRuleId && configStore.config.rules.some(r => r.ruleId === cachedRuleId)) {
-    selectedRuleId.value = cachedRuleId
-  }
-  const cachedTab = localStorage.getItem(CACHE_TAB_KEY)
-  if (cachedTab === 'rules' || cachedTab === 'lookups') {
-    selectedTab.value = cachedTab
-  }
-  const cachedLookupId = localStorage.getItem(CACHE_LOOKUP_KEY)
-  if (cachedLookupId && configStore.config.lookupTables.some(t => t.tableId === cachedLookupId)) {
-    selectedLookupTableId.value = cachedLookupId
-  }
+const templateRules = computed(() => {
+  if (!selectedTemplateId.value) return []
+  return store.getFeeRulesByTemplate(selectedTemplateId.value)
 })
 
-watch(selectedRuleSetId, (val) => {
-  localStorage.setItem(CACHE_RULESET_KEY, val)
-})
-watch(selectedRuleId, (val) => {
-  localStorage.setItem(CACHE_RULE_KEY, val)
-})
-watch(selectedTab, (val) => {
-  localStorage.setItem(CACHE_TAB_KEY, val)
-})
-watch(selectedLookupTableId, (val) => {
-  localStorage.setItem(CACHE_LOOKUP_KEY, val)
+const templateParams = computed(() => {
+  if (!selectedTemplateId.value) return []
+  return store.getTemplateParams(selectedTemplateId.value)
 })
 
-/** @type {import('vue').Ref<boolean>} 是否显示规则编辑弹窗 */
+// 当前国家的所有字段（用于下拉选项）
+const countryFields = computed(() =>
+  store.getFieldsByCountry(selectedCountryId.value),
+)
+const fieldKeys = computed(() => countryFields.value.map(f => f.字段键))
+const outputFieldKeys = computed(() =>
+  countryFields.value.filter(f => f.输入输出 === '输出' || f.输入输出 === 'output').map(f => f.字段键),
+)
+
+// ── 模板表 ──
+const templateColumns = [
+  { key: '编号', label: '编号', type: 'text' },
+  { key: '名称', label: '名称', type: 'text' },
+  { key: '所属国家平台', label: '所属国家平台', type: 'text' },
+  { key: '启用', label: '启用', type: 'boolean' },
+  { key: '说明', label: '说明', type: 'text' },
+]
+
+// ── 规则摘要列 ──
+const ruleSummaryColumns = [
+  { key: '编号', label: '编号', type: 'text' },
+  { key: '输出字段键', label: '输出到', type: 'text' },
+  { key: '计算方式', label: '计算方式', type: 'text' },
+  { key: '条件摘要', label: '条件', type: 'text' },
+  { key: '计算顺序', label: '顺序', type: 'number' },
+  { key: '启用', label: '启用', type: 'boolean' },
+]
+
+// ── 规则编辑弹窗 ──
 const showRuleModal = ref(false)
-/** @type {import('vue').Ref<object | null>} 正在编辑的规则 */
-const editingRule = ref(null)
-/** @type {import('vue').Ref<object>} 规则表单数据 */
-const ruleForm = ref({
-  ruleId: '',
-  ruleSetId: '',
-  priority: 100,
-  enabled: true,
-  rootGroupId: '',
-  description: '',
-})
-/** @type {import('vue').Ref<string[]>} 规则表单校验错误 */
-const ruleErrors = ref([])
+const editingIndex = ref(-1)
+const ruleForm = reactive({})
 
-/** @type {import('vue').Ref<boolean>} 是否显示分组编辑弹窗 */
-const showGroupModal = ref(false)
-/** @type {import('vue').Ref<object | null>} 正在编辑的分组 */
-const editingGroup = ref(null)
-/** @type {import('vue').Ref<object>} 分组表单数据 */
-const groupForm = ref({ groupId: '', ruleId: '', parentGroupId: '', logic: 'and', sort: 1, description: '' })
-
-/** @type {import('vue').Ref<boolean>} 是否显示条件编辑弹窗 */
-const showConditionModal = ref(false)
-/** @type {import('vue').Ref<object | null>} 正在编辑的条件 */
-const editingCondition = ref(null)
-/** @type {import('vue').Ref<object>} 条件表单数据 */
-const conditionForm = ref({
-  conditionId: '',
-  groupId: '',
-  fieldKey: '',
-  operator: 'eq',
-  valueType: 'literal',
-  value: '',
-  valueEnd: '',
-  sort: 1,
-  description: '',
-})
-
-/** @type {import('vue').Ref<boolean>} 是否显示动作编辑弹窗 */
-const showActionModal = ref(false)
-/** @type {import('vue').Ref<object | null>} 正在编辑的动作 */
-const editingAction = ref(null)
-/** @type {import('vue').Ref<object>} 动作表单数据 */
-const actionForm = ref({
-  actionId: '',
-  ruleId: '',
-  sort: 1,
-  actionType: 'set',
-  targetField: '',
-  configJson: {},
-})
-
-/** @type {import('vue').Ref<boolean>} 是否显示查找表编辑弹窗 */
-const showLookupModal = ref(false)
-/** @type {import('vue').Ref<object | null>} 正在编辑的查找表 */
-const editingLookup = ref(null)
-/** @type {import('vue').Ref<object>} 查找表表单数据 */
-const lookupForm = ref({
-  tableId: '',
-  tableName: '',
-  matchMode: 'exact',
-  sheetName: '',
-  description: '',
-})
-
-/** 当前规则集下的规则列表 */
-const ruleSetRules = computed(() =>
-  configStore.getRulesByRuleSet(selectedRuleSetId.value),
-)
-
-/** 当前选中的规则对象 */
-const selectedRule = computed(() =>
-  configStore.config.rules.find(r => r.ruleId === selectedRuleId.value),
-)
-
-/** 当前选中的查找表对象 */
-const selectedLookupTable = computed(() =>
-  configStore.config.lookupTables.find(t => t.tableId === selectedLookupTableId.value),
-)
-
-/**
- * 获取动作类型的中文标签。
- * @param {string} type - 动作类型
- * @returns {string} 中文标签
- */
-function actionTypeLabel(type) {
-  const map = {
-    set: '赋值',
-    lookup: '查表',
-    branch: '分支',
-  }
-  return map[type] || type
+function conditionSummary(r) {
+  const parts = []
+  if (r.条件1字段) parts.push(`${r.条件1字段} ${r.条件1运算符 || ''} ${r.条件1值}`)
+  if (r.条件2字段) parts.push(`AND ${r.条件2字段} ${r.条件2运算符 || ''} ${r.条件2值}`)
+  return parts.join(' ') || '无条件'
 }
 
-/**
- * 获取匹配模式的中文标签。
- * @param {string} mode - 匹配模式
- * @returns {string} 中文标签
- */
-function matchModeLabel(mode) {
-  const map = {
-    exact: '精确匹配',
-    range: '区间匹配',
-  }
-  return map[mode] || mode
-}
-
-/** 打开新建规则弹窗。 */
 function openNewRule() {
-  editingRule.value = null
-  ruleForm.value = {
-    ruleId: `rule_${Date.now()}`,
-    ruleSetId: selectedRuleSetId.value,
-    priority: 100,
-    enabled: true,
-    rootGroupId: '',
-    description: '',
-  }
-  ruleErrors.value = []
+  editingIndex.value = -1
+  Object.assign(ruleForm, {
+    编号: '', 所属模板: selectedTemplateId.value, 输出字段键: '', 费用名称: '',
+    计算顺序: '', 启用: '是',
+    条件1字段: '', 条件1运算符: '', 条件1值: '', 条件1值2: '',
+    条件2字段: '', 条件2运算符: '', 条件2值: '', 条件2值2: '',
+    计算方式: '', 查表名称: '', 匹配方式: '', 输入映射: '', 输出列: '',
+    百分比基数: '', 百分比值: '', 百分比来源字段: '',
+    固定金额: '', 加总字段: '', 公式: '', 累加: '否', 说明: '',
+  })
   showRuleModal.value = true
 }
 
-/**
- * 打开编辑规则弹窗。
- * @param {object} rule - 待编辑的规则对象
- */
-function openEditRule(rule) {
-  editingRule.value = rule
-  ruleForm.value = { ...rule }
+function openEditRule(idx) {
+  editingIndex.value = idx
+  const realIdx = store['费用规则'].indexOf(templateRules.value[idx])
+  Object.assign(ruleForm, JSON.parse(JSON.stringify(store['费用规则'][realIdx])))
   showRuleModal.value = true
 }
 
-/** 校验并保存规则（新建或更新）。 */
 function saveRule() {
-  if (!ruleForm.value.ruleId)
-    return
-
-  if (editingRule.value) {
-    Object.assign(editingRule.value, ruleForm.value)
-    const idx = configStore.config.rules.findIndex(r => r.ruleId === editingRule.value.ruleId)
-    if (idx !== -1) {
-      configStore.config.rules[idx] = editingRule.value
-    }
+  if (editingIndex.value >= 0) {
+    const realIdx = store['费用规则'].indexOf(templateRules.value[editingIndex.value])
+    if (realIdx !== -1) store['费用规则'][realIdx] = { ...ruleForm }
   }
   else {
-    const newRule = {
-      ...ruleForm.value,
-      conditionGroups: [],
-      allConditions: [],
-      conditionTree: [],
-      actions: [],
-    }
-    configStore.config.rules.push(newRule)
-    selectedRuleId.value = newRule.ruleId
+    store['费用规则'].push({ ...ruleForm })
   }
   showRuleModal.value = false
 }
 
-/**
- * 删除指定规则。
- * @param {object} rule - 待删除的规则对象
- */
-function deleteRule(rule) {
-  configStore.config.rules = configStore.config.rules.filter(r => r.ruleId !== rule.ruleId)
-  if (selectedRuleId.value === rule.ruleId)
-    selectedRuleId.value = ''
+function deleteRuleFromModal() {
+  if (editingIndex.value >= 0) {
+    const realIdx = store['费用规则'].indexOf(templateRules.value[editingIndex.value])
+    if (realIdx !== -1) store['费用规则'].splice(realIdx, 1)
+  }
+  showRuleModal.value = false
 }
 
-/**
- * 打开新建分组弹窗。
- * @param {object} [parent] - 父分组节点
- */
-function openNewGroup(parent) {
-  editingGroup.value = null
-  groupForm.value = {
-    groupId: `grp_${Date.now()}`,
-    ruleId: selectedRuleId.value,
-    parentGroupId: parent ? parent.id : selectedRule.value?.rootGroupId || '',
-    logic: 'and',
-    sort: 1,
-    description: '',
-  }
-  showGroupModal.value = true
+// ── 模板 params ──
+const paramColumns = [
+  { key: '模板编号', label: '模板编号', type: 'text' },
+  { key: '字段键', label: '字段键', type: 'text' },
+  { key: '默认值', label: '默认值', type: 'text' },
+  { key: '必填', label: '必填', type: 'boolean' },
+]
+
+function handleCountryChange(e) {
+  selectedCountryId.value = e.target.value
+  selectedTemplateId.value = ''
 }
 
-/**
- * 打开编辑分组弹窗。
- * @param {object} group - 待编辑的分组对象
- */
-function openEditGroup(group) {
-  editingGroup.value = group
-  groupForm.value = { ...group }
-  showGroupModal.value = true
+function onAddTemplate() {
+  store['计算模板'].push({ 编号: '', 名称: '', 所属国家平台: selectedCountryId.value, 启用: '是', 说明: '' })
+}
+function onUpdateTemplate({ index, row }) {
+  const idx = store['计算模板'].indexOf(countryTemplates.value[index])
+  if (idx !== -1) store['计算模板'][idx] = row
+}
+function onDeleteTemplate({ index }) {
+  const idx = store['计算模板'].indexOf(countryTemplates.value[index])
+  if (idx !== -1) store['计算模板'].splice(idx, 1)
 }
 
-/** 保存分组（新建或更新），并重建条件树。 */
-function saveGroup() {
-  if (!selectedRule.value)
-    return
-  if (editingGroup.value) {
-    Object.assign(editingGroup.value, groupForm.value)
-  }
-  else {
-    selectedRule.value.conditionGroups.push({
-      group_id: groupForm.value.groupId,
-      rule_id: groupForm.value.ruleId,
-      parent_group_id: groupForm.value.parentGroupId || '',
-      logic: groupForm.value.logic,
-      sort: groupForm.value.sort,
-      description: groupForm.value.description,
-    })
-  }
-  rebuildConditionTree()
-  showGroupModal.value = false
+function onAddParam() {
+  store['模板参数'].push({ 模板编号: selectedTemplateId.value, 字段键: '', 默认值: '', 必填: '否' })
 }
-
-/**
- * 删除分组及其后代节点。
- * @param {object} group - 待删除的分组节点
- */
-function deleteGroup(group) {
-  if (!selectedRule.value)
-    return
-  selectedRule.value.conditionGroups = selectedRule.value.conditionGroups.filter(
-    g => g.group_id !== group.id && !isDescendant(group.id),
-  )
-  selectedRule.value.allConditions = selectedRule.value.allConditions.filter(
-    _c => !isDescendantCondition(group.id),
-  )
-  rebuildConditionTree()
-
-  function isDescendant(gid) {
-    const children = selectedRule.value.conditionGroups.filter(c => c.parent_group_id === gid)
-    for (const child of children) {
-      isDescendant(child.group_id)
-    }
-    selectedRule.value.conditionGroups = selectedRule.value.conditionGroups.filter(c => c.group_id !== gid)
-  }
-
-  function isDescendantCondition(gid) {
-    const cGroups = selectedRule.value.conditionGroups.filter(g => g.parent_group_id === gid)
-    for (const cg of cGroups) {
-      isDescendantCondition(cg.group_id)
-    }
-    const idx = selectedRule.value.allConditions.findIndex(c => c.group_id === gid)
-    if (idx !== -1)
-      selectedRule.value.allConditions.splice(idx, 1)
-  }
+function onUpdateParam({ index, row }) {
+  const idx = store['模板参数'].indexOf(templateParams.value[index])
+  if (idx !== -1) store['模板参数'][idx] = row
 }
-
-/**
- * 打开编辑条件弹窗。
- * @param {object} cond - 待编辑的条件对象
- */
-function openEditCondition(cond) {
-  editingCondition.value = cond
-  conditionForm.value = {
-    conditionId: cond.id,
-    groupId: cond.groupId,
-    fieldKey: cond.fieldKey,
-    operator: cond.operator,
-    valueType: cond.valueType || 'literal',
-    value: cond.value,
-    valueEnd: cond.valueEnd || '',
-    sort: cond.sort,
-    description: cond.description || '',
-  }
-  showConditionModal.value = true
-}
-
-/** 保存条件（新建或更新），并重建条件树。 */
-function saveCondition() {
-  if (!selectedRule.value)
-    return
-  const flat = {
-    condition_id: conditionForm.value.conditionId,
-    group_id: conditionForm.value.groupId,
-    field_key: conditionForm.value.fieldKey,
-    operator: conditionForm.value.operator,
-    value_type: conditionForm.value.valueType,
-    value: conditionForm.value.value,
-    value_end: conditionForm.value.valueEnd,
-    sort: conditionForm.value.sort,
-    description: conditionForm.value.description,
-  }
-
-  if (editingCondition.value) {
-    const idx = selectedRule.value.allConditions.findIndex(c => c.condition_id === editingCondition.value.id)
-    if (idx !== -1)
-      selectedRule.value.allConditions[idx] = flat
-  }
-  else {
-    selectedRule.value.allConditions.push(flat)
-  }
-  rebuildConditionTree()
-  showConditionModal.value = false
-}
-
-/**
- * 删除条件。
- * @param {object} cond - 待删除的条件对象
- */
-function deleteCondition(cond) {
-  if (!selectedRule.value)
-    return
-  selectedRule.value.allConditions = selectedRule.value.allConditions.filter(
-    c => c.condition_id !== cond.id,
-  )
-  rebuildConditionTree()
-}
-
-/** 根据原始分组和条件数据重建条件树。 */
-function rebuildConditionTree() {
-  if (!selectedRule.value)
-    return
-  selectedRule.value.conditionTree = buildTreeFromGroups(
-    selectedRule.value.conditionGroups,
-    selectedRule.value.allConditions,
-  )
-}
-
-/**
- * 将原始分组和条件数据构建为树形结构。
- * @param {Array} groups - 分组原始数据
- * @param {Array} conditions - 条件原始数据
- * @returns {Array} 根级条件组节点数组
- */
-function buildTreeFromGroups(groups, conditions) {
-  const groupMap = new Map()
-  const condMap = new Map()
-
-  for (const g of groups) {
-    groupMap.set(String(g.group_id), {
-      id: String(g.group_id),
-      ruleId: String(g.rule_id),
-      parentGroupId: g.parent_group_id ? String(g.parent_group_id) : null,
-      logic: (g.logic || 'and').toLowerCase(),
-      sort: Number(g.sort) || 0,
-      conditions: [],
-      children: [],
-    })
-  }
-
-  for (const c of conditions) {
-    const key = String(c.condition_id)
-    condMap.set(key, {
-      id: key,
-      groupId: String(c.group_id),
-      fieldKey: c.field_key,
-      operator: (c.operator || 'eq').toLowerCase(),
-      valueType: c.value_type || 'literal',
-      value: c.value,
-      valueEnd: c.value_end || undefined,
-      sort: Number(c.sort) || 0,
-    })
-  }
-
-  const roots = []
-  for (const g of groups) {
-    const node = groupMap.get(String(g.group_id))
-    if (!node)
-      continue
-    for (const c of conditions) {
-      if (String(c.group_id) === node.id) {
-        node.conditions.push(condMap.get(String(c.condition_id)))
-      }
-    }
-    node.conditions.sort((a, b) => a.sort - b.sort)
-    if (node.parentGroupId && groupMap.has(node.parentGroupId)) {
-      groupMap.get(node.parentGroupId).children.push(node)
-    }
-    else {
-      roots.push(node)
-    }
-  }
-
-  for (const g of groupMap.values()) {
-    g.children.sort((a, b) => a.sort - b.sort)
-  }
-  return roots
-}
-
-/** 打开新建动作弹窗。 */
-function openNewAction() {
-  editingAction.value = null
-  actionForm.value = {
-    actionId: `act_${Date.now()}`,
-    ruleId: selectedRuleId.value,
-    sort: 1,
-    actionType: 'set',
-    targetField: '',
-    configJson: {},
-  }
-  showActionModal.value = true
-}
-
-/**
- * 打开编辑动作弹窗。
- * @param {object} action - 待编辑的动作对象
- */
-function openEditAction(action) {
-  editingAction.value = action
-  actionForm.value = { ...action }
-  showActionModal.value = true
-}
-
-/** 保存动作（新建或更新），并按排序重排。 */
-function saveAction() {
-  if (!selectedRule.value)
-    return
-  const flat = {
-    ...actionForm.value,
-    configJson: actionForm.value.configJson,
-  }
-  if (editingAction.value) {
-    const idx = selectedRule.value.actions.findIndex(a => a.actionId === editingAction.value.actionId)
-    if (idx !== -1)
-      selectedRule.value.actions[idx] = flat
-  }
-  else {
-    selectedRule.value.actions.push(flat)
-  }
-  selectedRule.value.actions.sort((a, b) => a.sort - b.sort)
-  showActionModal.value = false
-}
-
-/**
- * 删除动作。
- * @param {object} action - 待删除的动作对象
- */
-function deleteAction(action) {
-  if (!selectedRule.value)
-    return
-  selectedRule.value.actions = selectedRule.value.actions.filter(a => a.actionId !== action.actionId)
-}
-
-/** 打开新建查找表弹窗。 */
-function openNewLookup() {
-  editingLookup.value = null
-  lookupForm.value = {
-    tableId: `table_${Date.now()}`,
-    tableName: '',
-    matchMode: 'exact',
-    sheetName: '',
-    description: '',
-  }
-  showLookupModal.value = true
-}
-
-/**
- * 打开编辑查找表弹窗。
- * @param {object} table - 待编辑的查找表对象
- */
-function openEditLookup(table) {
-  editingLookup.value = table
-  lookupForm.value = { ...table }
-  showLookupModal.value = true
-}
-
-/** 保存查找表（新建或更新）。 */
-function saveLookup() {
-  if (editingLookup.value) {
-    Object.assign(editingLookup.value, lookupForm.value)
-  }
-  else {
-    configStore.config.lookupTables.push({
-      ...lookupForm.value,
-      rows: [],
-    })
-    selectedLookupTableId.value = lookupForm.value.tableId
-  }
-  showLookupModal.value = false
-}
-
-/**
- * 删除查找表。
- * @param {object} table - 待删除的查找表对象
- */
-function deleteLookup(table) {
-  configStore.config.lookupTables = configStore.config.lookupTables.filter(t => t.tableId !== table.tableId)
-  if (selectedLookupTableId.value === table.tableId)
-    selectedLookupTableId.value = ''
+function onDeleteParam({ index }) {
+  const idx = store['模板参数'].indexOf(templateParams.value[index])
+  if (idx !== -1) store['模板参数'].splice(idx, 1)
 }
 </script>
 
 <template>
   <div class="h-full flex flex-col overflow-hidden">
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold">
-        模板
-      </h1>
-      <div class="flex gap-2">
-        <button v-if="showNoConfig" class="btn btn-primary btn-sm" @click="openConfigExcel">
-          打开配置
-        </button>
-        <button v-else class="btn btn-ghost btn-sm" @click="saveConfigExcel">
-          保存配置
-        </button>
+    <h1 class="text-2xl font-bold mb-4">模板管理</h1>
+
+    <div class="mb-4 flex gap-4 items-end">
+      <div>
+        <label class="label py-1"><span class="label-text">国家平台</span></label>
+        <select class="select select-bordered w-full max-w-xs" :value="selectedCountryId" @change="handleCountryChange">
+          <option value="">-- 选择国家 --</option>
+          <option v-for="c in enabledCountries" :key="c.编号" :value="c.编号">{{ c.国家 }} - {{ c.平台 }}</option>
+        </select>
+      </div>
+      <div v-if="selectedCountryId">
+        <label class="label py-1"><span class="label-text">模板</span></label>
+        <select v-model="selectedTemplateId" class="select select-bordered w-full max-w-xs">
+          <option value="">-- 选择模板 --</option>
+          <option v-for="t in countryTemplates" :key="t.编号" :value="t.编号">{{ t.名称 }}</option>
+        </select>
       </div>
     </div>
 
-    <div v-if="showNoConfig" class="flex-1 flex items-center justify-center text-base-content/50">
-      <div class="text-center">
-        <p class="mb-4">
-          请先打开配置 Excel 文件以开始使用。
-        </p>
-        <button class="btn btn-primary" @click="openConfigExcel">
-          打开配置 Excel
-        </button>
+    <div class="flex-1 min-h-0 space-y-6 overflow-y-auto">
+      <!-- 模板列表 -->
+      <div class="card card-sm bg-base-100 border border-base-300">
+        <div class="card-body">
+          <h2 class="card-title text-lg">计算模板</h2>
+          <EditableTable :columns="templateColumns" :rows="countryTemplates" id-key="编号"
+            @add="onAddTemplate" @update="onUpdateTemplate" @delete="onDeleteTemplate" />
+        </div>
       </div>
+
+      <template v-if="selectedTemplateId">
+        <!-- 费用规则 -->
+        <div class="card card-sm bg-base-100 border border-base-300">
+          <div class="card-body">
+            <div class="flex items-center justify-between">
+              <h2 class="card-title text-lg">费用规则（{{ templateRules.length }} 条）</h2>
+              <button class="btn btn-primary btn-sm" @click="openNewRule">＋ 新建规则</button>
+            </div>
+
+            <div class="text-sm text-base-content/60 mb-2">
+              💡 同行多个条件 = AND；不同行同输出字段键 = OR。点击行可编辑。
+            </div>
+
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>编号</th>
+                  <th>输出到</th>
+                  <th>计算方式</th>
+                  <th>条件</th>
+                  <th>顺序</th>
+                  <th>启用</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(r, i) in templateRules" :key="r.编号 || i" class="hover cursor-pointer"
+                  @click="openEditRule(i)">
+                  <td class="font-mono text-xs">{{ r.编号 }}</td>
+                  <td>{{ r.输出字段键 }}</td>
+                  <td><span class="badge badge-sm">{{ r.计算方式 }}</span></td>
+                  <td class="text-xs text-base-content/70">{{ conditionSummary(r) }}</td>
+                  <td>{{ r.计算顺序 }}</td>
+                  <td>{{ r.启用 === '是' ? '✅' : '—' }}</td>
+                  <td>
+                    <button class="btn btn-ghost btn-xs text-error"
+                      @click.stop="onDeleteRule({ index: i })">🗑️</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 模板参数 -->
+        <div class="card card-sm bg-base-100 border border-base-300">
+          <div class="card-body">
+            <h2 class="card-title text-lg">模板参数（默认值）</h2>
+            <EditableTable :columns="paramColumns" :rows="templateParams" id-key="字段键"
+              @add="onAddParam" @update="onUpdateParam" @delete="onDeleteParam" />
+          </div>
+        </div>
+      </template>
     </div>
 
-    <div v-else class="flex-1 min-h-0 flex gap-3">
-      <div class="w-64 flex-shrink-0 min-h-0 flex flex-col gap-4">
-        <div class="card card-sm bg-base-100 border border-base-300 flex-1 min-h-0" data-tour="template-ruleset-list">
-          <div class="card-body flex-1 flex-col min-h-0 p-3">
-            <h3 class="font-medium text-sm mb-1 flex-shrink-0">
-              规则集
-            </h3>
-            <div class="flex-1 min-h-0 overflow-y-auto">
-              <ul class="menu menu-vertical gap-0.5 w-full">
-                <!-- <template v-for="i in 10"> -->
-                <li v-for="rs in configStore.config.ruleSets" :key="rs.ruleSetId">
-                  <button
-                    :class="{ active: selectedRuleSetId === rs.ruleSetId }"
-                    @click="selectedRuleSetId = rs.ruleSetId; selectedRuleId = ''"
-                  >
-                    {{ rs.name }}
-                  </button>
-                </li>
-                <!-- </template> -->
-                <li v-if="configStore.config.ruleSets.length === 0">
-                  <span class="text-base-content/50 text-xs">暂无规则集</span>
-                </li>
-              </ul>
+    <!-- 规则编辑弹窗 -->
+    <dialog :open="showRuleModal" class="modal">
+      <div class="modal-box w-11/12 max-w-3xl max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-4">{{ editingIndex >= 0 ? '编辑规则' : '新建规则' }}</h3>
+
+        <!-- 基本信息 -->
+        <fieldset class="fieldset mb-4">
+          <legend class="font-semibold text-sm mb-2">基本信息</legend>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">编号</span></label>
+              <input v-model="ruleForm.编号" class="input input-bordered input-sm" placeholder="r_br_001">
+            </div>
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">费用名称</span></label>
+              <input v-model="ruleForm.费用名称" class="input input-bordered input-sm" placeholder="销售佣金费率">
+            </div>
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">计算顺序</span></label>
+              <input v-model="ruleForm.计算顺序" type="number" class="input input-bordered input-sm" placeholder="10">
+            </div>
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">启用</span></label>
+              <select v-model="ruleForm.启用" class="select select-bordered select-sm">
+                <option>是</option><option>否</option>
+              </select>
             </div>
           </div>
-        </div>
-
-        <div v-if="selectedRuleSetId" class="card card-sm bg-base-100 border border-base-300 flex-1 min-h-0" data-tour="template-rule-list">
-          <div class="card-body flex-1 flex-col min-h-0 p-3">
-            <div class="flex justify-between items-center mb-1 flex-shrink-0">
-              <h3 class="font-medium text-sm">
-                规则
-              </h3>
-              <button class="btn btn-ghost btn-xs" @click="openNewRule">
-                +
-              </button>
-            </div>
-            <div class="flex-1 min-h-0 overflow-y-auto">
-              <ul class="menu menu-vertical gap-0.5 w-full">
-                <!-- <template v-for="i in 10">  -->
-                <li v-for="r in ruleSetRules" :key="r.ruleId">
-                  <button
-                    :class="{ active: selectedRuleId === r.ruleId }"
-                    @click="selectedRuleId = r.ruleId"
-                  >
-                    <span class="text-xs">{{ r.description || r.ruleId }}</span>
-                  </button>
-                </li>
-                <!-- </template>  -->
-                <li v-if="ruleSetRules.length === 0">
-                  <span class="text-base-content/50 text-xs">暂无规则</span>
-                </li>
-              </ul>
-            </div>
+          <div class="form-control mt-2">
+            <label class="label py-0"><span class="label-text text-xs">输出字段键（结果写到哪个字段）</span></label>
+            <input v-model="ruleForm.输出字段键" class="input input-bordered input-sm" list="outputKeys" placeholder="销售佣金费率">
+            <datalist id="outputKeys">
+              <option v-for="k in outputFieldKeys" :key="k" :value="k" />
+            </datalist>
           </div>
-        </div>
-      </div>
+        </fieldset>
 
-      <div class="flex-1 min-w-0 min-h-0 flex flex-col">
-        <div v-if="!selectedRule" class="card card-sm bg-base-100 border border-base-300">
-          <div class="card-body text-center py-20 text-base-content/50">
-            请选择规则集和规则。
+        <!-- 条件 -->
+        <fieldset class="fieldset mb-4 p-3 bg-base-200 rounded">
+          <legend class="font-semibold text-sm mb-2">条件设置</legend>
+          <div class="text-xs text-base-content/60 mb-2">
+            ⚡ 条件1 AND 条件2 = 同行两个条件都满足才触发。OR = 拆成两条规则，同输出字段键。
           </div>
-        </div>
 
-        <div v-else class="flex flex-col min-h-0 flex-1">
-          <div data-tour="template-rule-detail" class="flex items-center justify-between mb-4 flex-shrink-0">
-            <div>
-              <h2 class="text-lg font-bold">
-                {{ selectedRule.description || selectedRule.ruleId }}
-              </h2>
-              <p class="text-sm text-base-content/60">
-                优先级：{{ selectedRule.priority }} | 启用：{{ selectedRule.enabled ? '是' : '否' }}
-              </p>
+          <div class="grid grid-cols-4 gap-2 mb-2">
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">条件1 字段</span></label>
+              <input v-model="ruleForm.条件1字段" class="input input-bordered input-sm" list="allKeys" placeholder="是否包邮">
             </div>
-            <div class="flex gap-1">
-              <button class="btn btn-ghost btn-sm" @click="openEditRule(selectedRule)">
-                编辑规则
-              </button>
-              <button class="btn btn-ghost btn-sm text-error" @click="deleteRule(selectedRule)">
-                删除
-              </button>
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">运算符</span></label>
+              <select v-model="ruleForm.条件1运算符" class="select select-bordered select-sm">
+                <option value="">—</option>
+                <option>等于</option><option>不等于</option>
+                <option>大于</option><option>大于等于</option>
+                <option>小于</option><option>小于等于</option>
+              </select>
+            </div>
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">值</span></label>
+              <input v-model="ruleForm.条件1值" class="input input-bordered input-sm" placeholder="是">
+            </div>
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">值2（between用）</span></label>
+              <input v-model="ruleForm.条件1值2" class="input input-bordered input-sm">
             </div>
           </div>
 
-          <div class="tabs tabs-bordered mb-4 flex-shrink-0" data-tour="template-tabs">
-            <button
-              class="tab"
-              :class="{ 'tab-active': selectedTab === 'rules' }"
-              @click="selectedTab = 'rules'"
-            >
-              条件与动作
-            </button>
-            <button
-              class="tab"
-              :class="{ 'tab-active': selectedTab === 'lookups' }"
-              @click="selectedTab = 'lookups'"
-            >
-              查找表
-            </button>
+          <div class="text-xs font-semibold mb-1">{{ ruleForm.条件2字段 ? 'AND' : '+ AND 条件2（可选）' }}</div>
+          <div class="grid grid-cols-4 gap-2">
+            <input v-model="ruleForm.条件2字段" class="input input-bordered input-sm" list="allKeys" placeholder="字段">
+            <select v-model="ruleForm.条件2运算符" class="select select-bordered select-sm">
+              <option value="">—</option>
+              <option>等于</option><option>不等于</option>
+              <option>大于</option><option>大于等于</option>
+              <option>小于</option><option>小于等于</option>
+            </select>
+            <input v-model="ruleForm.条件2值" class="input input-bordered input-sm" placeholder="值">
+            <input v-model="ruleForm.条件2值2" class="input input-bordered input-sm" placeholder="值2">
           </div>
 
-          <div v-if="selectedTab === 'rules'" class="flex-1 min-h-0 overflow-y-auto space-y-6">
-            <div class="card card-sm bg-base-100 border border-base-300" data-tour="template-condition-tree">
-              <div class="card-body">
-                <div class="flex justify-between items-center mb-3">
-                  <h3 class="font-medium">
-                    条件树
-                  </h3>
-                  <button class="btn btn-ghost btn-xs" @click="openNewGroup(null)">
-                    + 根分组
-                  </button>
-                </div>
-                <div data-tour="template-condition-detail">
-                  <TreeView
-                    :tree="buildTreeFromGroups(selectedRule.conditionGroups, selectedRule.allConditions)"
-                    :editable="true"
-                    @edit-group="openEditGroup"
-                    @edit-condition="openEditCondition"
-                    @add-child="openNewGroup"
-                    @delete-group="deleteGroup"
-                    @delete-condition="deleteCondition"
-                  />
-                </div>
-              </div>
-            </div>
+          <datalist id="allKeys">
+            <option v-for="k in fieldKeys" :key="k" :value="k" />
+          </datalist>
+        </fieldset>
 
-            <div class="card card-sm bg-base-100 border border-base-300" data-tour="template-action-list">
-              <div class="card-body">
-                <div class="flex justify-between items-center mb-3">
-                  <h3 class="font-medium">
-                    动作
-                  </h3>
-                  <button class="btn btn-ghost btn-xs" @click="openNewAction">
-                    + 新建动作
-                  </button>
-                </div>
-                <div v-if="selectedRule.actions.length === 0" class="text-base-content/50 text-sm py-2">
-                  暂无动作
-                </div>
-                <div v-else class="space-y-3" data-tour="template-action-detail">
-                  <div v-for="action in selectedRule.actions" :key="action.actionId">
-                    <div class="flex items-center gap-2 mb-1">
-                      <span class="badge badge-outline">{{ actionTypeLabel(action.actionType) }}</span>
-                      <span class="text-sm">{{ action.targetField }}</span>
-                      <span class="text-xs text-base-content/50">排序：{{ action.sort }}</span>
-                      <div class="flex-1" />
-                      <button class="btn btn-ghost btn-xs" @click="openEditAction(action)">
-                        编辑
-                      </button>
-                      <button class="btn btn-ghost btn-xs text-error" @click="deleteAction(action)">
-                        删除
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="selectedTab === 'lookups'" class="flex-1 min-h-0">
-            <div class="flex gap-3 h-full">
-              <div class="w-64 flex-shrink-0 min-h-0 overflow-y-auto">
-                <div class="card card-sm bg-base-100 border border-base-300" data-tour="template-lookup-list">
-                  <div class="card-body p-3">
-                    <div class="flex justify-between items-center mb-1">
-                      <h3 class="font-medium text-sm">
-                        查找表
-                      </h3>
-                      <button class="btn btn-ghost btn-xs" @click="openNewLookup">
-                        +
-                      </button>
-                    </div>
-                    <ul class="menu menu-vertical gap-0.5 w-full">
-                      <li v-for="t in configStore.config.lookupTables" :key="t.tableId">
-                        <button
-                          :class="{ active: selectedLookupTableId === t.tableId }"
-                          @click="selectedLookupTableId = t.tableId"
-                        >
-                          <span class="text-xs">{{ t.tableName || t.tableId }}</span>
-                        </button>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-              <div class="flex-1 flex flex-col min-h-0">
-                <div v-if="!selectedLookupTable" class="card card-sm bg-base-100 border border-base-300">
-                  <div class="card-body text-center py-20 text-base-content/50">
-                    请选择一个查找表。
-                  </div>
-                </div>
-                <div v-else class="card card-sm bg-base-100 border border-base-300 flex-1 min-h-0">
-                  <div class="card-body flex-1 flex-col min-h-0">
-                    <div class="flex justify-between items-center mb-3 flex-shrink-0">
-                      <div>
-                        <h3 class="font-medium">
-                          {{ selectedLookupTable.tableName }}
-                        </h3>
-                        <p class="text-xs text-base-content/60">
-                          {{ selectedLookupTable.sheetName }} | {{ matchModeLabel(selectedLookupTable.matchMode) }}
-                        </p>
-                      </div>
-                      <div class="flex gap-1">
-                        <button class="btn btn-ghost btn-sm" @click="openEditLookup(selectedLookupTable)">
-                          编辑
-                        </button>
-                        <button class="btn btn-ghost btn-sm text-error" @click="deleteLookup(selectedLookupTable)">
-                          删除
-                        </button>
-                      </div>
-                    </div>
-                    <div v-if="!selectedLookupTable.rows || selectedLookupTable.rows.length === 0" class="text-base-content/50 text-sm">
-                      暂无数据行。
-                    </div>
-                    <div v-else class="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
-                      <table class="table table-sm">
-                        <thead>
-                          <tr>
-                            <th v-for="key in Object.keys(selectedLookupTable.rows[0])" :key="key" class="sticky top-0 bg-base-100 z-10">
-                              {{ key }}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr v-for="(row, i) in selectedLookupTable.rows" :key="i">
-                            <td v-for="key in Object.keys(selectedLookupTable.rows[0])" :key="key">
-                              {{ row[key] }}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Rule Modal -->
-    <div v-if="showRuleModal" class="modal modal-open">
-      <div class="modal-box">
-        <h3 class="text-lg font-bold mb-4">
-          {{ editingRule ? '编辑' : '新建' }}规则
-        </h3>
-        <div class="space-y-3">
-          <div>
-            <label class="label text-xs pb-1">规则 ID</label>
-            <input v-model="ruleForm.ruleId" type="text" class="input input-bordered w-full" :disabled="!!editingRule">
-          </div>
-          <div>
-            <label class="label text-xs pb-1">说明</label>
-            <input v-model="ruleForm.description" type="text" class="input input-bordered w-full">
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="label text-xs pb-1">优先级</label>
-              <input v-model.number="ruleForm.priority" type="number" class="input input-bordered w-full">
-            </div>
-            <div>
-              <label class="label text-xs pb-1">根分组 ID</label>
-              <input v-model="ruleForm.rootGroupId" type="text" class="input input-bordered w-full">
-            </div>
-          </div>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input v-model="ruleForm.enabled" type="checkbox" class="toggle toggle-sm">
-            <span class="text-sm">启用</span>
-          </label>
-        </div>
-        <div class="modal-action">
-          <button class="btn btn-ghost btn-sm" @click="showRuleModal = false">
-            取消
-          </button>
-          <button class="btn btn-primary btn-sm" @click="saveRule">
-            保存
-          </button>
-        </div>
-      </div>
-      <div class="modal-backdrop" @click="showRuleModal = false" />
-    </div>
-
-    <!-- Condition Modal -->
-    <div v-if="showConditionModal" class="modal modal-open">
-      <div class="modal-box">
-        <h3 class="text-lg font-bold mb-4">
-          {{ editingCondition ? '编辑' : '新建' }}条件
-        </h3>
-        <div class="space-y-3">
-          <div>
-            <label class="label text-xs pb-1">字段</label>
-            <select v-model="conditionForm.fieldKey" class="select select-bordered w-full">
-              <option value="">
-                -- 请选择 --
-              </option>
-              <option v-for="f in configStore.config.fields" :key="f.fieldKey" :value="f.fieldKey">
-                {{ f.fieldName || f.fieldKey }}
-              </option>
+        <!-- 计算配置 -->
+        <fieldset class="fieldset mb-4">
+          <legend class="font-semibold text-sm mb-2">计算配置</legend>
+          <div class="form-control mb-2">
+            <label class="label py-0"><span class="label-text text-xs">计算方式</span></label>
+            <select v-model="ruleForm.计算方式" class="select select-bordered select-sm w-full max-w-xs">
+              <option value="">— 选择 —</option>
+              <option>查表</option><option>百分比</option><option>固定值</option><option>加总</option><option>公式</option>
             </select>
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="label text-xs pb-1">运算符</label>
-              <select v-model="conditionForm.operator" class="select select-bordered w-full">
-                <option value="eq">
-                  =
-                </option>
-                <option value="neq">
-                  !=
-                </option>
-                <option value="gt">
-                  &gt;
-                </option>
-                <option value="gte">
-                  &gt;=
-                </option>
-                <option value="lt">
-                  &lt;
-                </option>
-                <option value="lte">
-                  &lt;=
-                </option>
-                <option value="between">
-                  区间
-                </option>
-                <option value="in">
-                  包含
-                </option>
-                <option value="not_in">
-                  不包含
-                </option>
-              </select>
-            </div>
-            <div>
-              <label class="label text-xs pb-1">值类型</label>
-              <select v-model="conditionForm.valueType" class="select select-bordered w-full">
-                <option value="literal">
-                  字面量
-                </option>
-                <option value="number_range">
-                  数值区间
-                </option>
-              </select>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="label text-xs pb-1">值</label>
-              <input v-model="conditionForm.value" type="text" class="input input-bordered w-full">
-            </div>
-            <div v-if="conditionForm.operator === 'between'">
-              <label class="label text-xs pb-1">结束值</label>
-              <input v-model="conditionForm.valueEnd" type="text" class="input input-bordered w-full">
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="label text-xs pb-1">排序</label>
-              <input v-model.number="conditionForm.sort" type="number" class="input input-bordered w-full">
-            </div>
-            <div>
-              <label class="label text-xs pb-1">分组 ID</label>
-              <input v-model="conditionForm.groupId" type="text" class="input input-bordered w-full" disabled>
-            </div>
-          </div>
-        </div>
-        <div class="modal-action">
-          <button class="btn btn-ghost btn-sm" @click="showConditionModal = false">
-            取消
-          </button>
-          <button class="btn btn-primary btn-sm" @click="saveCondition">
-            保存
-          </button>
-        </div>
-      </div>
-      <div class="modal-backdrop" @click="showConditionModal = false" />
-    </div>
 
-    <!-- Group Modal -->
-    <div v-if="showGroupModal" class="modal modal-open">
-      <div class="modal-box">
-        <h3 class="text-lg font-bold mb-4">
-          {{ editingGroup ? '编辑' : '新建' }}分组
-        </h3>
-        <div class="space-y-3">
-          <div>
-            <label class="label text-xs pb-1">分组 ID</label>
-            <input v-model="groupForm.groupId" type="text" class="input input-bordered w-full" :disabled="!!editingGroup">
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="label text-xs pb-1">逻辑</label>
-              <select v-model="groupForm.logic" class="select select-bordered w-full">
-                <option value="and">
-                  AND
-                </option>
-                <option value="or">
-                  OR
-                </option>
-              </select>
+          <!-- 查表 -->
+          <template v-if="ruleForm.计算方式 === '查表'">
+            <div class="grid grid-cols-2 gap-2">
+              <div class="form-control">
+                <label class="label py-0"><span class="label-text text-xs">查表名称（Sheet名）</span></label>
+                <input v-model="ruleForm.查表名称" class="input input-bordered input-sm" placeholder="commission_table">
+              </div>
+              <div class="form-control">
+                <label class="label py-0"><span class="label-text text-xs">匹配方式</span></label>
+                <select v-model="ruleForm.匹配方式" class="select select-bordered select-sm">
+                  <option value="">—</option><option>精确</option><option>区间</option>
+                </select>
+              </div>
+              <div class="form-control">
+                <label class="label py-0"><span class="label-text text-xs">输入映射（字段键=表列名, 逗号分隔）</span></label>
+                <input v-model="ruleForm.输入映射" class="input input-bordered input-sm" placeholder="刊登类型=刊登类型,商品类目=类目">
+              </div>
+              <div class="form-control">
+                <label class="label py-0"><span class="label-text text-xs">输出列（取费率表哪一列）</span></label>
+                <input v-model="ruleForm.输出列" class="input input-bordered input-sm" placeholder="费率">
+              </div>
             </div>
-            <div>
-              <label class="label text-xs pb-1">排序</label>
-              <input v-model.number="groupForm.sort" type="number" class="input input-bordered w-full">
-            </div>
-          </div>
-          <div>
-            <label class="label text-xs pb-1">说明</label>
-            <input v-model="groupForm.description" type="text" class="input input-bordered w-full">
-          </div>
-        </div>
-        <div class="modal-action">
-          <button class="btn btn-ghost btn-sm" @click="showGroupModal = false">
-            取消
-          </button>
-          <button class="btn btn-primary btn-sm" @click="saveGroup">
-            保存
-          </button>
-        </div>
-      </div>
-      <div class="modal-backdrop" @click="showGroupModal = false" />
-    </div>
+          </template>
 
-    <!-- Action Modal -->
-    <div v-if="showActionModal" class="modal modal-open">
-      <div class="modal-box max-w-2xl">
-        <h3 class="text-lg font-bold mb-4">
-          {{ editingAction ? '编辑' : '新建' }}动作
-        </h3>
-        <ActionEditor
-          v-model="actionForm"
-          :fields="configStore.config.fields"
-          :lookup-tables="configStore.config.lookupTables"
-        />
-        <div class="modal-action">
-          <button class="btn btn-ghost btn-sm" @click="showActionModal = false">
-            取消
-          </button>
-          <button class="btn btn-primary btn-sm" @click="saveAction">
-            保存
-          </button>
-        </div>
-      </div>
-      <div class="modal-backdrop" @click="showActionModal = false" />
-    </div>
+          <!-- 百分比 -->
+          <template v-if="ruleForm.计算方式 === '百分比'">
+            <div class="grid grid-cols-3 gap-2">
+              <div class="form-control">
+                <label class="label py-0"><span class="label-text text-xs">百分比基数</span></label>
+                <input v-model="ruleForm.百分比基数" class="input input-bordered input-sm" list="allKeys" placeholder="售价">
+              </div>
+              <div class="form-control">
+                <label class="label py-0"><span class="label-text text-xs">固定百分比值</span></label>
+                <input v-model="ruleForm.百分比值" class="input input-bordered input-sm" placeholder="4.8（表示4.8%）">
+              </div>
+              <div class="form-control">
+                <label class="label py-0"><span class="label-text text-xs">或用 动态来源字段</span></label>
+                <input v-model="ruleForm.百分比来源字段" class="input input-bordered input-sm" list="allKeys" placeholder="销售佣金费率">
+              </div>
+            </div>
+          </template>
 
-    <!-- Lookup Modal -->
-    <div v-if="showLookupModal" class="modal modal-open">
-      <div class="modal-box">
-        <h3 class="text-lg font-bold mb-4">
-          {{ editingLookup ? '编辑' : '新建' }}查找表
-        </h3>
-        <div class="space-y-3">
-          <div>
-            <label class="label text-xs pb-1">表 ID</label>
-            <input v-model="lookupForm.tableId" type="text" class="input input-bordered w-full" :disabled="!!editingLookup">
-          </div>
-          <div>
-            <label class="label text-xs pb-1">表名称</label>
-            <input v-model="lookupForm.tableName" type="text" class="input input-bordered w-full">
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="label text-xs pb-1">匹配模式</label>
-              <select v-model="lookupForm.matchMode" class="select select-bordered w-full">
-                <option value="exact">
-                  精确匹配
-                </option>
-                <option value="range">
-                  区间匹配
-                </option>
-              </select>
+          <!-- 固定值 -->
+          <template v-if="ruleForm.计算方式 === '固定值'">
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">固定金额</span></label>
+              <input v-model="ruleForm.固定金额" class="input input-bordered input-sm w-32" placeholder="0">
             </div>
-            <div>
-              <label class="label text-xs pb-1">工作表名称</label>
-              <input v-model="lookupForm.sheetName" type="text" class="input input-bordered w-full">
+          </template>
+
+          <!-- 加总 -->
+          <template v-if="ruleForm.计算方式 === '加总'">
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">加总字段（逗号分隔）</span></label>
+              <input v-model="ruleForm.加总字段" class="input input-bordered input-sm w-full" list="allKeys" placeholder="销售佣金金额,运费,支付手续费">
             </div>
-          </div>
-          <div>
-            <label class="label text-xs pb-1">说明</label>
-            <input v-model="lookupForm.description" type="text" class="input input-bordered w-full">
-          </div>
+          </template>
+
+          <!-- 公式 -->
+          <template v-if="ruleForm.计算方式 === '公式'">
+            <div class="form-control">
+              <label class="label py-0"><span class="label-text text-xs">公式（中文字段键 + - * /）</span></label>
+              <input v-model="ruleForm.公式" class="input input-bordered input-sm w-full font-mono" placeholder="售价 - 总费用 - 成本价">
+            </div>
+          </template>
+        </fieldset>
+
+        <!-- 说明 -->
+        <div class="form-control mb-4">
+          <label class="label py-0"><span class="label-text text-xs">说明</span></label>
+          <input v-model="ruleForm.说明" class="input input-bordered input-sm w-full" placeholder="规则说明">
         </div>
+
         <div class="modal-action">
-          <button class="btn btn-ghost btn-sm" @click="showLookupModal = false">
-            取消
-          </button>
-          <button class="btn btn-primary btn-sm" @click="saveLookup">
-            保存
-          </button>
+          <button v-if="editingIndex >= 0" class="btn btn-error btn-sm btn-outline" @click="deleteRuleFromModal">删除规则</button>
+          <button class="btn btn-ghost btn-sm" @click="showRuleModal = false">取消</button>
+          <button class="btn btn-primary btn-sm" @click="saveRule">保存</button>
         </div>
       </div>
-      <div class="modal-backdrop" @click="showLookupModal = false" />
-    </div>
+      <form method="dialog" class="modal-backdrop" @click="showRuleModal = false"><button>关闭</button></form>
+    </dialog>
   </div>
 </template>

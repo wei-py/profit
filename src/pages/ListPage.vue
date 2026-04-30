@@ -1,282 +1,262 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
+import FieldInput from '@/components/common/FieldInput.vue'
 import ImageUploader from '@/components/common/ImageUploader.vue'
+import SkuTable from '@/components/common/SkuTable.vue'
 import { useFileIO } from '@/composables/useFileIO'
-import { useImageHost } from '@/composables/useImageHost'
+import { useConfigStore } from '@/stores/config'
+import { useCreateStore } from '@/stores/create'
 import { useListStore } from '@/stores/list'
 
+const configStore = useConfigStore()
+const createStore = useCreateStore()
 const listStore = useListStore()
-const { openListExcel, saveListExcel } = useFileIO()
-const { getImageUrls } = useImageHost()
+const { openConfigExcel, saveConfigExcel, openListExcel, saveListExcel } = useFileIO()
 
-/** @type {import('vue').Ref<string>} 当前选中的记录 ID */
-const selectedRecordId = ref('')
-/** @type {import('vue').Ref<boolean>} 是否显示详情弹窗 */
-const showDetailModal = ref(false)
-/** @type {import('vue').Ref<object | null>} 正在编辑的记录 */
-const editingRecord = ref(null)
-/** @type {import('vue').Ref<object>} 编辑表单数据 */
-const editForm = ref({})
-/** @type {import('vue').Ref<string[]>} 查看模式下的图片预览 URL */
-const viewImageUrls = ref([])
+const showCreatePanel = ref(true)
 
-/** 是否显示空文件提示 */
-const showNoFile = computed(() => !listStore.filePath && listStore.records.length === 0)
+const showNoConfig = computed(() => !configStore.loaded)
 
-/** 从第一条记录提取的列头列表（排除 id） */
-const headers = computed(() => {
-  if (listStore.records.length === 0)
-    return []
-  return Object.keys(listStore.records[0]).filter(k => k !== 'id')
+// ── 国家 / 模板下拉 ──
+const enabledCountries = computed(() =>
+  configStore['国家平台'].filter(c => c.启用 === '是' || c.启用 === 'TRUE'),
+)
+
+const availableTemplates = computed(() => {
+  if (!createStore.selectedCountryId) return []
+  return configStore.getTemplatesByCountry(createStore.selectedCountryId)
 })
 
-/**
- * 删除指定记录。
- * @param {string} id - 记录 ID
- */
-function handleDelete(id) {
-  // eslint-disable-next-line no-alert
-  if (window.confirm('确定删除这条记录吗？')) {
-    listStore.removeRecord(id)
-    if (selectedRecordId.value === id) {
-      selectedRecordId.value = ''
+function handleCountryChange(e) {
+  createStore.selectTemplate(e.target.value, '')
+}
+
+function handleTemplateChange(e) {
+  createStore.selectTemplate(createStore.selectedCountryId, e.target.value)
+}
+
+// ── 商品级字段 ──
+const productFields = computed(() => {
+  if (!createStore.selectedCountryId) return []
+  return configStore.getFieldsByCountry(createStore.selectedCountryId)
+    .filter(f => f.层级 === '商品级' && (f.输入输出 === '输入' || f.输入输出 === 'input'))
+})
+
+// ── SKU 级输入字段 ──
+const skuInputFields = computed(() => {
+  if (!createStore.selectedCountryId) return []
+  return configStore.getFieldsByCountry(createStore.selectedCountryId)
+    .filter(f => f.层级 === 'SKU级' && (f.输入输出 === '输入' || f.输入输出 === 'input'))
+})
+
+function handleCalculate() {
+  createStore.calculate()
+}
+
+// ── 保存到列表 ──
+function handleSaveToList() {
+  const combos = createStore.generatedSkuCombos
+  const records = []
+  const now = new Date().toISOString().slice(0, 10)
+  const cp = configStore['国家平台'].find(c => c.编号 === createStore.selectedCountryId)
+
+  if (combos.length > 0) {
+    for (const combo of combos) {
+      const sd = createStore.skuData[combo.key] || {}
+      const results = createStore.skuResults[combo.key] || {}
+      const row = {
+        '商品ID': createStore.basicInfo.name ? createStore.basicInfo.name + '_' + Date.now() : '',
+        '商品名称': createStore.basicInfo.name,
+        '国家平台编号': createStore.selectedCountryId,
+        '模板编号': createStore.selectedTemplateId,
+        'SKU码': sd.sku || '',
+        ...combo.values,
+      }
+      // 商品级字段
+      for (const [k, v] of Object.entries(createStore.productInputs)) {
+        row[k] = v
+      }
+      // SKU 级输入
+      if (sd.overrides) {
+        for (const [k, v] of Object.entries(sd.overrides)) {
+          row[k] = v
+        }
+      }
+      // 结果
+      for (const [k, v] of Object.entries(results)) {
+        row[k] = v
+      }
+      row['图片'] = sd.images || ''
+      row['计算时间'] = now
+      records.push(row)
     }
   }
-}
-
-/**
- * 打开记录详情弹窗。
- * @param {object} record - 记录对象
- */
-function openDetail(record) {
-  selectedRecordId.value = record.id
-  showDetailModal.value = true
-}
-
-/**
- * 打开记录编辑模式。
- * @param {object} record - 记录对象
- */
-function openEdit(record) {
-  selectedRecordId.value = record.id
-  editingRecord.value = record
-  editForm.value = { ...record }
-  showDetailModal.value = true
-}
-
-/** 保存编辑并关闭弹窗。 */
-function saveEdit() {
-  if (editingRecord.value) {
-    listStore.updateRecord(editingRecord.value.id, editForm.value)
-  }
-  editingRecord.value = null
-  editForm.value = {}
-  showDetailModal.value = false
-}
-
-/**
- * 判断记录是否包含图片。
- * @param {object} record - 记录对象
- * @returns {boolean} 是否有图片
- */
-function hasImages(record) {
-  return record.images && typeof record.images === 'string' && record.images.trim() !== ''
-}
-
-function parseSkuData(record) {
-  try {
-    if (!record.skuData || typeof record.skuData !== 'string' || !record.skuData.trim())
-      return {}
-    const obj = JSON.parse(record.skuData)
-    if (typeof obj === 'object' && obj !== null && !Array.isArray(obj))
-      return obj
-    return {}
-  }
-  catch {
-    return {}
-  }
-}
-
-function hasSkuData(record) {
-  const sd = parseSkuData(record)
-  return Object.keys(sd).length > 0
-}
-
-watch(showDetailModal, async (val) => {
-  if (val && !editingRecord.value) {
-    const record = listStore.records.find(r => r.id === selectedRecordId.value)
-    if (record && hasImages(record)) {
-      viewImageUrls.value = await getImageUrls(record.images)
+  else {
+    const row = {
+      '商品ID': createStore.basicInfo.name ? createStore.basicInfo.name + '_' + Date.now() : '',
+      '商品名称': createStore.basicInfo.name,
+      '国家平台编号': createStore.selectedCountryId,
+      '模板编号': createStore.selectedTemplateId,
+      'SKU码': createStore.basicInfo.sku,
+      ...createStore.productInputs,
+      ...createStore.results,
+      '图片': createStore.images,
+      '计算时间': now,
     }
-    else {
-      viewImageUrls.value = []
-    }
+    records.push(row)
   }
+
+  listStore.addRecords(records)
+}
+
+// ── 列表列头 ──
+const listColumns = computed(() => {
+  if (!listStore.records.length) return []
+  return Object.keys(listStore.records[0]).filter(k => k !== 'id')
 })
 </script>
 
 <template>
-  <div>
+  <div class="h-full flex flex-col overflow-hidden">
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold">
-        列表
-      </h1>
-      <div class="flex gap-2" data-tour="list-toolbar">
-        <button v-if="showNoFile" class="btn btn-primary btn-sm" @click="openListExcel">
-          打开列表 Excel
-        </button>
-        <button v-else class="btn btn-primary btn-sm" @click="openListExcel">
-          加载列表 Excel
-        </button>
-        <button v-if="!showNoFile" class="btn btn-ghost btn-sm" @click="saveListExcel(headers)">
-          保存
+      <h1 class="text-2xl font-bold">商品列表</h1>
+      <div class="flex gap-2">
+        <button v-if="showNoConfig" class="btn btn-primary btn-sm" @click="openConfigExcel">打开配置</button>
+        <button v-else class="btn btn-outline btn-sm" @click="saveConfigExcel">保存配置</button>
+        <button class="btn btn-outline btn-sm" @click="openListExcel">打开列表</button>
+        <button class="btn btn-outline btn-sm" @click="saveListExcel">保存列表</button>
+        <button class="btn btn-primary btn-sm" @click="showCreatePanel = !showCreatePanel">
+          {{ showCreatePanel ? '收起 ▲' : '＋ 新建' }}
         </button>
       </div>
     </div>
 
-    <div v-if="showNoFile" class="text-center py-20 text-base-content/50">
-      <p class="mb-4">
-        当前未加载列表，请先打开或创建列表 Excel 文件。
-      </p>
-      <button class="btn btn-primary" @click="openListExcel">
-        打开列表 Excel
-      </button>
+    <!-- 无配置 -->
+    <div v-if="showNoConfig" class="text-center py-20 text-base-content/50">
+      <p class="mb-4">请先打开配置 Excel 文件</p>
+      <button class="btn btn-primary" @click="openConfigExcel">打开配置 Excel</button>
     </div>
 
-    <div v-else>
-      <div v-if="listStore.filePath" data-tour="list-filepath" class="text-sm text-base-content/60 mb-4">
-        文件：{{ listStore.filePath }}
-      </div>
+    <div v-else class="flex-1 min-h-0 overflow-y-auto space-y-4">
+      <!-- 可展开新建面板 -->
+      <div v-if="showCreatePanel" class="card card-sm bg-base-100 border border-base-300">
+        <div class="card-body">
+          <h2 class="card-title text-lg">新建商品</h2>
 
-      <div v-if="listStore.records.length === 0" class="text-center py-20 text-base-content/50">
-        暂无记录，请前往“新建”页面添加记录。
-      </div>
-
-      <div v-else class="overflow-x-auto" data-tour="list-table">
-        <table class="table table-sm">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th v-for="h in headers.slice(0, 8)" :key="h">
-                {{ h }}
-              </th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(record, idx) in listStore.records" :key="record.id">
-              <td>{{ idx + 1 }}</td>
-              <td v-for="h in headers.slice(0, 8)" :key="h" class="max-w-32 truncate">
-                {{ record[h] }}
-              </td>
-              <td>
-                <div class="flex gap-1">
-                  <button class="btn btn-ghost btn-xs" @click="openDetail(record)">
-                    查看
-                  </button>
-                  <button class="btn btn-ghost btn-xs" @click="openEdit(record)">
-                    编辑
-                  </button>
-                  <button class="btn btn-ghost btn-xs text-error" @click="handleDelete(record.id)">
-                    删除
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div v-if="showDetailModal" class="modal modal-open" data-tour="list-detail-modal">
-      <div class="modal-box max-w-3xl">
-        <h3 class="text-lg font-bold mb-4">
-          记录详情
-        </h3>
-
-        <div v-if="editingRecord" class="space-y-3">
-          <div v-for="h in headers" :key="h" class="form-control">
-            <label class="label py-0">
-              <span class="label-text text-xs">{{ h }}</span>
-            </label>
-            <template v-if="h === 'images'">
-              <ImageUploader v-model="editForm[h]" />
-            </template>
-            <template v-else-if="h === 'variants' || h === 'skuData'">
-              <textarea v-model="editForm[h]" class="textarea textarea-bordered textarea-sm w-full" rows="4" />
-            </template>
-            <template v-else>
-              <input v-model="editForm[h]" type="text" class="input input-bordered input-sm w-full">
-            </template>
+          <!-- 国家+模板 -->
+          <div class="flex gap-4">
+            <div class="form-control">
+              <label class="label py-1"><span class="label-text">国家平台</span></label>
+              <select class="select select-bordered" @change="handleCountryChange">
+                <option value="">-- 选择国家 --</option>
+                <option v-for="c in enabledCountries" :key="c.编号" :value="c.编号">{{ c.国家 }} - {{ c.平台 }}</option>
+              </select>
+            </div>
+            <div class="form-control" v-if="createStore.selectedCountryId">
+              <label class="label py-1"><span class="label-text">模板</span></label>
+              <select class="select select-bordered" @change="handleTemplateChange">
+                <option value="">-- 选择模板 --</option>
+                <option v-for="t in availableTemplates" :key="t.编号" :value="t.编号">{{ t.名称 }}</option>
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div v-else class="space-y-2">
-          <div v-for="h in headers" :key="h" class="flex">
-            <span class="font-medium text-sm w-32 flex-shrink-0">{{ h }}:</span>
-            <template v-if="h === 'images' && viewImageUrls.length > 0">
-              <div class="flex gap-2 flex-wrap">
-                <img
-                  v-for="(url, i) in viewImageUrls"
-                  :key="i"
-                  :src="url"
-                  class="w-24 h-24 object-cover rounded border"
-                  @error="($event.target).style.display = 'none'"
-                >
-              </div>
-            </template>
-            <template v-else-if="h === 'skuData' && hasSkuData(listStore.records.find(r => r.id === selectedRecordId))">
-              <table class="table table-xs">
-                <thead>
-                  <tr>
-                    <th class="text-xs">
-                      组合
-                    </th>
-                    <th class="text-xs">
-                      SKU款号
-                    </th>
-                    <th class="text-xs">
-                      图片
-                    </th>
-                  </tr>
-                </thead>
+          <template v-if="createStore.selectedTemplateId">
+            <!-- 商品级字段 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <FieldInput
+                v-for="f in productFields" :key="f.字段键"
+                :field="{ fieldKey: f.字段键, fieldName: f.字段名称, type: f.类型, required: f.必填 === '是', optionGroupId: f.选项组编号 }"
+                :model-value="createStore.productInputs[f.字段键]"
+                :option-groups="configStore['选项组']"
+                @update:model-value="createStore.updateProductInput(f.字段键, $event)"
+              />
+            </div>
+
+            <!-- 无变体时的 SKU 级字段（售价、成本价、重量 等） -->
+            <div v-if="createStore.generatedSkuCombos.length === 0" class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <FieldInput
+                v-for="f in skuInputFields" :key="f.字段键"
+                :field="{ fieldKey: f.字段键, fieldName: f.字段名称, type: f.类型, required: f.必填 === '是', unit: f.单位 }"
+                :model-value="createStore.productInputs[f.字段键]"
+                @update:model-value="createStore.updateProductInput(f.字段键, $event)"
+              />
+            </div>
+
+            <!-- 变体 -->
+            <div class="mt-4">
+              <h3 class="font-semibold mb-2">变体属性</h3>
+              <table v-if="createStore.variantRows.length" class="table table-sm">
+                <thead><tr><th>属性名</th><th>选项值（逗号分隔）</th><th>操作</th></tr></thead>
                 <tbody>
-                  <tr v-for="(sku, key) in parseSkuData(listStore.records.find(r => r.id === selectedRecordId))" :key="key">
-                    <td class="text-xs font-mono">
-                      {{ key }}
-                    </td>
-                    <td class="text-xs">
-                      {{ sku.sku || '-' }}
-                    </td>
-                    <td>
-                      <div class="flex gap-1 flex-wrap">
-                        <img
-                          v-for="(url, i) in (sku.images ? sku.images.split(',').map(s => s.trim()).filter(Boolean) : [])"
-                          :key="i"
-                          class="w-10 h-10 object-cover rounded border"
-                          :src="url"
-                          @error="($event.target).style.display = 'none'"
-                        >
-                      </div>
-                    </td>
+                  <tr v-for="row in createStore.variantRows" :key="row.id">
+                    <td><input class="input input-bordered input-sm w-full" :value="row.key"
+                      placeholder="如：颜色" @input="createStore.updateVariantRow(row.id, { key: $event.target.value })"></td>
+                    <td><input class="input input-bordered input-sm w-full" :value="row.options"
+                      placeholder="如：红,蓝" @input="createStore.updateVariantRow(row.id, { options: $event.target.value })"></td>
+                    <td><button class="btn btn-ghost btn-xs text-error" @click="createStore.deleteVariantRow(row.id)">删除</button></td>
                   </tr>
                 </tbody>
               </table>
-            </template>
-            <span v-else class="text-sm">{{ listStore.records.find(r => r.id === selectedRecordId)?.[h] }}</span>
-          </div>
-        </div>
+              <button class="btn btn-ghost btn-sm" @click="createStore.addVariantRow">+ 添加属性</button>
+            </div>
 
-        <div class="modal-action">
-          <button class="btn btn-ghost btn-sm" @click="showDetailModal = false; editingRecord = null">
-            关闭
-          </button>
-          <button v-if="editingRecord" class="btn btn-primary btn-sm" @click="saveEdit">
-            保存
-          </button>
+            <!-- SKU 表 -->
+            <SkuTable
+              v-if="createStore.generatedSkuCombos.length > 0"
+              :sku-combos="createStore.generatedSkuCombos"
+              :sku-data="createStore.skuData"
+              :sku-results="createStore.skuResults"
+              :base-sku="createStore.basicInfo.sku"
+              :default-values="{ ...createStore.productInputs }"
+              :all-field-keys="skuInputFields.map(f => f.字段键)"
+              :selected-field-keys="skuInputFields.map(f => f.字段键)"
+              @update-sku-field="createStore.updateSkuField"
+              @update-sku-images="createStore.updateSkuImages"
+            />
+
+            <!-- 操作按钮 -->
+            <div class="flex gap-2 mt-4">
+              <button class="btn btn-primary" :disabled="createStore.calculating" @click="handleCalculate">
+                <span v-if="createStore.calculating" class="loading loading-spinner loading-xs mr-1" />计算
+              </button>
+              <button class="btn btn-success btn-sm" @click="handleSaveToList">保存到列表</button>
+            </div>
+
+            <!-- 计算结果 (无变体时) -->
+            <div v-if="Object.keys(createStore.results).length > 0 && createStore.generatedSkuCombos.length === 0" class="mt-4">
+              <div v-for="(val, key) in createStore.results" :key="key" class="flex justify-between max-w-xs">
+                <span class="text-sm font-medium">{{ key }}</span>
+                <span class="text-sm">{{ typeof val === 'number' ? val.toFixed(2) : val }}</span>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
-      <div class="modal-backdrop" @click="showDetailModal = false; editingRecord = null" />
+
+      <!-- 商品列表 -->
+      <div class="card card-sm bg-base-100 border border-base-300">
+        <div class="card-body">
+          <h2 class="card-title text-lg">商品记录（{{ listStore.records.length }} 行）</h2>
+          <div v-if="listStore.records.length === 0" class="text-base-content/50 text-sm">暂无商品，展开上方「新建」面板开始。</div>
+          <div v-else class="overflow-x-auto">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th v-for="col in listColumns" :key="col">{{ col }}</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, idx) in listStore.records" :key="idx">
+                  <td v-for="col in listColumns" :key="col">{{ row[col] }}</td>
+                  <td><button class="btn btn-ghost btn-xs text-error" @click="listStore.removeRecord(idx)">删除</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

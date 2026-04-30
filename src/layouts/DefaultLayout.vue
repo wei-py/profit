@@ -10,37 +10,28 @@ const route = useRoute()
 const { isDark, toggleTheme } = useTheme()
 const { startTour } = useTour()
 
-/** 各页面的 tooltip 描述映射 */
 const tooltipMap = {
-  preset: '预设管理：创建和管理利润计算预设，定义参数列表',
-  option: '选项分组：为选择型字段提供下拉选项，如颜色、尺寸',
-  template: '规则模板：配置条件树与动作，管理查找表',
-  create: '新建记录：选择预设填写参数，一键计算利润',
-  list: '记录列表：查看、编辑和删除已保存的记录',
+  country: '国家平台：创建和管理国家+电商平台组合，所有数据的根锚点',
+  option: '选项管理：为选择型字段提供下拉选项',
+  template: '模板管理：配置费用计算规则（佣金、运费、手续费等）',
+  list: '商品列表：展开新建面板、计算利润、管理商品记录',
 }
 
-/** 当前页面对应的 tooltip 文本 */
 const pageTooltip = computed(() => {
   const name = typeof route.name === 'string' ? route.name : ''
   return tooltipMap[name] || '利润工具：管理产品利润计算的配置与记录'
 })
 
-/**
- * 获取当前路由对应的引导页面名称。
- * @returns {string} 页面引导 key
- */
 function getTourPageName() {
   const name = typeof route.name === 'string' ? route.name : ''
-  return name === '/' ? 'preset' : name
+  return name === '/' ? 'country' : name
 }
 
-/** 侧边栏导航项定义 */
 const navItems = [
-  { path: '/preset', label: '预设', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
-  { path: '/option', label: '选项', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
+  { path: '/country', label: '国家', icon: 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+  { path: '/option', label: '选项', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
   { path: '/template', label: '模板', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-  { path: '/create', label: '新建', icon: 'M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z' },
-  { path: '/list', label: '列表', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
+  { path: '/list', label: '商品', icon: 'M16 11V7m4 4V7m-8 4V7m-4 4V7m12 14H4a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v14a2 2 0 01-2 2z' },
 ]
 
 /** @type {import('vue').Ref<boolean>} 侧边栏是否折叠 */
