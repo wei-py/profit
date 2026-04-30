@@ -1,12 +1,11 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import EditableTable from '@/components/common/EditableTable.vue'
 import { useConfigStore } from '@/stores/config'
 
 const store = useConfigStore()
 const CORE_KEYS = ['编号', '国家', '平台', '货币']
 
-// ── 国家表格：动态列 ──
+// ── 国家表格 ──
 const allKeys = computed(() => {
   const keys = new Set(CORE_KEYS)
   for (const row of store['国家平台']) for (const k of Object.keys(row)) if (k) keys.add(k)
@@ -29,133 +28,176 @@ function updateCell(id, k, v) { const r = store['国家平台'].find(r => r.编�
 function deleteRow(id) { const i = store['国家平台'].findIndex(r => r.编号 === id); if (i !== -1) store['国家平台'].splice(i, 1) }
 function toggleExpand(id) { expandedId.value = expandedId.value === id ? null : id }
 
-// ── 展开后数据 ──
 const cpId = computed(() => expandedId.value)
+
+// ══════════════════════════════════════════════════════════
+// 计算字段 弹窗
+// ══════════════════════════════════════════════════════════
+const showFieldModal = ref(false)
+const fieldForm = reactive({})
+const editingFieldIdx = ref(-1)
+
 const expFields = computed(() => cpId.value ? store.getFieldsByCountry(cpId.value) : [])
+
+function openNewField() {
+  editingFieldIdx.value = -1
+  Object.assign(fieldForm, { 字段键:'',字段名称:'',类型:'数字',单位:'',选项组编号:'',所属国家平台:cpId.value,层级:'商品级',输入输出:'输入',必填:'否',说明:'' })
+  showFieldModal.value = true
+}
+function openEditField(idx) {
+  editingFieldIdx.value = idx
+  Object.assign(fieldForm, JSON.parse(JSON.stringify(expFields.value[idx])))
+  showFieldModal.value = true
+}
+function saveField() {
+  if (editingFieldIdx.value >= 0) {
+    const x = store['计算字段'].indexOf(expFields.value[editingFieldIdx.value])
+    if (x !== -1) store['计算字段'][x] = { ...fieldForm }
+  } else {
+    store['计算字段'].push({ ...fieldForm })
+  }
+  showFieldModal.value = false
+}
+function deleteField(idx) {
+  const x = store['计算字段'].indexOf(expFields.value[idx])
+  if (x !== -1) store['计算字段'].splice(x, 1)
+}
+
+// ══════════════════════════════════════════════════════════
+// 选项组 弹窗
+// ══════════════════════════════════════════════════════════
+const showOptModal = ref(false)
+const optForm = reactive({})
+const editingOptIdx = ref(-1)
+const optItemsLocal = ref([]) // 弹窗内编辑的选项值
+
 const expOptGroups = computed(() => cpId.value ? store.getOptionGroupsByCountry(cpId.value) : [])
+
+function openNewOpt() {
+  editingOptIdx.value = -1
+  Object.assign(optForm, { 编号:'',名称:'',所属国家平台:cpId.value,说明:'' })
+  optItemsLocal.value = []
+  showOptModal.value = true
+}
+function openEditOpt(idx) {
+  editingOptIdx.value = idx
+  const g = expOptGroups.value[idx]
+  Object.assign(optForm, JSON.parse(JSON.stringify(g)))
+  optItemsLocal.value = JSON.parse(JSON.stringify(store.getOptionItemsByGroup(g.编号)))
+  showOptModal.value = true
+}
+function saveOpt() {
+  if (editingOptIdx.value >= 0) {
+    const x = store['选项组'].indexOf(expOptGroups.value[editingOptIdx.value])
+    if (x !== -1) store['选项组'][x] = { ...optForm }
+    // 替换选项值
+    const gid = optForm.编号
+    const keep = []
+    for (const r of store['选项值']) { if (r.所属分组 !== gid) keep.push(r) }
+    store['选项值'] = [...keep, ...optItemsLocal.value]
+  } else {
+    store['选项组'].push({ ...optForm })
+    store['选项值'] = [...store['选项值'], ...optItemsLocal.value]
+  }
+  showOptModal.value = false
+}
+function deleteOpt(idx) {
+  const g = expOptGroups.value[idx]
+  const x = store['选项组'].indexOf(g)
+  if (x !== -1) store['选项组'].splice(x, 1)
+  store['选项值'] = store['选项值'].filter(r => r.所属分组 !== g.编号)
+}
+function addOptItem() {
+  optItemsLocal.value.push({ 所属分组:optForm.编号,选项值:'',显示名:'',排序:'',启用:'是',备注:'' })
+}
+function delOptItem(i) { optItemsLocal.value.splice(i, 1) }
+
+// ══════════════════════════════════════════════════════════
+// 模板 弹窗
+// ══════════════════════════════════════════════════════════
+const showTplModal = ref(false)
+const tplForm = reactive({})
+const editingTplIdx = ref(-1)
+const tplRulesLocal = ref([])
+const tplParamsLocal = ref([])
+
 const expTemplates = computed(() => cpId.value ? store.getTemplatesByCountry(cpId.value) : [])
-const countryFields = computed(() => store.getFieldsByCountry(cpId.value))
+const countryFieldKeys = computed(() => store.getFieldsByCountry(cpId.value).map(f => f.字段键))
+const outputKeys = computed(() => store.getFieldsByCountry(cpId.value).filter(f => f.输入输出 === '输出').map(f => f.字段键))
 
-// ── 计算字段 ──
-const fieldCols = [
-  { key: '字段键', label: '字段键', type: 'text' },
-  { key: '字段名称', label: '名称', type: 'text' },
-  { key: '类型', label: '类型', type: 'text' },
-  { key: '层级', label: '层级', type: 'text' },
-  { key: '输入输出', label: '输入/输出', type: 'text' },
-  { key: '单位', label: '单位', type: 'text' },
-  { key: '必填', label: '必填', type: 'boolean' },
-  { key: '说明', label: '说明', type: 'text' },
-]
-function addF() { store['计算字段'].push({ 字段键:'',字段名称:'',类型:'数字',单位:'',选项组编号:'',所属国家平台:cpId.value,层级:'商品级',输入输出:'输入',必填:'否',说明:'' }) }
-function upF({ i, row }) { const x = store['计算字段'].indexOf(expFields.value[i]); if (x !== -1) store['计算字段'][x] = row }
-function delF({ i }) { const x = store['计算字段'].indexOf(expFields.value[i]); if (x !== -1) store['计算字段'].splice(x, 1) }
-
-// ── 选项组 + 选项值 ──
-const expandedGroupId = ref(null)
-const optGroupCols = [
-  { key: '编号', label: '编号', type: 'text' },
-  { key: '名称', label: '名称', type: 'text' },
-  { key: '说明', label: '说明', type: 'text' },
-]
-const optItemCols = [
-  { key: '选项值', label: '选项值', type: 'text' },
-  { key: '显示名', label: '显示名', type: 'text' },
-  { key: '排序', label: '排序', type: 'number' },
-  { key: '启用', label: '启用', type: 'boolean' },
-  { key: '备注', label: '备注', type: 'text' },
-]
-function addG() { store['选项组'].push({ 编号:'',名称:'',所属国家平台:cpId.value,说明:'' }) }
-function upG({ i, row }) { const x = store['选项组'].indexOf(expOptGroups.value[i]); if (x !== -1) store['选项组'][x] = row }
-function delG({ i }) { const x = store['选项组'].indexOf(expOptGroups.value[i]); if (x !== -1) store['选项组'].splice(x, 1) }
-function getItems(gid) { return store.getOptionItemsByGroup(gid) }
-function addI(gid) { store['选项值'].push({ 所属分组:gid, 选项值:'', 显示名:'', 排序:'', 启用:'是', 备注:'' }) }
-function upI(gid, i, row) {
-  const items = getItems(gid); const x = store['选项值'].indexOf(items[i])
-  if (x !== -1) store['选项值'][x] = row
+function openNewTpl() {
+  editingTplIdx.value = -1
+  Object.assign(tplForm, { 编号:'',名称:'',所属国家平台:cpId.value,启用:'是',说明:'' })
+  tplRulesLocal.value = []
+  tplParamsLocal.value = []
+  showTplModal.value = true
 }
-function delI(gid, i) {
-  const items = getItems(gid); const x = store['选项值'].indexOf(items[i])
-  if (x !== -1) store['选项值'].splice(x, 1)
+function openEditTpl(idx) {
+  editingTplIdx.value = idx
+  const t = expTemplates.value[idx]
+  Object.assign(tplForm, JSON.parse(JSON.stringify(t)))
+  tplRulesLocal.value = JSON.parse(JSON.stringify(store.getFeeRulesByTemplate(t.编号)))
+  tplParamsLocal.value = JSON.parse(JSON.stringify(store.getTemplateParams(t.编号)))
+  showTplModal.value = true
+}
+function saveTpl() {
+  if (editingTplIdx.value >= 0) {
+    const x = store['计算模板'].indexOf(expTemplates.value[editingTplIdx.value])
+    if (x !== -1) store['计算模板'][x] = { ...tplForm }
+    const tid = tplForm.编号
+    const keepR = []; for (const r of store['费用规则']) { if (r.所属模板 !== tid) keepR.push(r) }
+    store['费用规则'] = [...keepR, ...tplRulesLocal.value]
+    const keepP = []; for (const p of store['模板参数']) { if (p.模板编号 !== tid) keepP.push(p) }
+    store['模板参数'] = [...keepP, ...tplParamsLocal.value]
+  } else {
+    store['计算模板'].push({ ...tplForm })
+    store['费用规则'] = [...store['费用规则'], ...tplRulesLocal.value]
+    store['模板参数'] = [...store['模板参数'], ...tplParamsLocal.value]
+  }
+  showTplModal.value = false
+}
+function deleteTpl(idx) {
+  const t = expTemplates.value[idx]
+  const x = store['计算模板'].indexOf(t)
+  if (x !== -1) store['计算模板'].splice(x, 1)
+  store['费用规则'] = store['费用规则'].filter(r => r.所属模板 !== t.编号)
+  store['模板参数'] = store['模板参数'].filter(p => p.模板编号 !== t.编号)
 }
 
-// ── 模板 + 费用规则 ──
-const expandedTplId = ref(null)
-const templateCols = [
-  { key: '编号', label: '编号', type: 'text' },
-  { key: '名称', label: '名称', type: 'text' },
-  { key: '启用', label: '启用', type: 'boolean' },
-  { key: '说明', label: '说明', type: 'text' },
-]
-function addT() { store['计算模板'].push({ 编号:'',名称:'',所属国家平台:cpId.value,启用:'是',说明:'' }) }
-function upT({ i, row }) { const x = store['计算模板'].indexOf(expTemplates.value[i]); if (x !== -1) store['计算模板'][x] = row }
-function delT({ i }) { const x = store['计算模板'].indexOf(expTemplates.value[i]); if (x !== -1) store['计算模板'].splice(x, 1) }
-function getRules(tid) { return store.getFeeRulesByTemplate(tid) }
-function getParams(tid) { return store.getTemplateParams(tid) }
-
-// ── 规则弹窗 ──
-const showRuleModal = ref(false)
-const editingRuleIdx = ref(-1)
-const editingRuleTplId = ref('')
+// ── 模板内 规则/参数 CRUD ──
+const showRuleSubModal = ref(false)
 const ruleForm = reactive({})
-const fieldKeys = computed(() => countryFields.value.map(f => f.字段键))
-const outputKeys = computed(() => countryFields.value.filter(f => f.输入输出 === '输出').map(f => f.字段键))
+const editingRuleIdx = ref(-1)
+
+function openNewRule() {
+  editingRuleIdx.value = -1
+  Object.assign(ruleForm, { 编号:'',所属模板:tplForm.编号,输出字段键:'',费用名称:'',计算顺序:'',启用:'是',条件1字段:'',条件1运算符:'',条件1值:'',条件1值2:'',条件2字段:'',条件2运算符:'',条件2值:'',条件2值2:'',计算方式:'',查表名称:'',匹配方式:'',输入映射:'',输出列:'',百分比基数:'',百分比值:'',百分比来源字段:'',固定金额:'',加总字段:'',公式:'',累加:'否',说明:'' })
+  showRuleSubModal.value = true
+}
+function openEditRule(idx) {
+  editingRuleIdx.value = idx
+  Object.assign(ruleForm, JSON.parse(JSON.stringify(tplRulesLocal.value[idx])))
+  showRuleSubModal.value = true
+}
+function saveRule() {
+  if (editingRuleIdx.value >= 0) tplRulesLocal.value[editingRuleIdx.value] = { ...ruleForm }
+  else tplRulesLocal.value.push({ ...ruleForm })
+  showRuleSubModal.value = false
+}
+function deleteRuleFromSub() {
+  if (editingRuleIdx.value >= 0) tplRulesLocal.value.splice(editingRuleIdx.value, 1)
+  showRuleSubModal.value = false
+}
+function deleteRuleInline(i) { tplRulesLocal.value.splice(i, 1) }
+
+function addParam() { tplParamsLocal.value.push({ 模板编号:tplForm.编号,字段键:'',默认值:'',必填:'否' }) }
+function delParam(i) { tplParamsLocal.value.splice(i, 1) }
 
 function condSummary(r) {
   const p = []
   if (r.条件1字段) p.push(`${r.条件1字段} ${r.条件1运算符||''} ${r.条件1值}`)
   if (r.条件2字段) p.push(`AND ${r.条件2字段} ${r.条件2运算符||''} ${r.条件2值}`)
   return p.join(' ') || '—'
-}
-
-function openNewRule(tplId) {
-  editingRuleTplId.value = tplId; editingRuleIdx.value = -1
-  Object.assign(ruleForm, { 编号:'',所属模板:tplId,输出字段键:'',费用名称:'',计算顺序:'',启用:'是',条件1字段:'',条件1运算符:'',条件1值:'',条件1值2:'',条件2字段:'',条件2运算符:'',条件2值:'',条件2值2:'',计算方式:'',查表名称:'',匹配方式:'',输入映射:'',输出列:'',百分比基数:'',百分比值:'',百分比来源字段:'',固定金额:'',加总字段:'',公式:'',累加:'否',说明:'' })
-  showRuleModal.value = true
-}
-function openEditRule(tplId, idx, rule) {
-  editingRuleTplId.value = tplId; editingRuleIdx.value = idx
-  Object.assign(ruleForm, JSON.parse(JSON.stringify(rule)))
-  showRuleModal.value = true
-}
-function saveRule() {
-  const rules = getRules(editingRuleTplId.value)
-  if (editingRuleIdx.value >= 0) {
-    const realIdx = store['费用规则'].indexOf(rules[editingRuleIdx.value])
-    if (realIdx !== -1) store['费用规则'][realIdx] = { ...ruleForm }
-  } else {
-    store['费用规则'].push({ ...ruleForm })
-  }
-  showRuleModal.value = false
-}
-function deleteRuleFromModal() {
-  const rules = getRules(editingRuleTplId.value)
-  if (editingRuleIdx.value >= 0) {
-    const realIdx = store['费用规则'].indexOf(rules[editingRuleIdx.value])
-    if (realIdx !== -1) store['费用规则'].splice(realIdx, 1)
-  }
-  showRuleModal.value = false
-}
-function deleteRuleInline(tplId, i) {
-  const rules = getRules(tplId)
-  const x = store['费用规则'].indexOf(rules[i])
-  if (x !== -1) store['费用规则'].splice(x, 1)
-}
-
-// ── 模板参数 ──
-const paramCols = [
-  { key: '字段键', label: '字段键', type: 'text' },
-  { key: '默认值', label: '默认值', type: 'text' },
-  { key: '必填', label: '必填', type: 'boolean' },
-]
-function addP(tid) { store['模板参数'].push({ 模板编号:tid,字段键:'',默认值:'',必填:'否' }) }
-function upP(tid, i, row) {
-  const p = getParams(tid); const x = store['模板参数'].indexOf(p[i])
-  if (x !== -1) store['模板参数'][x] = row
-}
-function delP(tid, i) {
-  const p = getParams(tid); const x = store['模板参数'].indexOf(p[i])
-  if (x !== -1) store['模板参数'].splice(x, 1)
 }
 </script>
 
@@ -181,8 +223,7 @@ function delP(tid, i) {
               <thead>
                 <tr>
                   <th class="w-8"></th>
-                  <th v-for="k in allKeys" :key="k" class="relative group">
-                    {{ k }}
+                  <th v-for="k in allKeys" :key="k" class="relative group">{{ k }}
                     <button v-if="!CORE_KEYS.includes(k)" class="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 text-error absolute -top-1 -right-1" @click="removeColumn(k)">✕</button>
                   </th>
                   <th class="w-12"></th>
@@ -193,91 +234,59 @@ function delP(tid, i) {
                   <tr class="hover" :class="{ 'bg-base-200': expandedId === row.编号 }">
                     <td><button class="btn btn-ghost btn-xs" @click="toggleExpand(row.编号)">{{ expandedId === row.编号 ? '▼' : '▶' }}</button></td>
                     <td v-for="k in allKeys" :key="k" @click="editingCell = { id: row.编号, key: k }">
-                      <span v-if="editingCell?.id !== row.编号 || editingCell?.key !== k" class="cursor-text min-w-[2rem] inline-block">
-                        {{ k === '启用' ? (row[k] === '是' || row[k] === 'TRUE' ? '是' : '否') : (row[k] || '—') }}
-                      </span>
-                      <input v-else :value="row[k]" class="input input-bordered input-xs w-full"
-                        @blur="editingCell = null; updateCell(row.编号, k, $event.target.value)"
-                        @keyup.enter="editingCell = null; updateCell(row.编号, k, $event.target.value)" />
+                      <span v-if="editingCell?.id !== row.编号 || editingCell?.key !== k" class="cursor-text min-w-[2rem] inline-block">{{ k === '启用' ? (row[k] === '是' || row[k] === 'TRUE' ? '是' : '否') : (row[k] || '—') }}</span>
+                      <input v-else :value="row[k]" class="input input-bordered input-xs w-full" @blur="editingCell = null; updateCell(row.编号, k, $event.target.value)" @keyup.enter="editingCell = null; updateCell(row.编号, k, $event.target.value)" />
                     </td>
                     <td><button class="btn btn-ghost btn-xs text-error" @click="deleteRow(row.编号)">🗑️</button></td>
                   </tr>
-                  <!-- 展开子管理 -->
                   <tr v-if="expandedId === row.编号">
-                    <td :colspan="allKeys.length + 2" class="p-0">
-                      <div class="p-4 space-y-4 bg-base-200/50">
+                    <td :colspan="allKeys.length + 2" class="p-4 bg-base-200/50">
+                      <div class="grid grid-cols-3 gap-4">
 
-                        <!-- 1. 计算字段 -->
-                        <details open class="bg-base-100 rounded p-3">
-                          <summary class="font-semibold cursor-pointer">计算字段（{{ expFields.length }}）</summary>
-                          <div class="mt-2"><EditableTable :columns="fieldCols" :rows="expFields" id-key="字段键" @add="addF" @update="(e) => upF({ i: e.index, row: e.row })" @delete="(e) => delF({ i: e.index })" /></div>
-                        </details>
-
-                        <!-- 2. 选项组 + 选项值 -->
-                        <details class="bg-base-100 rounded p-3">
-                          <summary class="font-semibold cursor-pointer">选项组（{{ expOptGroups.length }}）</summary>
-                          <div class="mt-2 space-y-2">
-                            <EditableTable :columns="optGroupCols" :rows="expOptGroups" id-key="编号" @add="addG" @update="(e) => upG({ i: e.index, row: e.row })" @delete="(e) => delG({ i: e.index })" />
-                            <div v-for="g in expOptGroups" :key="g.编号" class="ml-4 p-2 bg-base-200 rounded">
-                              <div class="flex items-center gap-2 mb-1">
-                                <button class="btn btn-ghost btn-xs" @click="expandedGroupId = expandedGroupId === g.编号 ? null : g.编号">
-                                  {{ expandedGroupId === g.编号 ? '▼' : '▶' }}
-                                </button>
-                                <span class="text-sm font-semibold">{{ g.名称 }}（{{ g.编号 }}）</span>
-                                <span class="text-xs text-base-content/50">{{ g.说明 }}</span>
-                              </div>
-                              <div v-if="expandedGroupId === g.编号">
-                                <EditableTable :columns="optItemCols" :rows="getItems(g.编号)" id-key="选项值"
-                                  @add="addI(g.编号)" @update="(e) => upI(g.编号, e.index, e.row)" @delete="(e) => delI(g.编号, e.index)" />
-                              </div>
+                        <!-- 计算字段 -->
+                        <div class="card card-sm bg-base-100">
+                          <div class="card-body p-3">
+                            <div class="flex justify-between items-center mb-2">
+                              <span class="font-semibold text-sm">计算字段（{{ expFields.length }}）</span>
+                              <button class="btn btn-xs btn-primary" @click="openNewField">＋</button>
+                            </div>
+                            <div v-if="!expFields.length" class="text-xs text-base-content/40">暂无</div>
+                            <div v-for="(f, i) in expFields" :key="f.字段键 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
+                              <span class="cursor-pointer hover:text-primary" @click="openEditField(i)">{{ f.字段键 || '(新字段)' }} <span class="text-base-content/40">{{ f.层级 }}·{{ f.输入输出 }}</span></span>
+                              <button class="btn btn-ghost btn-xs text-error" @click="deleteField(i)">🗑️</button>
                             </div>
                           </div>
-                        </details>
+                        </div>
 
-                        <!-- 3. 模板 + 费用规则 -->
-                        <details class="bg-base-100 rounded p-3">
-                          <summary class="font-semibold cursor-pointer">计算模板（{{ expTemplates.length }}）</summary>
-                          <div class="mt-2 space-y-3">
-                            <EditableTable :columns="templateCols" :rows="expTemplates" id-key="编号" @add="addT" @update="(e) => upT({ i: e.index, row: e.row })" @delete="(e) => delT({ i: e.index })" />
-                            <div v-for="t in expTemplates" :key="t.编号" class="ml-4 p-2 bg-base-200 rounded">
-                              <div class="flex items-center gap-2 mb-1">
-                                <button class="btn btn-ghost btn-xs" @click="expandedTplId = expandedTplId === t.编号 ? null : t.编号">
-                                  {{ expandedTplId === t.编号 ? '▼' : '▶' }}
-                                </button>
-                                <span class="text-sm font-semibold">{{ t.名称 }}（{{ t.编号 }}）</span>
-                                <span class="badge badge-xs">{{ t.启用 === '是' ? '启用' : '禁用' }}</span>
-                              </div>
-                              <div v-if="expandedTplId === t.编号" class="space-y-2">
-                                <!-- 费用规则 -->
-                                <div>
-                                  <div class="flex items-center justify-between mb-1">
-                                    <span class="text-xs font-semibold">费用规则（{{ getRules(t.编号).length }} 条）</span>
-                                    <button class="btn btn-xs btn-primary" @click="openNewRule(t.编号)">＋ 新建规则</button>
-                                  </div>
-                                  <table v-if="getRules(t.编号).length" class="table table-xs">
-                                    <thead><tr><th>编号</th><th>输出到</th><th>计算方式</th><th>条件</th><th>顺序</th><th></th></tr></thead>
-                                    <tbody>
-                                      <tr v-for="(r, i) in getRules(t.编号)" :key="r.编号 || i" class="hover cursor-pointer" @click="openEditRule(t.编号, i, r)">
-                                        <td class="font-mono text-xs">{{ r.编号 }}</td>
-                                        <td>{{ r.输出字段键 }}</td>
-                                        <td><span class="badge badge-xs">{{ r.计算方式 }}</span></td>
-                                        <td class="text-xs text-base-content/60">{{ condSummary(r) }}</td>
-                                        <td>{{ r.计算顺序 }}</td>
-                                        <td><button class="btn btn-ghost btn-xs text-error" @click.stop="deleteRuleInline(t.编号, i)">🗑️</button></td>
-                                      </tr>
-                                    </tbody>
-                                  </table>
-                                </div>
-                                <!-- 模板参数 -->
-                                <div>
-                                  <span class="text-xs font-semibold">模板参数</span>
-                                  <div class="mt-1"><EditableTable :columns="paramCols" :rows="getParams(t.编号)" id-key="字段键"
-                                    @add="addP(t.编号)" @update="(e) => upP(t.编号, e.index, e.row)" @delete="(e) => delP(t.编号, e.index)" /></div>
-                                </div>
-                              </div>
+                        <!-- 选项组 -->
+                        <div class="card card-sm bg-base-100">
+                          <div class="card-body p-3">
+                            <div class="flex justify-between items-center mb-2">
+                              <span class="font-semibold text-sm">选项组（{{ expOptGroups.length }}）</span>
+                              <button class="btn btn-xs btn-primary" @click="openNewOpt">＋</button>
+                            </div>
+                            <div v-if="!expOptGroups.length" class="text-xs text-base-content/40">暂无</div>
+                            <div v-for="(g, i) in expOptGroups" :key="g.编号 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
+                              <span class="cursor-pointer hover:text-primary" @click="openEditOpt(i)">{{ g.名称 || '(新)' }} <span class="text-base-content/40">{{ g.编号 }}</span></span>
+                              <button class="btn btn-ghost btn-xs text-error" @click="deleteOpt(i)">🗑️</button>
                             </div>
                           </div>
-                        </details>
+                        </div>
+
+                        <!-- 计算模板 -->
+                        <div class="card card-sm bg-base-100">
+                          <div class="card-body p-3">
+                            <div class="flex justify-between items-center mb-2">
+                              <span class="font-semibold text-sm">计算模板（{{ expTemplates.length }}）</span>
+                              <button class="btn btn-xs btn-primary" @click="openNewTpl">＋</button>
+                            </div>
+                            <div v-if="!expTemplates.length" class="text-xs text-base-content/40">暂无</div>
+                            <div v-for="(t, i) in expTemplates" :key="t.编号 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
+                              <span class="cursor-pointer hover:text-primary" @click="openEditTpl(i)">{{ t.名称 || '(新)' }} <span class="badge badge-xs">{{ t.启用 === '是' ? '启用' : '—' }}</span></span>
+                              <button class="btn btn-ghost btn-xs text-error" @click="deleteTpl(i)">🗑️</button>
+                            </div>
+                          </div>
+                        </div>
 
                       </div>
                     </td>
@@ -291,41 +300,158 @@ function delP(tid, i) {
       </div>
     </div>
 
-    <!-- 费用规则弹窗 -->
-    <dialog :open="showRuleModal" class="modal">
-      <div class="modal-box w-11/12 max-w-3xl max-h-[90vh] overflow-y-auto">
+    <!-- ═══ 计算字段弹窗 ═══ -->
+    <dialog :open="showFieldModal" class="modal">
+      <div class="modal-box max-w-lg">
+        <h3 class="text-lg font-bold mb-4">{{ editingFieldIdx >= 0 ? '编辑字段' : '新建字段' }}</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label py-0 text-xs">字段键</label><input v-model="fieldForm.字段键" class="input input-bordered input-sm w-full"></div>
+          <div><label class="label py-0 text-xs">字段名称</label><input v-model="fieldForm.字段名称" class="input input-bordered input-sm w-full"></div>
+          <div><label class="label py-0 text-xs">类型</label><select v-model="fieldForm.类型" class="select select-bordered select-sm w-full"><option>数字</option><option>文本</option><option>下拉</option><option>布尔</option></select></div>
+          <div><label class="label py-0 text-xs">层级</label><select v-model="fieldForm.层级" class="select select-bordered select-sm w-full"><option>商品级</option><option>SKU级</option></select></div>
+          <div><label class="label py-0 text-xs">输入/输出</label><select v-model="fieldForm.输入输出" class="select select-bordered select-sm w-full"><option>输入</option><option>输出</option></select></div>
+          <div><label class="label py-0 text-xs">单位</label><input v-model="fieldForm.单位" class="input input-bordered input-sm w-full"></div>
+          <div><label class="label py-0 text-xs">选项组编号</label><input v-model="fieldForm.选项组编号" class="input input-bordered input-sm w-full"></div>
+          <div><label class="label py-0 text-xs">必填</label><select v-model="fieldForm.必填" class="select select-bordered select-sm w-full"><option>是</option><option>否</option></select></div>
+        </div>
+        <div class="mt-2"><label class="label py-0 text-xs">说明</label><input v-model="fieldForm.说明" class="input input-bordered input-sm w-full"></div>
+        <div class="modal-action">
+          <button v-if="editingFieldIdx >= 0" class="btn btn-error btn-sm btn-outline" @click="deleteField(editingFieldIdx); showFieldModal = false">删除</button>
+          <button class="btn btn-ghost btn-sm" @click="showFieldModal = false">取消</button>
+          <button class="btn btn-primary btn-sm" @click="saveField">保存</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showFieldModal = false"><button>关闭</button></form>
+    </dialog>
+
+    <!-- ═══ 选项组弹窗（含选项值） ═══ -->
+    <dialog :open="showOptModal" class="modal">
+      <div class="modal-box max-w-2xl max-h-[85vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-4">{{ editingOptIdx >= 0 ? '编辑选项组' : '新建选项组' }}</h3>
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div><label class="label py-0 text-xs">编号</label><input v-model="optForm.编号" class="input input-bordered input-sm w-full"></div>
+          <div><label class="label py-0 text-xs">名称</label><input v-model="optForm.名称" class="input input-bordered input-sm w-full"></div>
+          <div><label class="label py-0 text-xs">说明</label><input v-model="optForm.说明" class="input input-bordered input-sm w-full"></div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold">选项值（{{ optItemsLocal.length }}）</span>
+            <button class="btn btn-xs btn-primary" @click="addOptItem">＋</button>
+          </div>
+          <table v-if="optItemsLocal.length" class="table table-xs">
+            <thead><tr><th>选项值</th><th>显示名</th><th>排序</th><th>启用</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="(item, i) in optItemsLocal" :key="i">
+                <td><input v-model="item.选项值" class="input input-bordered input-xs w-20"></td>
+                <td><input v-model="item.显示名" class="input input-bordered input-xs w-24"></td>
+                <td><input v-model="item.排序" class="input input-bordered input-xs w-12"></td>
+                <td><select v-model="item.启用" class="select select-bordered select-xs w-16"><option>是</option><option>否</option></select></td>
+                <td><button class="btn btn-ghost btn-xs text-error" @click="delOptItem(i)">🗑️</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-action">
+          <button v-if="editingOptIdx >= 0" class="btn btn-error btn-sm btn-outline" @click="deleteOpt(editingOptIdx); showOptModal = false">删除</button>
+          <button class="btn btn-ghost btn-sm" @click="showOptModal = false">取消</button>
+          <button class="btn btn-primary btn-sm" @click="saveOpt">保存</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showOptModal = false"><button>关闭</button></form>
+    </dialog>
+
+    <!-- ═══ 模板弹窗（含费用规则 + 模板参数） ═══ -->
+    <dialog :open="showTplModal" class="modal">
+      <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-4">{{ editingTplIdx >= 0 ? '编辑模板' : '新建模板' }}</h3>
+        <div class="grid grid-cols-4 gap-3 mb-4">
+          <div><label class="label py-0 text-xs">编号</label><input v-model="tplForm.编号" class="input input-bordered input-sm w-full"></div>
+          <div><label class="label py-0 text-xs">名称</label><input v-model="tplForm.名称" class="input input-bordered input-sm w-full"></div>
+          <div><label class="label py-0 text-xs">启用</label><select v-model="tplForm.启用" class="select select-bordered select-sm w-full"><option>是</option><option>否</option></select></div>
+          <div><label class="label py-0 text-xs">说明</label><input v-model="tplForm.说明" class="input input-bordered input-sm w-full"></div>
+        </div>
+
+        <!-- 费用规则 -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold">费用规则（{{ tplRulesLocal.length }} 条）</span>
+            <button class="btn btn-xs btn-primary" @click="openNewRule">＋ 新建规则</button>
+          </div>
+          <table v-if="tplRulesLocal.length" class="table table-xs">
+            <thead><tr><th>编号</th><th>输出到</th><th>计算方式</th><th>条件</th><th>顺序</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="(r, i) in tplRulesLocal" :key="r.编号 || i" class="hover cursor-pointer" @click="openEditRule(i)">
+                <td class="font-mono text-xs">{{ r.编号 }}</td>
+                <td>{{ r.输出字段键 }}</td>
+                <td><span class="badge badge-xs">{{ r.计算方式 }}</span></td>
+                <td class="text-xs text-base-content/60">{{ condSummary(r) }}</td>
+                <td>{{ r.计算顺序 }}</td>
+                <td><button class="btn btn-ghost btn-xs text-error" @click.stop="deleteRuleInline(i)">🗑️</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="text-xs text-base-content/40">暂无规则</div>
+        </div>
+
+        <!-- 模板参数 -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold">模板参数（{{ tplParamsLocal.length }}）</span>
+            <button class="btn btn-xs btn-primary" @click="addParam">＋</button>
+          </div>
+          <table v-if="tplParamsLocal.length" class="table table-xs">
+            <thead><tr><th>字段键</th><th>默认值</th><th>必填</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="(p, i) in tplParamsLocal" :key="i">
+                <td><input v-model="p.字段键" class="input input-bordered input-xs w-24" list="paramKeys"></td>
+                <td><input v-model="p.默认值" class="input input-bordered input-xs w-24"></td>
+                <td><select v-model="p.必填" class="select select-bordered select-xs w-16"><option>是</option><option>否</option></select></td>
+                <td><button class="btn btn-ghost btn-xs text-error" @click="delParam(i)">🗑️</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <datalist id="paramKeys"><option v-for="k in countryFieldKeys" :key="k" :value="k" /></datalist>
+        </div>
+
+        <div class="modal-action">
+          <button v-if="editingTplIdx >= 0" class="btn btn-error btn-sm btn-outline" @click="deleteTpl(editingTplIdx); showTplModal = false">删除</button>
+          <button class="btn btn-ghost btn-sm" @click="showTplModal = false">取消</button>
+          <button class="btn btn-primary btn-sm" @click="saveTpl">保存</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showTplModal = false"><button>关闭</button></form>
+    </dialog>
+
+    <!-- ═══ 费用规则子弹窗 ═══ -->
+    <dialog :open="showRuleSubModal" class="modal">
+      <div class="modal-box w-11/12 max-w-3xl max-h-[85vh] overflow-y-auto">
         <h3 class="text-lg font-bold mb-4">{{ editingRuleIdx >= 0 ? '编辑规则' : '新建规则' }}</h3>
-        <!-- 基本信息 -->
         <div class="grid grid-cols-4 gap-2 mb-4">
           <div><label class="label py-0 text-xs">编号</label><input v-model="ruleForm.编号" class="input input-bordered input-sm w-full"></div>
           <div><label class="label py-0 text-xs">费用名称</label><input v-model="ruleForm.费用名称" class="input input-bordered input-sm w-full"></div>
           <div><label class="label py-0 text-xs">顺序</label><input v-model="ruleForm.计算顺序" type="number" class="input input-bordered input-sm w-full"></div>
           <div><label class="label py-0 text-xs">启用</label><select v-model="ruleForm.启用" class="select select-bordered select-sm w-full"><option>是</option><option>否</option></select></div>
         </div>
-        <div class="form-control mb-3">
-          <label class="label py-0 text-xs">输出字段键</label>
-          <input v-model="ruleForm.输出字段键" class="input input-bordered input-sm" list="ruleOutputKeys">
-          <datalist id="ruleOutputKeys"><option v-for="k in outputKeys" :key="k" :value="k" /></datalist>
-        </div>
-        <!-- 条件 -->
+        <div class="mb-3"><label class="label py-0 text-xs">输出字段键</label><input v-model="ruleForm.输出字段键" class="input input-bordered input-sm w-full" list="rOutputKeys"><datalist id="rOutputKeys"><option v-for="k in outputKeys" :key="k" :value="k" /></datalist></div>
+
         <fieldset class="fieldset p-3 bg-base-200 rounded mb-3">
-          <legend class="font-semibold text-sm">条件（同行 AND，跨行同输出字段键 = OR）</legend>
+          <legend class="font-semibold text-sm">条件（同行=AND，多行同输出字段键=OR）</legend>
           <div class="grid grid-cols-4 gap-2 mb-2">
-            <div><label class="label py-0 text-xs">条件1字段</label><input v-model="ruleForm.条件1字段" class="input input-bordered input-sm w-full" list="ruleFieldKeys"></div>
+            <div><label class="label py-0 text-xs">条件1字段</label><input v-model="ruleForm.条件1字段" class="input input-bordered input-sm w-full" list="rFieldKeys"></div>
             <div><label class="label py-0 text-xs">运算符</label><select v-model="ruleForm.条件1运算符" class="select select-bordered select-sm w-full"><option value="">—</option><option>等于</option><option>不等于</option><option>大于</option><option>大于等于</option><option>小于</option><option>小于等于</option></select></div>
             <div><label class="label py-0 text-xs">值</label><input v-model="ruleForm.条件1值" class="input input-bordered input-sm w-full"></div>
             <div><label class="label py-0 text-xs">值2</label><input v-model="ruleForm.条件1值2" class="input input-bordered input-sm w-full"></div>
           </div>
-          <div class="text-xs mb-1">+ AND 条件2</div>
+          <div class="text-xs mb-1">{{ ruleForm.条件2字段 ? 'AND' : '+ AND 条件2' }}</div>
           <div class="grid grid-cols-4 gap-2">
-            <input v-model="ruleForm.条件2字段" class="input input-bordered input-sm" list="ruleFieldKeys" placeholder="字段">
+            <input v-model="ruleForm.条件2字段" class="input input-bordered input-sm" list="rFieldKeys" placeholder="字段">
             <select v-model="ruleForm.条件2运算符" class="select select-bordered select-sm"><option value="">—</option><option>等于</option><option>不等于</option><option>大于</option><option>大于等于</option><option>小于</option><option>小于等于</option></select>
             <input v-model="ruleForm.条件2值" class="input input-bordered input-sm" placeholder="值">
             <input v-model="ruleForm.条件2值2" class="input input-bordered input-sm" placeholder="值2">
           </div>
-          <datalist id="ruleFieldKeys"><option v-for="k in fieldKeys" :key="k" :value="k" /></datalist>
+          <datalist id="rFieldKeys"><option v-for="k in countryFieldKeys" :key="k" :value="k" /></datalist>
         </fieldset>
-        <!-- 计算 -->
+
         <fieldset class="fieldset mb-3">
           <legend class="font-semibold text-sm">计算配置</legend>
           <select v-model="ruleForm.计算方式" class="select select-bordered select-sm mb-2"><option value="">— 选择 —</option><option>查表</option><option>百分比</option><option>固定值</option><option>加总</option><option>公式</option></select>
@@ -339,23 +465,25 @@ function delP(tid, i) {
           </template>
           <template v-if="ruleForm.计算方式 === '百分比'">
             <div class="grid grid-cols-3 gap-2">
-              <div><label class="label py-0 text-xs">基数</label><input v-model="ruleForm.百分比基数" class="input input-bordered input-sm w-full" list="ruleFieldKeys"></div>
+              <div><label class="label py-0 text-xs">基数</label><input v-model="ruleForm.百分比基数" class="input input-bordered input-sm w-full" list="rFieldKeys"></div>
               <div><label class="label py-0 text-xs">固定%值</label><input v-model="ruleForm.百分比值" class="input input-bordered input-sm w-full"></div>
-              <div><label class="label py-0 text-xs">动态来源字段</label><input v-model="ruleForm.百分比来源字段" class="input input-bordered input-sm w-full" list="ruleFieldKeys"></div>
+              <div><label class="label py-0 text-xs">动态来源</label><input v-model="ruleForm.百分比来源字段" class="input input-bordered input-sm w-full" list="rFieldKeys"></div>
             </div>
           </template>
           <template v-if="ruleForm.计算方式 === '固定值'"><div><label class="label py-0 text-xs">固定金额</label><input v-model="ruleForm.固定金额" class="input input-bordered input-sm w-32"></div></template>
-          <template v-if="ruleForm.计算方式 === '加总'"><div><label class="label py-0 text-xs">加总字段</label><input v-model="ruleForm.加总字段" class="input input-bordered input-sm w-full" list="ruleFieldKeys"></div></template>
+          <template v-if="ruleForm.计算方式 === '加总'"><div><label class="label py-0 text-xs">加总字段（逗号分隔）</label><input v-model="ruleForm.加总字段" class="input input-bordered input-sm w-full" list="rFieldKeys"></div></template>
           <template v-if="ruleForm.计算方式 === '公式'"><div><label class="label py-0 text-xs">公式</label><input v-model="ruleForm.公式" class="input input-bordered input-sm w-full font-mono"></div></template>
         </fieldset>
-        <div class="form-control mb-4"><label class="label py-0 text-xs">说明</label><input v-model="ruleForm.说明" class="input input-bordered input-sm w-full"></div>
+
+        <div class="mb-4"><label class="label py-0 text-xs">说明</label><input v-model="ruleForm.说明" class="input input-bordered input-sm w-full"></div>
+
         <div class="modal-action">
-          <button v-if="editingRuleIdx >= 0" class="btn btn-error btn-sm btn-outline" @click="deleteRuleFromModal">删除</button>
-          <button class="btn btn-ghost btn-sm" @click="showRuleModal = false">取消</button>
+          <button v-if="editingRuleIdx >= 0" class="btn btn-error btn-sm btn-outline" @click="deleteRuleFromSub">删除</button>
+          <button class="btn btn-ghost btn-sm" @click="showRuleSubModal = false">取消</button>
           <button class="btn btn-primary btn-sm" @click="saveRule">保存</button>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop" @click="showRuleModal = false"><button>关闭</button></form>
+      <form method="dialog" class="modal-backdrop" @click="showRuleSubModal = false"><button>关闭</button></form>
     </dialog>
   </div>
 </template>
