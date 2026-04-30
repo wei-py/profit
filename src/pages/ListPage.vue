@@ -11,11 +11,9 @@ import { useListStore } from '@/stores/list'
 const configStore = useConfigStore()
 const createStore = useCreateStore()
 const listStore = useListStore()
-const { openConfigExcel, saveConfigExcel, openListExcel, saveListExcel } = useFileIO()
+const { openListExcel, saveListExcel } = useFileIO()
 
 const showCreatePanel = ref(true)
-
-const showNoConfig = computed(() => !configStore.loaded)
 
 // ── 国家 / 模板下拉 ──
 const enabledCountries = computed(() =>
@@ -121,8 +119,6 @@ const listColumns = computed(() => {
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-bold">商品列表</h1>
       <div class="flex gap-2">
-        <button v-if="showNoConfig" class="btn btn-primary btn-sm" @click="openConfigExcel">打开配置</button>
-        <button v-else class="btn btn-outline btn-sm" @click="saveConfigExcel">保存配置</button>
         <button class="btn btn-outline btn-sm" @click="openListExcel">打开列表</button>
         <button class="btn btn-outline btn-sm" @click="saveListExcel">保存列表</button>
         <button class="btn btn-primary btn-sm" @click="showCreatePanel = !showCreatePanel">
@@ -131,13 +127,7 @@ const listColumns = computed(() => {
       </div>
     </div>
 
-    <!-- 无配置 -->
-    <div v-if="showNoConfig" class="text-center py-20 text-base-content/50">
-      <p class="mb-4">请先打开配置 Excel 文件</p>
-      <button class="btn btn-primary" @click="openConfigExcel">打开配置 Excel</button>
-    </div>
-
-    <div v-else class="flex-1 min-h-0 overflow-y-auto space-y-4">
+    <div class="flex-1 min-h-0 overflow-y-auto space-y-4">
       <!-- 可展开新建面板 -->
       <div v-if="showCreatePanel" class="card card-sm bg-base-100 border border-base-300">
         <div class="card-body">

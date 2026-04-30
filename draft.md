@@ -1,444 +1,269 @@
-According to a document from 2026-04-30，我看了这版 Excel 和文档：**这次 Excel 基本可以了，已经可以作为 v2 主线开工；但文档还没完全同步，正式定版前还要收尾。** 
+⏺ 让我把 ListPage 涉及的所有文件都读一遍，给你完整的介绍。
 
-最重要的变化已经修好了：
+  Read 6 files (ctrl+o to expand)
 
-```text
-中文字段键：已改好
-输出字段键：已存在
-百分比来源字段：已存在
-加总 / 公式：已存在
-是否包邮：已统一成 是 / 否
-shipping_table_mx：已补上
-r_mx_008 利润率乱码：已修正
-巴西 / 墨西哥：都已经能完整闭环
-```
+⏺ 下面是商品列表页面的完整架构介绍，你可以直接参考移植到其他项目。
 
----
+  ---
+  商品列表模块：完整架构
 
-## 我实际跑了一遍 Excel
+  整体数据流
 
-### 巴西模板
+  Excel配置文件 ──→ config store ──→ CreatePanel (表单+计算) ──→ list store ──→ 商品记录表格
+                                               │                        │
+                                          rule-engine               Excel导出
 
-输入：
+  两个独立的 Excel 文件、两个 Store 各管各的：
 
-```text
-刊登类型 = premium
-商品类目 = beauty
-是否包邮 = 否
-售价 = 100
-成本价 = 25
-重量 = 0.3
-```
+  ┌────────────────────────────┬─────────────┬──────────────────────────────────────────┐
+  │            文件            │    Store    │                   用途                   │
+  ├────────────────────────────┼─────────────┼──────────────────────────────────────────┤
+  │ 配置工作簿 (config.xlsx)   │ configStore │ 国家平台、模板、费用规则、字段定义、选项 │
+  ├────────────────────────────┼─────────────┼──────────────────────────────────────────┤
+  │ 商品工作簿 (products.xlsx) │ listStore   │ 每次计算保存的 SKU 商品记录              │
+  └────────────────────────────┴─────────────┴──────────────────────────────────────────┘
 
-算出来：
+  ---
+  一、ListPage.vue（页面主体）
 
-```text
-销售佣金费率 = 0.16
-销售佣金金额 = 16.00
-运费 = 14.35
-支付手续费 = 4.80
-总费用 = 35.15
-净利润 = 39.85
-利润率 = 39.85%
-```
+  文件：src/pages/ListPage.vue
 
-这和文档里 “100 / 0.3 / premium / beauty” 的 8 条规则验证结果一致：佣金 16、运费 14.35、手续费 4.80、总费用 35.15、净利润 39.85。
+  3 个区域从上到下：
 
----
+  ┌─ 工具栏 ────────────────────────────────────────┐
+  │ [国家平台▾] [模板▾] [打开配置] [打开商品] [保存] [清空] │
+  └────────────────────────────────────────────────┘
+  ┌─ CreatePanel（新建面板，可折叠）─────────────────┐
+  │  商品信息(字段表单) + 变体属性 + SKU表格 + [计算] [保存到列表] │
+  └────────────────────────────────────────────────┘
+  ┌─ 商品记录表格 ──────────────────────────────────┐
+  │  动态列（从所有行 keys 的并集生成）│ 每行可删除  │
+  └────────────────────────────────────────────────┘
 
-### 墨西哥模板
+  工具栏的关键联动逻辑：
 
-我也测了一条墨西哥：
+  - 选择国家平台 → 模板下拉框自动过滤该国家的模板 → configStore.selectCountry(id)
+  - 选择模板后 CreatePanel 才会渲染：v-if="configStore.loaded && configStore.selectedTemplateId"
+  - "打开配置"：加载 config.xlsx，解析到 configStore
+  - "打开商品"：加载已有 products.xlsx，解析到 listStore.rows，设置绑定路径
+  - "保存商品"：已绑定路径→直接覆写文件；未绑定→弹窗让用户选位置+命名
 
-```text
-刊登类型 = premium
-商品类目 = beauty
-是否包邮 = 否
-售价 = 300
-成本价 = 80
-重量 = 0.3
-```
+  商品记录表格：
 
-算出来：
-
-```text
-销售佣金费率 = 0.15
-销售佣金金额 = 45.00
-运费 = 60.00
-支付手续费 = 10.50
-总费用 = 115.50
-净利润 = 104.50
-利润率 = 34.83%
-```
-
-说明墨西哥现在也不是断的了，`shipping_table_mx` 已经接上。
-
----
-
-## 现在 Excel 本身的判断
-
-| 项目            | 状态  |
-| ------------- | --- |
-| 巴西模板          | 可以用 |
-| 墨西哥模板         | 可以用 |
-| 中文字段键         | 可以用 |
-| 选项组国家隔离       | 可以  |
-| 费用规则结构        | 可以  |
-| 输出字段映射        | 可以  |
-| sum / formula | 可以  |
-| 模板参数          | 可以  |
-| 查表结构          | 可以  |
-
-**Excel 这版已经不是结构问题了。**
-
-现在真正剩下的是：
-
-```text
-1. 区间边界规则要写死
-2. 文档旧内容要清干净
-3. 公式/计算方式伪代码要和 Excel 中文值一致
-```
-
----
-
-## 还需要改的地方
-
-### 1. 运费区间边界还有重叠
-
-这个是现在最需要明确的点。
-
-你的运费表里有：
-
-```text
-重量 0 - 0.3
-重量 0.3 - 0.5
-```
-
-所以当：
-
-```text
-重量 = 0.3
-```
-
-它其实会同时命中两行。
-
-我实际跑巴西：
-
-```text
-售价 = 100
-重量 = 0.3
-```
-
-程序如果用闭区间 `[下限, 上限]`，会同时命中：
-
-```text
-100-119.99，0-0.3kg     → 14.35
-100-119.99，0.3-0.5kg   → 15.45
-```
-
-我这次测试是按“表格顺序取第一条”，所以得到了：
-
-```text
-运费 = 14.35
-```
-
-文档里的示例也是按这个结果走的。文档多 SKU 示例也已经按当前表算出 `99 / 0.30 → 12.35`、`109 / 0.35 → 15.45`。
-
-建议你在文档和代码里明确一句：
-
-```text
-区间匹配采用闭区间 [下限, 上限]；
-如果多行命中，按费率表从上到下取第一条；
-并在配置校验中给出“区间重叠提醒”。
-```
-
-或者更严谨一点，把表改成不重叠：
-
-```text
-0 - 0.3
-0.3001 - 0.5
-0.5001 - 1
-```
-
-我更建议第一种：**保留业务表可读性，但引擎规定 first match wins。**
-
----
-
-### 2. 文档里的计算方式伪代码还没同步
-
-Excel 里现在用的是中文：
-
-```text
-查表
-百分比
-固定值
-加总
-公式
-```
-
-但文档里的伪代码还在写：
-
-```js
-case "lookup":
-case "percent":
-case "fixed":
-case "sum":
-case "formula":
-```
-
-这会让实现的人写错。因为如果程序直接读 Excel 的 `计算方式`，读到的是：
-
-```text
-查表
-```
-
-不是：
-
-```text
-lookup
-```
-
-建议改成：
-
-```js
-switch (rule.计算方式) {
-  case "查表":
-  case "百分比":
-  case "固定值":
-  case "加总":
-  case "公式":
-}
-```
-
-或者在 reader 层统一做映射：
-
-```js
-const calcTypeMap = {
-  "查表": "lookup",
-  "百分比": "percent",
-  "固定值": "fixed",
-  "加总": "sum",
-  "公式": "formula"
-}
-```
-
-二选一就行。**不要让规则表中文、引擎判断英文直接混用。**
-
----
-
-### 3. 文档里还有 “6 个标准 sheet” 残留
-
-文档前面已经说现在是：
-
-```text
-7 个标准 sheet + N 个费率表 sheet
-```
-
-这才是对的，因为现在有：
-
-```text
-国家平台
-计算字段
-选项组
-选项值
-计算模板
-费用规则
-模板参数
-```
-
-但后面的 `excel-writer.js` 说明和 v1/v2 对比表里还写着：
-
-```text
-处理：6 个标准 sheet
-v2（6+N sheet）
-```
-
-这个要统一改成：
-
-```text
-7 个标准 sheet + N 个费率表 sheet
-```
-
-或者：
-
-```text
-6 个必需 sheet + 1 个可选模板参数 sheet + N 个费率表 sheet
-```
-
-文档当前的服务接口段落仍写了 `处理：6 个标准 sheet`，这和前面的 7 sheet 口径冲突。
-
----
-
-### 4. 商品记录 JSON 还是旧英文 key
-
-文档里的“商品工作簿记录格式”还残留旧写法：
-
-```json
-{
-  "listing_type": "premium",
-  "category": "美容",
-  "free_shipping": false,
-  "selling_price": 99,
-  "cost_price": 25,
-  "weight": 0.3,
-  "sales_commission_rate": 0.16,
-  "shipping_cost": 5.65
-}
-```
-
-这和你现在的中文字段键冲突。
-
-既然 Excel 的字段键已经是中文，商品记录建议也改成中文：
-
-```json
-{
-  "刊登类型": "premium",
-  "商品类目": "beauty",
-  "是否包邮": "否",
-  "skuData": {
-    "红,S": {
-      "sku": "RS001",
-      "售价": 99,
-      "成本价": 25,
-      "重量": 0.3,
-      "images": "red_s_1.jpg",
-      "results": {
-        "销售佣金费率": 0.16,
-        "销售佣金金额": 15.84,
-        "运费": 12.35,
-        "支付手续费": 4.75,
-        "总费用": 32.94,
-        "净利润": 41.06,
-        "利润率": 0.4147
-      }
+  // 列是动态的——取所有行 key 的并集
+  const listColumns = computed(() => {
+    const keys = new Set()
+    for (const row of listStore.rows) {
+      for (const key of Object.keys(row)) keys.add(key)
     }
+    return [...keys]
+  })
+
+  每行是一个 SKU，列包括：商品ID、商品名称、国家平台、模板编号、SKU码、变体属性（颜色/尺码等）、商品级输入值、SKU级输入值、所有
+  计算结果、计算时间。
+
+  ---
+  二、configStore（配置数据中心）
+
+  文件：src/stores/config.js
+
+  核心数据和计算属性：
+
+  // 原始数据（从 Excel 解析来）
+  countryPlatforms   // 国家平台列表
+  calcFields         // 计算字段（定义每个国家有哪些输入/输出字段）
+  optionGroups       // 选项组（下拉选项的分组）
+  optionItems        // 选项值（具体的下拉选项）
+  calcTemplates      // 计算模板（每个国家下可有多个模板）
+  feeRules           // 费用规则（模板下的计费规则，最重要）
+  templateParams     // 模板参数（字段默认值）
+  lookupTables       // 费率表（如运费表、佣金表）
+
+  // 关键计算属性（链式过滤）
+  enabledCountryPlatforms   // 启用 + 按排序号排列的国家
+  templatesByCountry        // 当前选中国家的模板列表
+  fieldsByCountry           // 当前选中国家的字段列表
+  productInputFields        // 字段中 level=商品级 + io=输入
+  skuInputFields            // 字段中 level=SKU级 + io=输入
+  skuOutputFields           // 字段中 level=SKU级 + io=输出
+  selectedTemplateRules     // 当前选中模板的规则（按 order 排序）
+
+  联动链路：
+
+  选国家(id) → 过滤模板列表、过滤字段列表、过滤选项列表
+  选模板(id) → 过滤费用规则、加载模板参数默认值
+
+  ---
+  三、createStore（新建商品状态）
+
+  文件：src/stores/create.js
+
+  核心状态：
+
+  productId           // 商品ID（手动填）
+  productName         // 商品名称
+  productInputs       // 商品级字段值（reactive对象，key=字段键）
+  variantAttributes   // 变体属性 [{name:'颜色', values:'红,蓝'}, {name:'尺码', values:'S,M'}]
+  skus               // SKU数组（笛卡尔积生成）
+  lastCalculatedAt   // 上次计算时间
+
+  核心方法链：
+
+  resetForTemplate(configStore)
+    ├─ 清空 productInputs
+    ├─ 按模板参数设置默认值
+    └─ 调用 generateSkus(configStore)
+
+  generateSkus(configStore)
+    ├─ 对变体属性做笛卡尔积 → 生成 SKU 组合
+    ├─ 每个 SKU 的 inputs 填入示例值或默认值
+    └─ 写入 skus[]
+
+  calculateAll(configStore)
+    ├─ 遍历每个 SKU
+    ├─ 合并输入: { ...productInputs, ...sku.inputs }
+    ├─ 调用 executeRules({ feeRules, lookupTables, inputs, fieldKeys })
+    └─ 写入 results / traces / errors
+
+  productRows(configStore)
+    └─ 展平 SKU → 用于保存到 listStore 的格式
+        { 商品ID, 商品名称, 国家平台, 模板编号, SKU码, ...attrs, ...inputs, ...results }
+
+  笛卡尔积实现：
+
+  // 颜色:红,蓝 + 尺码:S,M → [{颜色:'红',尺码:'S'}, {颜色:'红',尺码:'M'}, ...]
+  function cartesian(attributes) {
+    if (!attributes.length) return [{}]
+    return attributes.reduce((rows, attr) =>
+      rows.flatMap(row => attr.values.map(v => ({ ...row, [attr.name]: v }))),
+      [{}]
+    )
   }
-}
-```
 
-这里注意：`商品类目` 现在保存的是 `beauty`，不是 `美容`。因为你当前 Excel 的选项值和佣金表都是用 `beauty` 作为真实值，`美容` 只是显示名。这个设计可以用。
+  ---
+  四、listStore（商品记录列表）
 
----
+  文件：src/stores/list.js
 
-### 5. CreatePanel 里还有一个旧选项组名
+  rows      // 已保存的商品 SKU 行数组
+  filePath  // 绑定的 Excel 文件路径（空=未绑定）
+  fileName  // 从路径提取的文件名（显示用）
 
-文档里还有：
+  appendRows(nextRows)  // 追加行（CreatePanel 保存到列表时用）
+  removeRow(index)      // 删除一行
+  clearRows()          // 清空
+  loadRows(newRows)     // 从 Excel 加载（覆盖）
+  setFilePath(path)     // 设置绑定路径
 
-```text
-opt_category → [美容, 个护, 家居, 电子, 服饰, 其他]
-```
+  ---
+  五、CreatePanel.vue（新建面板）
 
-但现在 Excel 里已经是：
+  文件：src/components/list/CreatePanel.vue
 
-```text
-br_商品类目
-mx_商品类目
-```
+  布局：左右两栏
 
-所以这里应该改成：
+  ┌──── 左栏 (22rem) ────┐  ┌──── 右栏（自适应）──────────────────┐
+  │ 基本信息              │  │ SKU 表格                           │
+  │  商品ID [____]       │  │ ┌──────────────────────────────┐  │
+  │  商品名称 [____]     │  │ │SKU码│颜色│尺码│售价│成本│图片│..│  │
+  │                      │  │ ├────┼────┼────┼────┼────┼────┤  │
+  │ 商品级字段            │  │ │红-S │ 红 │ S  │ 99 │ 25 │🖼️   │  │
+  │  刊登类型 [▾]       │  │ │红-M │ 红 │ M  │109 │ 28 │🖼️   │  │
+  │  商品类目 [▾]       │  │ └──────────────────────────────┘  │
+  │  是否包邮 [▾]       │  │                                    │
+  │                      │  │ [生成SKU] [计算] [保存到列表]       │
+  │ 变体属性              │  │                                    │
+  │  颜色: [红,蓝]   [✕] │  │                                    │
+  │  尺码: [S,M]    [✕] │  │                                    │
+  │  [+添加变体属性]      │  │                                    │
+  └──────────────────────┘  └────────────────────────────────────┘
 
-```text
-br_商品类目 → [beauty/美容, personal_care/个护, home/家居...]
-```
+  关键联动：
 
-这个是小问题，但会误导后面写代码的人。
+  - 切换国家/模板时 watch 自动调用 resetForTemplate，重新生成字段和 SKU
+  - "生成SKU" → generateSkus（用笛卡尔积重新生成，保留输入值）
+  - "计算" → calculateAll（逐SKU调用规则引擎）
+  - "保存到列表" → 先计算（如未计算），再 listStore.appendRows(productRows)
 
----
+  ---
+  六、SkuTable.vue（SKU 变体表格）
 
-### 6. “9 条规则”要改成 “8 条规则”
+  文件：src/components/common/SkuTable.vue
 
-文档 Step 2 写：
+  动态列结构：
 
-```text
-ORDER BY calc_order ASC → 9条规则
-```
+  ┌───────┬──────┬────────────────────────┬──────┬─────────────────────────┬──────┐
+  │ SKU码 │ 变体 │ (inputFields...动态列) │ 图片 │ (outputFields...动态列) │ 状态 │
+  ├───────┼──────┼────────────────────────┼──────┼─────────────────────────┼──────┤
+  └───────┴──────┴────────────────────────┴──────┴─────────────────────────┴──────┘
 
-但现在巴西和墨西哥模板都是 8 条规则：
+  - 输入列可编辑（number 或 text input）
+  - 输出列只读（计算结果），利润率自动格式化 41.47%
+  - 状态列：✅已计算 / ⏳未计算 / ❌错误
+  - 列完全由 configStore.skuInputFields 和 configStore.skuOutputFields 决定，不写死
 
-```text
-r_001  销售佣金费率
-r_002  销售佣金金额
-r_003  包邮运费=0
-r_004  非包邮查运费
-r_005  支付手续费
-r_006  总费用
-r_007  净利润
-r_008  利润率
-```
+  ---
+  七、FieldInput.vue（动态字段渲染器）
 
-这个改成：
+  文件：src/components/common/FieldInput.vue
 
-```text
-ORDER BY calc_order ASC → 8条规则
-```
+  根据字段的 type 渲染不同控件：
 
----
+  ┌──────────────┬─────────────────────────────────────────────────────────┐
+  │     type     │                          控件                           │
+  ├──────────────┼─────────────────────────────────────────────────────────┤
+  │ 下拉         │ <select> + 选项来自 configStore.optionItemsForGroup(id) │
+  ├──────────────┼─────────────────────────────────────────────────────────┤
+  │ 数字         │ <input type="number" step="0.01">                       │
+  ├──────────────┼─────────────────────────────────────────────────────────┤
+  │ 布尔         │ <input type="checkbox" class="toggle">                  │
+  ├──────────────┼─────────────────────────────────────────────────────────┤
+  │ 文本（默认） │ <input type="text">                                     │
+  └──────────────┴─────────────────────────────────────────────────────────┘
 
-## 关于“字段中文 + 选项值英文 code”
+  通过 v-model 双向绑定到 createStore.productInputs[field.key]。
 
-现在你的设计是：
+  ---
+  八、文件 IO（useFileIO.js）
 
-```text
-字段键：中文
-  商品类目
+  文件：src/composables/useFileIO.js
 
-选项值：英文 code
-  beauty
+  // 配置工作簿
+  openConfigFile(configStore)    // 打开 → 解析 → 设置 sourcePath
+  saveConfigFile(configStore)    // 已绑定→直接覆写 / 未绑定→弹窗选路径
 
-显示名：中文
-  美容
+  // 商品工作簿
+  openProductFile(listStore)     // 打开 → 解析 → loadRows → 设置 filePath
+  saveProducts(listStore)        // 已绑定→直接覆写 / 未绑定→弹窗选路径命名
 
-佣金表：英文 code
-  beauty
-```
+  Tauri 环境：用原生 dialog + fs 插件，对话框选路径后直接读写
+  浏览器环境：用 <input type="file"> 选文件 + <a download> 触发下载
 
-这个是可以的，而且比较稳。
+  ---
+  九、移植清单
 
-也就是说：
+  如果要在其他项目使用这套架构，你需要的文件：
 
-```text
-业务人员看到：美容
-系统保存：beauty
-规则查表：beauty
-```
+  src/
+  ├── stores/
+  │   ├── config.js        ← Excel配置加载后的数据中心
+  │   ├── create.js        ← 新建面板状态 + 笛卡尔积 + 计算调度
+  │   └── list.js          ← 商品行存储 + 文件路径绑定
+  ├── services/
+  │   ├── excel-reader.js  ← SheetJS 读取解析 Excel
+  │   ├── excel-writer.js  ← SheetJS 序列化写入 Excel
+  │   └── rule-engine.js   ← 费用计算引擎（核心）
+  ├── composables/
+  │   └── useFileIO.js     ← 文件对话框 + 读写（Tauri/浏览器双模式）
+  ├── components/
+  │   ├── common/
+  │   │   ├── FieldInput.vue   ← 动态字段渲染（下拉/数字/布尔/文本）
+  │   │   └── SkuTable.vue     ← SKU变体表格
+  │   └── list/
+  │       └── CreatePanel.vue  ← 新建面板
+  ├── pages/
+  │   └── ListPage.vue     ← 页面主体
+  └── utils/
+      └── value.js          ← isBlank, toNumber, toBoolean 等工具函数
 
-只要你文档写清楚，就没问题。
-
-不要出现这种混用：
-
-```text
-用户输入保存：美容
-佣金表：beauty
-```
-
-否则查表会失败。
-
----
-
-## 最终判断
-
-现在这版我会这样定：
-
-```text
-Excel：可以作为 v2 主线配置
-巴西模板：可以开工实现
-墨西哥模板：可以开工实现
-文档：还需要最后清理
-引擎：实现时注意区间多命中和中文计算方式映射
-```
-
-优先改这几处：
-
-```text
-P0：
-1. 明确区间边界：多行命中取第一条，或改成不重叠区间
-2. 计算方式伪代码改成中文，或增加中文→英文映射
-3. 商品记录 JSON 改成中文字段键
-
-P1：
-4. 文档里的 6+N 改成 7+N
-5. opt_category 改成 br_商品类目
-6. 9条规则改成8条规则
-```
-
-一句话：**现在 Excel 已经可以了，剩下主要是文档和实现约定的收尾。可以开始写 reader / rule-engine / CreatePanel，但不要忘了把上面 6 个地方清干净。**
+  依赖库：xlsx（SheetJS）、pinia、dayjs、vue-router、@tauri-apps/plugin-dialog、@tauri-apps/plugin-fs

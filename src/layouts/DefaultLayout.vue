@@ -11,7 +11,7 @@ const { isDark, toggleTheme } = useTheme()
 const { startTour } = useTour()
 
 const tooltipMap = {
-  country: '国家平台：管理国家站点、计算字段、选项组、模板规则',
+  country: '配置：管理国家站点、计算字段、选项组、模板规则',
   list: '商品列表：新建商品、输入售价/成本/重量、计算利润',
 }
 

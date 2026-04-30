@@ -3,8 +3,10 @@ import { computed, reactive, ref } from 'vue'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { useConfigStore } from '@/stores/config'
+import { useFileIO } from '@/composables/useFileIO'
 
 const store = useConfigStore()
+const { openConfigExcel, saveConfigExcel } = useFileIO()
 const CORE_KEYS = ['编号', '国家', '平台', '货币', '货币符号', '汇率', '启用', '排序']
 
 // ═══ 国家表格：动态列 ═══
@@ -403,8 +405,10 @@ function delLookupCol(col) {
 <template>
   <div class="h-full flex flex-col overflow-hidden">
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-bold">国家平台</h1>
+      <h1 class="text-2xl font-bold">配置</h1>
       <div class="flex gap-2">
+        <button class="btn btn-outline btn-sm" @click="openConfigExcel">打开配置</button>
+        <button class="btn btn-outline btn-sm" @click="saveConfigExcel">保存配置</button>
         <button v-if="!showAddCol" class="btn btn-ghost btn-sm" @click="showAddCol = true">＋ 添加列</button>
         <div v-else class="flex gap-1 items-center">
           <input v-model="newColName" class="input input-bordered input-sm w-32" placeholder="列名" @keyup.enter="addColumn" />

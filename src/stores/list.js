@@ -9,9 +9,10 @@ export const useListStore = defineStore('list', () => {
   const loading = ref(false)
   const error = ref('')
 
-  async function loadFromBuffer(buffer) {
+  async function loadFromBuffer(buffer, p) {
     loading.value = true
     error.value = ''
+    if (p) filePath.value = p
     try {
       records.value = readListWorkbook(buffer)
     }

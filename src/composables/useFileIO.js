@@ -80,10 +80,10 @@ export function useFileIO() {
       if (!selected)
         return { success: false }
 
-      const path = typeof selected === 'string' ? selected : selected.path
-      const bytes = await readFile(path)
-      configStore.loadFromBuffer(bytes, path)
-      await saveLastPath(path)
+      const filePath = typeof selected === 'string' ? selected : selected.path
+      const bytes = await readFile(filePath)
+      await configStore.loadFromBuffer(bytes, filePath)
+      await saveLastPath(filePath)
       return { success: true }
     }
     catch (e) {
@@ -149,19 +149,18 @@ export function useFileIO() {
    * @param {Array} [headers] - 列头映射
    * @returns {Promise<boolean>} 是否成功
    */
-  async function saveListExcel(headers) {
+  async function saveListExcel() {
     let path = listStore.filePath
     if (!path) {
       const selected = await save({
-        title: '保存列表 Excel',
+        title: '保存商品列表',
         filters: [{ name: 'Excel', extensions: ['xlsx'] }],
       })
-      if (!selected)
-        return false
-      path = selected
+      if (!selected) return false
+      path = typeof selected === 'string' ? selected : selected.path
+      listStore.filePath = path
     }
-
-    const buffer = listStore.getExportBuffer(headers)
+    const buffer = listStore.getExportBuffer()
     await writeFile(path, buffer)
     return true
   }

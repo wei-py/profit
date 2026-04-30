@@ -21,10 +21,11 @@ export const useConfigStore = defineStore('config', () => {
 
   const loaded = computed(() => 国家平台.value.length > 0)
 
-  /** @param {ArrayBuffer} buffer */
-  async function loadFromBuffer(buffer) {
+  /** @param {ArrayBuffer} buffer @param {string} [p] */
+  async function loadFromBuffer(buffer, p) {
     loading.value = true
     error.value = ''
+    if (p) filePath.value = p
     try {
       const config = readWorkbookBuffer(buffer)
       国家平台.value = config['国家平台'] || []
@@ -119,7 +120,7 @@ export const useConfigStore = defineStore('config', () => {
     filePath, workbook, loading, error, loaded,
     '国家平台': 国家平台, '计算字段': 计算字段, '选项组': 选项组, '选项值': 选项值,
     '计算模板': 计算模板, '费用规则': 费用规则, '模板参数': 模板参数, lookupTables,
-    loadFromBuffer, getExportBuffer, clear,
+    loadFromBuffer, getExportBuffer, clear, setFilePath: (p) => { filePath.value = p },
     getTemplatesByCountry, getFeeRulesByTemplate, getFieldsByCountry,
     getOptionGroupsByCountry, getOptionItemsByGroup, getField, getTemplateParams,
     getEnabledFieldsByCountry,
