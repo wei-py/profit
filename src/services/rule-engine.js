@@ -20,17 +20,8 @@ export function execute(feeRules, lookupTables, userInputs) {
 
   for (const rule of sorted) {
     try {
-      // 条件判断
-      if (rule.条件1字段) {
-        if (!matches(getVal(rule.条件1字段, userInputs, results), rule.条件1运算符, rule.条件1值, rule.条件1值2)) {
-          continue
-        }
-      }
-      if (rule.条件2字段) {
-        if (!matches(getVal(rule.条件2字段, userInputs, results), rule.条件2运算符, rule.条件2值, rule.条件2值2)) {
-          continue
-        }
-      }
+      // 条件判断 — 通过条件结构树递归求值
+      if (!evalConditions(rule, userInputs, results)) continue
 
       const key = rule.输出字段键
       if (!key) continue
@@ -62,6 +53,72 @@ export function execute(feeRules, lookupTables, userInputs) {
 }
 
 // ── helpers ──
+
+/**
+ * 按条件数据求值。
+ * 优先从 条件数据 JSON 读取完整树，否则从条件1-4列读取（AND）。
+ */
+function evalConditions(rule, inputs, results) {
+  // 优先：条件数据 JSON 树
+  if (rule.条件数据) {
+    try {
+      const d = JSON.parse(rule.条件数据)
+      if (d.tree) return evalTree(d.tree, d.pool || [], inputs, results)
+    } catch { /* fall through */ }
+  }
+
+  // 或：解析 条件结构
+  const 结构 = (rule.条件结构 || '').trim()
+  if (结构) return evalStruct(结构, rule, inputs, results)
+
+  // 兜底：所有非空条件 AND
+  for (let i = 1; i <= 4; i++) {
+    const f = rule['条件' + i + '字段']
+    if (!f) continue
+    if (!matches(getVal(f, inputs, results), rule['条件' + i + '运算符'], rule['条件' + i + '值'], rule['条件' + i + '值2'])) {
+      return false
+    }
+  }
+  return true
+}
+
+function evalTree(node, pool, inputs, results) {
+  if (node.type === 'cond') {
+    const c = pool[node.idx]
+    if (!c || !c.字段) return true
+    return matches(getVal(c.字段, inputs, results), c.运算符, c.值, '')
+  }
+  // group: evaluate children with their individual connectors
+  let result = null
+  for (const ch of node.children) {
+    const chResult = evalTree(ch, pool, inputs, results)
+    if (result === null) {
+      result = chResult
+    } else {
+      const op = ch.type === 'cond' ? (ch.op || 'AND') : (ch.linkOp || 'AND')
+      result = op === 'AND' ? (result && chResult) : (result || chResult)
+    }
+  }
+  return result === null ? true : result
+}
+
+function evalStruct(结构, rule, inputs, results) {
+  const groups = 结构.split('|').map(g => g.split(',').map(s => s.trim()))
+  for (const group of groups) {
+    let ok = true
+    for (const idx of group) {
+      const i = Number(idx) + 1
+      if (i < 1 || i > 4) continue
+      const f = rule['条件' + i + '字段']
+      if (!f) continue
+      if (!matches(getVal(f, inputs, results), rule['条件' + i + '运算符'], rule['条件' + i + '值'], rule['条件' + i + '值2'])) {
+        ok = false; break
+      }
+    }
+    if (ok) return true
+  }
+  return false
+}
 
 function getVal(fieldKey, inputs, results) {
   if (results[fieldKey] !== undefined && results[fieldKey] !== null) return results[fieldKey]

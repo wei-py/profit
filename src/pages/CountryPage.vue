@@ -3,7 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import { useConfigStore } from '@/stores/config'
 
 const store = useConfigStore()
-const CORE_KEYS = ['编号', '国家', '平台', '货币']
+const CORE_KEYS = ['编号', '国家', '平台', '货币', '货币符号', '汇率', '启用', '排序']
 
 // ═══ 国家表格：动态列 ═══
 const allKeys = computed(() => {
@@ -156,59 +156,138 @@ function deleteTpl(idx) {
 const showRuleSubModal = ref(false)
 const ruleForm = reactive({})
 const editingRuleIdx = ref(-1)
-const ruleConds = ref([]) // [{字段, 运算符, 值}]
+// 条件树：每个节点自带 op（与前一兄弟的连接关系）。第一个节点 op 为空。
+// cond: { type:'cond', idx, op:'AND'|'OR'|'' }
+// group: { type:'group', op:'AND'|'OR', children: [cond|group], linkOp:'AND'|'OR'|'' }  // op=组内关系, linkOp=与前一兄弟关系
+const condPool = ref([])
+const condTree = ref({ type: 'group', op: 'AND', children: [], linkOp: '' })
 
-function openNewRule() {
-  editingRuleIdx.value = -1
-  Object.assign(ruleForm, { 编号:'',所属模板:tplForm.编号,输出字段键:'',费用名称:'',计算顺序:'',启用:'是',计算方式:'',查表名称:'',匹配方式:'',输入映射:'',输出列:'',百分比基数:'',百分比值:'',百分比来源字段:'',固定金额:'',加总字段:'',公式:'',累加:'否',说明:'' })
-  ruleConds.value = []
-  showRuleSubModal.value = true
+function initCondTree() {
+  condPool.value = [{ 字段: '', 运算符: '', 值: '' }]
+  condTree.value = { type: 'group', op: 'AND', children: [{ type: 'cond', idx: 0, op: '' }], linkOp: '' }
 }
-function openEditRule(idx) {
-  editingRuleIdx.value = idx
-  const r = tplRulesLocal.value[idx]
-  Object.assign(ruleForm, JSON.parse(JSON.stringify(r)))
-  // 从条件列反序列化条件列表
-  const conds = []
-  for (let i = 1; i <= 4; i++) {
-    if (r['条件' + i + '字段']) {
-      conds.push({ 字段: r['条件' + i + '字段'], 运算符: r['条件' + i + '运算符'] || '', 值: r['条件' + i + '值'] || '' })
+// 展平条件树 → [{type:'group'|'cond', node, depth, parent, idxInParent}]
+function flattenTree(node, depth = 0, parent = null, idx = 0) {
+  const items = [{ type: node.type === 'group' ? 'group-open' : 'cond', node, depth, parent, idx }]
+  if (node.type === 'group') {
+    for (let i = 0; i < node.children.length; i++) {
+      items.push(...flattenTree(node.children[i], depth + 1, node, i))
     }
+    items.push({ type: 'group-close', node, depth, parent, idx })
   }
-  ruleConds.value = conds
-  showRuleSubModal.value = true
+  return items
 }
-function saveRule() {
-  // 序列化条件列表到字段
+const flatTree = computed(() => condTree.value ? flattenTree(condTree.value) : [])
+
+function addCond(parentGroup, op) {
+  const idx = condPool.value.length
+  condPool.value.push({ 字段: '', 运算符: '', 值: '' })
+  parentGroup.children.push({ type: 'cond', idx, op: op || 'AND' })
+}
+function addSubGroup(parentGroup) {
+  const g = { type: 'group', op: 'AND', children: [], linkOp: 'AND' }
+  parentGroup.children.push(g)
+  addCond(g, 'AND')
+}
+function delNode(parentGroup, i) { parentGroup.children.splice(i, 1) }
+function toggleGroupOp(node) { node.op = node.op === 'AND' ? 'OR' : 'AND' }
+function toggleLinkOp(item) {
+  if (item.type === 'cond') {
+    item.node.op = item.node.op === 'AND' ? 'OR' : 'AND'
+  } else if (item.type === 'group-open') {
+    item.node.linkOp = item.node.linkOp === 'AND' ? 'OR' : 'AND'
+  }
+}
+
+function serializeCondTree() {
+  function dfs(node) {
+    if (node.type === 'cond') return `C${node.idx}`
+    const parts = []
+    for (const ch of node.children) {
+      let prefix = ''
+      if (ch.type === 'cond' && ch.op) prefix = ch.op[0] // A or O
+      else if (ch.type === 'group' && ch.linkOp) prefix = ch.linkOp[0]
+      parts.push(prefix + dfs(ch))
+    }
+    return `G${node.op[0]}[${parts.join(',')}]`
+  }
   const form = { ...ruleForm }
+  form.条件结构 = dfs(condTree.value)
+
   for (let i = 1; i <= 4; i++) {
-    const c = ruleConds.value[i - 1]
+    const c = condPool.value[i - 1]
     form['条件' + i + '字段'] = c ? c.字段 : ''
     form['条件' + i + '运算符'] = c ? c.运算符 : ''
     form['条件' + i + '值'] = c ? c.值 : ''
     form['条件' + i + '值2'] = ''
   }
-  if (editingRuleIdx.value >= 0) {
-    tplRulesLocal.value[editingRuleIdx.value] = form
-  } else {
-    tplRulesLocal.value.push(form)
+  form.条件数据 = JSON.stringify({ pool: condPool.value, tree: condTree.value })
+  return form
+}
+
+// 从 rule 反序列化条件树
+function deserializeCondTree(r) {
+  // 优先从 条件数据 JSON 加载完整树
+  if (r.条件数据) {
+    try {
+      const d = JSON.parse(r.条件数据)
+      condPool.value = d.pool || []
+      condTree.value = d.tree || { type: 'group', op: 'AND', children: [{ type: 'cond', idx: 0, op: '' }], linkOp: '' }
+      return
+    } catch { /* fall through */ }
   }
+  // 向后兼容：从条件1-4列构建
+  condPool.value = []
+  for (let i = 1; i <= 4; i++) {
+    condPool.value.push({ 字段: r['条件' + i + '字段'] || '', 运算符: r['条件' + i + '运算符'] || '', 值: r['条件' + i + '值'] || '' })
+  }
+  condTree.value = { type: 'group', op: 'AND', children: [], linkOp: '' }
+  for (let i = 0; i < condPool.value.length; i++) {
+    if (condPool.value[i].字段) condTree.value.children.push({ type: 'cond', idx: i, op: i > 0 ? 'AND' : '' })
+  }
+  if (!condTree.value.children.length) condTree.value.children.push({ type: 'cond', idx: 0, op: '' })
+}
+
+function parseCondStruct(s) {
+  // "0,1|2,3" → group(OR) with group(AND)[0,1] and group(AND)[2,3]
+  function parse(seg) {
+    if (!seg.includes('|') && !seg.includes(',')) {
+      return { type: 'cond', idx: Number(seg.trim()) }
+    }
+    if (seg.includes('|')) {
+      return { type: 'group', op: 'OR', children: seg.split('|').map(s => parse(s.trim())) }
+    }
+    return { type: 'group', op: 'AND', children: seg.split(',').map(s => parse(s.trim())) }
+  }
+  return parse(s)
+}
+
+function openNewRule() {
+  editingRuleIdx.value = -1
+  Object.assign(ruleForm, { 编号:'',所属模板:tplForm.编号,输出字段键:'',费用名称:'',计算顺序:'',启用:'是',计算方式:'',查表名称:'',匹配方式:'',输入映射:'',输出列:'',百分比基数:'',百分比值:'',百分比来源字段:'',固定金额:'',加总字段:'',公式:'',累加:'否',说明:'',条件结构:'' })
+  initCondTree()
+  showRuleSubModal.value = true
+}
+function openEditRule(idx) {
+  editingRuleIdx.value = idx
+  Object.assign(ruleForm, JSON.parse(JSON.stringify(tplRulesLocal.value[idx])))
+  deserializeCondTree(tplRulesLocal.value[idx])
+  showRuleSubModal.value = true
+}
+function saveRule() {
+  const form = serializeCondTree()
+  if (editingRuleIdx.value >= 0) tplRulesLocal.value[editingRuleIdx.value] = form
+  else tplRulesLocal.value.push(form)
   showRuleSubModal.value = false
 }
-function deleteRuleFromSub() {
-  if (editingRuleIdx.value >= 0) tplRulesLocal.value.splice(editingRuleIdx.value, 1)
-  showRuleSubModal.value = false
-}
+function deleteRuleFromSub() { if (editingRuleIdx.value >= 0) tplRulesLocal.value.splice(editingRuleIdx.value, 1); showRuleSubModal.value = false }
 function deleteRuleInline(i) { tplRulesLocal.value.splice(i, 1) }
-function addCond() { ruleConds.value.push({ 字段: '', 运算符: '', 值: '' }) }
-function delCond(i) { ruleConds.value.splice(i, 1) }
 
 function condSummary(r) {
-  const p = []
-  for (let i = 1; i <= 4; i++) {
-    if (r['条件' + i + '字段']) p.push(`${r['条件' + i + '字段']} ${r['条件' + i + '运算符']||''} ${r['条件' + i + '值']}`)
-  }
-  return p.join(' AND ') || '—'
+  const a = [1, 2].map(i => r['条件' + i + '字段'] ? `${r['条件' + i + '字段']} ${r['条件' + i + '运算符']||''} ${r['条件' + i + '值']}` : '').filter(Boolean).join(' AND ')
+  const b = [3, 4].map(i => r['条件' + i + '字段'] ? `${r['条件' + i + '字段']} ${r['条件' + i + '运算符']||''} ${r['条件' + i + '值']}` : '').filter(Boolean).join(' AND ')
+  if (a && b) return `(${a}) OR (${b})`
+  return a || b || '—'
 }
 
 // ═══ 查表数据弹窗 ═══
@@ -218,7 +297,9 @@ const lookupTableNewName = ref('')
 const lookupRowsLocal = ref([])
 
 // 扫描当前模板规则引用的所有查表名称
-const tplLookupNames = computed(() => [...new Set(tplRulesLocal.value.filter(r => r.查表名称).map(r => r.查表名称))])
+const allLookupNames = computed(() => Object.keys(store.lookupTables))
+const newLookupName = ref('')
+const showNewLookupInput = ref(false)
 
 function openLookup(name) {
   lookupTableName.value = name
@@ -227,9 +308,11 @@ function openLookup(name) {
   showLookupModal.value = true
 }
 function openNewLookup() {
-  const name = prompt('新表名称（Sheet名）：')
-  if (!name) return
+  const name = newLookupName.value.trim()
+  if (!name) { showNewLookupInput.value = true; return }
   store.lookupTables = { ...store.lookupTables, [name]: [] }
+  newLookupName.value = ''
+  showNewLookupInput.value = false
 }
 function saveLookup() {
   const oldName = lookupTableName.value
@@ -260,12 +343,15 @@ function addLookupRow() {
   const row = {}; for (const k of Object.keys(lookupRowsLocal.value[0])) row[k] = ''
   lookupRowsLocal.value.push(row)
 }
+const newLookupCol = ref('')
+
 function delLookupRow(i) { lookupRowsLocal.value.splice(i, 1) }
 function addLookupCol() {
-  const col = prompt('列名：')
+  const col = newLookupCol.value.trim()
   if (!col) return
   for (const row of lookupRowsLocal.value) { if (!(col in row)) row[col] = '' }
   lookupRowsLocal.value = [...lookupRowsLocal.value]
+  newLookupCol.value = ''
 }
 function delLookupCol(col) {
   for (const row of lookupRowsLocal.value) delete row[col]
@@ -496,15 +582,18 @@ function delLookupCol(col) {
         <!-- 查表数据 -->
         <div class="mb-4">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold">查表数据（{{ tplLookupNames.length }} 个）</span>
-            <button class="btn btn-xs btn-primary" @click="openNewLookup">＋ 新建表</button>
+            <span class="text-sm font-semibold">查表数据（{{ allLookupNames.length }} 个）</span>
+            <div class="flex gap-1 items-center">
+              <input v-if="showNewLookupInput" v-model="newLookupName" class="input input-bordered input-xs w-32" placeholder="表名" @keyup.enter="openNewLookup" />
+              <button class="btn btn-xs btn-primary" @click="openNewLookup">＋ 新建表</button>
+            </div>
           </div>
-          <div v-for="name in tplLookupNames" :key="name" class="flex items-center gap-2 py-1">
+          <div v-for="name in allLookupNames" :key="name" class="flex items-center gap-2 py-1">
             <span class="text-xs font-mono">{{ name }}</span>
             <button class="btn btn-ghost btn-xs" @click="openLookup(name)">📊 编辑</button>
             <button class="btn btn-ghost btn-xs text-error" @click="deleteLookup(name)">🗑️</button>
           </div>
-          <div v-if="!tplLookupNames.length" class="text-xs text-base-content/40">无</div>
+          <div v-if="!allLookupNames.length" class="text-xs text-base-content/40">无</div>
         </div>
 
         <div class="modal-action">
@@ -528,22 +617,30 @@ function delLookupCol(col) {
         </div>
         <div class="mb-3"><label class="label py-0 text-xs">输出字段键</label><input v-model="ruleForm.输出字段键" class="input input-bordered input-sm w-full" list="rOutputKeys"><datalist id="rOutputKeys"><option v-for="k in outputKeys" :key="k" :value="k" /></datalist></div>
 
-        <!-- 条件列表 -->
+        <!-- 条件树 — 无限嵌套 -->
         <fieldset class="fieldset p-3 bg-base-200 rounded mb-3">
-          <div class="flex items-center justify-between mb-2">
-            <legend class="font-semibold text-sm">条件（同行全部 AND，多行同输出字段键 = OR）</legend>
-            <button class="btn btn-xs btn-primary" @click="addCond">＋ 条件</button>
-          </div>
-          <div v-if="!ruleConds.length" class="text-xs text-base-content/40 mb-2">无条件 → 始终执行</div>
-          <div v-for="(c, i) in ruleConds" :key="i" class="flex items-center gap-2 mb-1">
-            <span class="text-xs text-base-content/40 w-4">{{ i > 0 ? 'AND' : '' }}</span>
-            <input v-model="c.字段" class="input input-bordered input-xs flex-1" list="rFieldKeys" placeholder="字段">
-            <select v-model="c.运算符" class="select select-bordered select-xs w-24"><option value="">—</option><option>等于</option><option>不等于</option><option>大于</option><option>大于等于</option><option>小于</option><option>小于等于</option></select>
-            <input v-model="c.值" class="input input-bordered input-xs w-20" placeholder="值">
-            <button class="btn btn-ghost btn-xs text-error" @click="delCond(i)">✕</button>
-          </div>
-          <datalist id="rFieldKeys"><option v-for="k in countryFieldKeys" :key="k" :value="k" /></datalist>
+          <legend class="font-semibold text-sm">条件</legend>
+          <template v-for="(item, i) in flatTree" :key="i">
+            <!-- 组头 -->
+            <div v-if="item.type === 'group-open'" :style="{ marginLeft: item.depth * 16 + 'px' }" class="flex items-center gap-2 mb-1 mt-1">
+              <button v-if="item.depth > 0" class="btn btn-xs" @click="toggleGroupOp(item.node)">{{ item.node.op }}</button>
+              <button class="btn btn-xs btn-ghost" @click="addCond(item.node, 'AND')">＋ AND</button>
+              <button class="btn btn-xs btn-ghost" @click="addCond(item.node, 'OR')">＋ OR</button>
+              <button class="btn btn-xs btn-ghost" @click="addSubGroup(item.node)">＋子组</button>
+              <button v-if="item.depth > 0" class="btn btn-ghost btn-xs text-error" @click="delNode(item.parent, item.idx)">✕</button>
+            </div>
+            <!-- 条件 -->
+            <div v-else-if="item.type === 'cond'" :style="{ marginLeft: item.depth * 16 + 'px' }" class="flex items-center gap-2 mb-1">
+              <button v-if="item.idx > 0" class="btn btn-xs btn-ghost font-bold text-primary w-8" @click="toggleLinkOp(item)">{{ item.node.op }}</button>
+              <span v-else class="w-8"></span>
+              <input v-model="condPool[item.node.idx].字段" class="input input-bordered input-xs flex-1" list="rFieldKeys" placeholder="字段">
+              <select v-model="condPool[item.node.idx].运算符" class="select select-bordered select-xs w-24"><option value="">—</option><option>等于</option><option>不等于</option><option>大于</option><option>大于等于</option><option>小于</option><option>小于等于</option></select>
+              <input v-model="condPool[item.node.idx].值" class="input input-bordered input-xs w-20" placeholder="值">
+              <button class="btn btn-ghost btn-xs text-error" @click="delNode(item.parent, item.idx)">✕</button>
+            </div>
+          </template>
         </fieldset>
+        <datalist id="rFieldKeys"><option v-for="k in countryFieldKeys" :key="k" :value="k" /></datalist>
 
         <!-- 计算配置 -->
         <fieldset class="fieldset mb-3">
@@ -551,7 +648,7 @@ function delLookupCol(col) {
           <select v-model="ruleForm.计算方式" class="select select-bordered select-sm mb-2"><option value="">— 选择 —</option><option>查表</option><option>百分比</option><option>固定值</option><option>加总</option><option>公式</option></select>
           <template v-if="ruleForm.计算方式 === '查表'">
             <div class="grid grid-cols-2 gap-2">
-              <div><label class="label py-0 text-xs">查表名称</label><select v-model="ruleForm.查表名称" class="select select-bordered select-sm w-full"><option value="">—</option><option v-for="n in tplLookupNames" :key="n" :value="n">{{ n }}</option></select></div>
+              <div><label class="label py-0 text-xs">查表名称</label><select v-model="ruleForm.查表名称" class="select select-bordered select-sm w-full"><option value="">—</option><option v-for="n in allLookupNames" :key="n" :value="n">{{ n }}</option></select></div>
               <div><label class="label py-0 text-xs">匹配方式</label><select v-model="ruleForm.匹配方式" class="select select-bordered select-sm w-full"><option value="">—</option><option>精确</option><option>区间</option></select></div>
               <div><label class="label py-0 text-xs">输入映射</label><input v-model="ruleForm.输入映射" class="input input-bordered input-sm w-full"></div>
               <div><label class="label py-0 text-xs">输出列</label><input v-model="ruleForm.输出列" class="input input-bordered input-sm w-full"></div>
@@ -589,6 +686,7 @@ function delLookupCol(col) {
         <div class="flex gap-2 mb-3">
           <button class="btn btn-xs btn-ghost" @click="addLookupRow">＋ 行</button>
           <button class="btn btn-xs btn-ghost" @click="addLookupCol">＋ 列</button>
+          <input v-model="newLookupCol" class="input input-bordered input-xs w-24" placeholder="列名" @keyup.enter="addLookupCol">
         </div>
         <div class="overflow-x-auto" v-if="lookupRowsLocal.length">
           <table class="table table-xs">
