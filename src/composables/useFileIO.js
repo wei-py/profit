@@ -117,7 +117,7 @@ export function useFileIO() {
   }
 
   async function saveListExcel() {
-    const buffer = listStore.getExportBuffer()
+    const buffer = await listStore.getExportBuffer()
     if (isTauri()) {
       let path = listStore.filePath
       if (!path) {

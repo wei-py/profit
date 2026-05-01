@@ -52,6 +52,58 @@ function openTrace(sku, fieldKey) {
   showTraceModal.value = true
 }
 
+// ── 图片上传/预览 ──
+const previewImage = ref('')
+const showImageModal = ref(false)
+const imageZoom = ref(1)
+
+function handleImageUpload(sku, event) {
+  const file = event.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => { sku.images = reader.result }
+  reader.readAsDataURL(file)
+}
+function openImagePreview(src) { previewImage.value = src; imageZoom.value = 1; showImageModal.value = true }
+function clearImage(sku) { sku.images = '' }
+
+function isImage(val) { return typeof val === 'string' && val.startsWith('data:image/') }
+
+// ── 加载已有商品回新建面板 ──
+function loadRecordBack(idx) {
+  const row = listStore.records[idx]
+  if (!row['国家平台编号'] || !row['模板编号']) return
+  createStore.selectCountry(row['国家平台编号'])
+  createStore.selectTemplate(row['模板编号'])
+  // setTimeout to let template load first, then fill values
+  setTimeout(() => {
+    createStore.productId = row['商品ID'] || ''
+    createStore.productName = row['商品名称'] || ''
+    // 商品级字段
+    for (const f of createStore.productFields) {
+      if (row[f.字段键] !== undefined) createStore.productInputs[f.字段键] = row[f.字段键]
+    }
+    // 变体属性 - 从列名推断
+    const knownKeys = new Set(['商品ID','商品名称','国家平台编号','模板编号','SKU码','图片','计算时间'])
+    for (const k of Object.keys(row)) {
+      if (!knownKeys.has(k) && createStore.skuInputFields.every(f => f.字段键 !== k) && createStore.skuOutputFields.every(f => f.字段键 !== k)) {
+        // could be a variant attribute
+      }
+    }
+    createStore.generateSkus()
+    // 填 SKU 数据
+    if (createStore.skus.length) {
+      const sku = createStore.skus[0]
+      sku.skuCode = row['SKU码'] || ''
+      for (const f of createStore.skuInputFields) {
+        if (row[f.字段键] !== undefined) sku.inputs[f.字段键] = row[f.字段键]
+      }
+      sku.images = row['图片'] || ''
+    }
+    showCreatePanel.value = true
+  }, 50)
+}
+
 const listColumns = computed(() => {
   if (!listStore.records.length) return []
   const keys = new Set()
@@ -163,7 +215,16 @@ const listColumns = computed(() => {
                       <td v-for="f in createStore.skuInputFields" :key="f.字段键">
                         <input v-model="sku.inputs[f.字段键]" class="input input-bordered input-xs w-20" type="number" step="any">
                       </td>
-                      <td><input v-model="sku.images" class="input input-bordered input-xs w-20" placeholder="url"></td>
+                      <td class="w-16">
+                        <div v-if="sku.images" class="relative group w-10 h-10">
+                          <img :src="sku.images" class="w-10 h-10 object-cover rounded cursor-pointer border" @click="openImagePreview(sku.images)">
+                          <button class="absolute -top-1 -right-1 btn btn-ghost btn-xs p-0 w-4 h-4 min-h-0 rounded-full bg-base-100 opacity-0 group-hover:opacity-100" @click="clearImage(sku)">✕</button>
+                        </div>
+                        <label v-else class="btn btn-ghost btn-xs w-10 h-10 p-0 border-dashed border text-base-content/30 text-lg cursor-pointer" title="上传图片">
+                          ＋
+                          <input type="file" accept="image/*" class="hidden" @change="handleImageUpload(sku, $event)">
+                        </label>
+                      </td>
                       <td v-for="f in createStore.skuOutputFields" :key="f.字段键" class="text-xs whitespace-nowrap">
                         <span v-if="sku.error" class="text-error text-xs">{{ sku.error }}</span>
                         <template v-else-if="sku.results[f.字段键] !== undefined">
@@ -189,11 +250,25 @@ const listColumns = computed(() => {
           <div v-if="!listStore.records.length" class="text-sm text-base-content/40">暂无</div>
           <div v-else class="overflow-x-auto">
             <table class="table table-sm">
-              <thead><tr><th v-for="col in listColumns" :key="col">{{ col }}</th><th class="sticky right-0 bg-base-100">操作</th></tr></thead>
+              <thead><tr><th class="w-10"></th><th v-for="col in listColumns" :key="col">{{ col }}</th><th class="sticky right-0 bg-base-100">操作</th></tr></thead>
               <tbody>
                 <tr v-for="(row, idx) in listStore.records" :key="idx">
-                  <td v-for="col in listColumns" :key="col" class="whitespace-nowrap">{{ row[col] }}</td>
-                  <td class="sticky right-0 bg-base-100"><button class="btn btn-ghost btn-xs text-error" @click="listStore.removeRecord(idx)">🗑️</button></td>
+                  <td>
+                    <span class="flex flex-col leading-none">
+                      <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(listStore.records, idx)">▲</button>
+                      <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(listStore.records, idx)">▼</button>
+                    </span>
+                  </td>
+                  <td v-for="col in listColumns" :key="col" class="whitespace-nowrap">
+                    <template v-if="isImage(row[col])">
+                      <img :src="row[col]" class="w-10 h-10 object-cover rounded cursor-pointer border" @click="openImagePreview(row[col])">
+                    </template>
+                    <template v-else>{{ row[col] }}</template>
+                  </td>
+                  <td class="sticky right-0 bg-base-100">
+                    <button class="btn btn-ghost btn-xs" @click="loadRecordBack(idx)" title="加载到新建面板">📋</button>
+                    <button class="btn btn-ghost btn-xs text-error" @click="listStore.removeRecord(idx)">✕</button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -201,6 +276,21 @@ const listColumns = computed(() => {
         </div>
       </div>
     </div>
+    <!-- ═══ 图片预览弹窗 ═══ -->
+    <dialog :open="showImageModal" class="modal">
+      <div class="modal-box max-w-4xl p-2 bg-black/90">
+        <div class="flex justify-end mb-2 gap-2">
+          <button class="btn btn-ghost btn-sm text-white" @click="imageZoom = Math.max(0.25, imageZoom - 0.25)">🔍−</button>
+          <button class="btn btn-ghost btn-sm text-white" @click="imageZoom = Math.min(3, imageZoom + 0.25)">🔍＋</button>
+          <button class="btn btn-ghost btn-sm text-white" @click="showImageModal = false">✕</button>
+        </div>
+        <div class="overflow-auto max-h-[80vh] flex justify-center">
+          <img :src="previewImage" :style="{ transform: `scale(${imageZoom})`, transition: 'transform 0.2s' }" class="max-w-full">
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showImageModal = false"><button>关闭</button></form>
+    </dialog>
+
     <!-- ═══ 计算过程弹窗 ═══ -->
     <dialog :open="showTraceModal" class="modal">
       <div class="modal-box max-w-lg">

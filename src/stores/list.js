@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { readListWorkbook } from '@/services/excel-reader'
-import { buildListWorkbookBuffer } from '@/services/excel-writer'
+import { buildListWorkbookBuffer } from '@/services/list-excel-writer'
 
 export const useListStore = defineStore('list', () => {
   const filePath = ref('')
@@ -24,8 +24,8 @@ export const useListStore = defineStore('list', () => {
     }
   }
 
-  function getExportBuffer() {
-    return buildListWorkbookBuffer(records.value)
+  async function getExportBuffer() {
+    return await buildListWorkbookBuffer(records.value)
   }
 
   /** 添加一组展平的 SKU 行 */
