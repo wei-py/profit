@@ -32,6 +32,9 @@ function handleSaveToList() {
   if (rows.length) listStore.addRecords(rows)
 }
 
+function moveUp(arr, i) { if (i > 0) { const tmp = arr[i]; arr[i] = arr[i - 1]; arr[i - 1] = tmp } }
+function moveDown(arr, i) { if (i < arr.length - 1) { const tmp = arr[i]; arr[i] = arr[i + 1]; arr[i + 1] = tmp } }
+
 function batchSetSkuInput(fieldKey) {
   const val = createStore.skus[0]?.inputs[fieldKey]
   if (val === undefined || val === '') return
@@ -136,6 +139,7 @@ const listColumns = computed(() => {
                 <table v-if="createStore.skus.length" class="table table-xs">
                   <thead>
                     <tr>
+                      <th class="w-12"></th>
                       <th>SKU码</th>
                       <th v-for="a in createStore.variantAttributes.filter(a=>a.name.trim())" :key="a.name">{{ a.name.trim() }}</th>
                       <th v-for="f in createStore.skuInputFields" :key="f.字段键">
@@ -148,6 +152,12 @@ const listColumns = computed(() => {
                   </thead>
                   <tbody>
                     <tr v-for="(sku, si) in createStore.skus" :key="sku.key">
+                      <td>
+                        <span class="flex flex-col leading-none">
+                          <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(createStore.skus, si)">▲</button>
+                          <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(createStore.skus, si)">▼</button>
+                        </span>
+                      </td>
                       <td><input v-model="sku.skuCode" class="input input-bordered input-xs w-20" placeholder="SKU"></td>
                       <td v-for="a in createStore.variantAttributes.filter(a=>a.name.trim())" :key="a.name" class="text-xs">{{ sku.attrs[a.name.trim()] }}</td>
                       <td v-for="f in createStore.skuInputFields" :key="f.字段键">

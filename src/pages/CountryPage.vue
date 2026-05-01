@@ -27,6 +27,8 @@ function addColumn() {
   newColName.value = ''; showAddCol.value = false
 }
 function removeColumn(k) { if (!CORE_KEYS.includes(k)) for (const r of store['国家平台']) delete r[k] }
+function moveUp(arr, i) { if (i > 0) { const tmp = arr[i]; arr[i] = arr[i - 1]; arr[i - 1] = tmp } }
+function moveDown(arr, i) { if (i < arr.length - 1) { const tmp = arr[i]; arr[i] = arr[i + 1]; arr[i + 1] = tmp } }
 function addRow() { const r = {}; for (const k of allKeys.value) r[k] = ''; r.启用 = '是'; store['国家平台'].push(r) }
 function deleteRow(id) { const i = store['国家平台'].findIndex(r => r.编号 === id); if (i !== -1) store['国家平台'].splice(i, 1) }
 function toggleExpand(id) { expandedId.value = expandedId.value === id ? null : id }
@@ -439,9 +441,13 @@ function delLookupCol(col) {
                     <td v-for="k in allKeys" :key="k" class="cursor-pointer" @click="toggleExpand(row.编号)">
                       {{ k === '启用' ? (row[k] === '是' || row[k] === 'TRUE' ? '是' : '否') : (row[k] || '—') }}
                     </td>
-                    <td>
+                    <td class="flex items-center gap-1">
+                      <span class="flex flex-col leading-none">
+                        <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(store['国家平台'], ri)">▲</button>
+                        <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(store['国家平台'], ri)">▼</button>
+                      </span>
                       <button class="btn btn-ghost btn-xs" @click="openEditCountry(row)">✏️</button>
-                      <button class="btn btn-ghost btn-xs text-error" @click="deleteRow(row.编号)">🗑️</button>
+                      <button class="btn btn-ghost btn-xs text-error" @click="deleteRow(row.编号)">✕</button>
                     </td>
                   </tr>
                   <tr v-if="expandedId === row.编号">
@@ -457,7 +463,7 @@ function delLookupCol(col) {
                             <div v-if="!expFields.length" class="text-xs text-base-content/40">暂无</div>
                             <div v-for="(f, i) in expFields" :key="f.字段键 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
                               <span class="cursor-pointer hover:text-primary" @click="openEditField(i)">{{ f.字段键 || '(新)' }} <span class="text-base-content/40">{{ f.层级 }}·{{ f.输入输出 }}</span></span>
-                              <button class="btn btn-ghost btn-xs text-error" @click="deleteField(i)">🗑️</button>
+                              <span class="flex items-center gap-1"><span class="flex flex-col leading-none"><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(expFields, i)">▲</button><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(expFields, i)">▼</button></span><button class="btn btn-ghost btn-xs text-error" @click="deleteField(i)">✕</button></span>
                             </div>
                           </div>
                         </div>
@@ -471,7 +477,7 @@ function delLookupCol(col) {
                             <div v-if="!expOptGroups.length" class="text-xs text-base-content/40">暂无</div>
                             <div v-for="(g, i) in expOptGroups" :key="g.编号 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
                               <span class="cursor-pointer hover:text-primary" @click="openEditOpt(i)">{{ g.名称 || '(新)' }} <span class="text-base-content/40">{{ g.编号 }}</span></span>
-                              <button class="btn btn-ghost btn-xs text-error" @click="deleteOpt(i)">🗑️</button>
+                              <span class="flex items-center gap-1"><span class="flex flex-col leading-none"><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(expOptGroups, i)">▲</button><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(expOptGroups, i)">▼</button></span><button class="btn btn-ghost btn-xs text-error" @click="deleteOpt(i)">✕</button></span>
                             </div>
                           </div>
                         </div>
@@ -485,7 +491,7 @@ function delLookupCol(col) {
                             <div v-if="!expTemplates.length" class="text-xs text-base-content/40">暂无</div>
                             <div v-for="(t, i) in expTemplates" :key="t.编号 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
                               <span class="cursor-pointer hover:text-primary" @click="openEditTpl(i)">{{ t.名称 || '(新)' }} <span class="badge badge-xs">{{ t.启用 === '是' ? '启用' : '—' }}</span></span>
-                              <button class="btn btn-ghost btn-xs text-error" @click="deleteTpl(i)">🗑️</button>
+                              <span class="flex items-center gap-1"><span class="flex flex-col leading-none"><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(expTemplates, i)">▲</button><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(expTemplates, i)">▼</button></span><button class="btn btn-ghost btn-xs text-error" @click="deleteTpl(i)">✕</button></span>
                             </div>
                           </div>
                         </div>
@@ -617,7 +623,15 @@ function delLookupCol(col) {
                 <td><span class="badge badge-xs">{{ r.计算方式 }}</span></td>
                 <td class="text-xs text-base-content/60">{{ condSummary(r) }}</td>
                 <td>{{ r.计算顺序 }}</td>
-                <td><button class="btn btn-ghost btn-xs text-error" @click.stop="deleteRuleInline(i)">🗑️</button></td>
+                <td>
+                  <span class="flex items-center gap-1">
+                    <span class="flex flex-col leading-none">
+                      <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click.stop="moveUp(tplRulesLocal, i)">▲</button>
+                      <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click.stop="moveDown(tplRulesLocal, i)">▼</button>
+                    </span>
+                    <button class="btn btn-ghost btn-xs text-error" @click.stop="deleteRuleInline(i)">✕</button>
+                  </span>
+                </td>
               </tr>
             </tbody>
           </table>

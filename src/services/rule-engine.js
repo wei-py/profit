@@ -162,9 +162,9 @@ function doLookup(rule, lookupTables, inputs, results) {
 
   const mappings = parseMappings(rule.输入映射)
   const isRange = rule.匹配方式 === '区间'
-  const condParts = []
 
   for (const row of table) {
+    const condParts = []
     let ok = true
     for (const [fieldKey, colName] of mappings) {
       const inputVal = getVal(fieldKey, inputs, results)
@@ -173,7 +173,7 @@ function doLookup(rule, lookupTables, inputs, results) {
         const lo = Number(row[colName + '下限'])
         const hi = Number(row[colName + '上限'])
         if (v < lo || v > hi) { ok = false; break }
-        condParts.push(`${fieldKey}=${inputVal} ∈ [${lo}, ${hi}]`)
+        condParts.push(`${fieldKey}=${inputVal}(${colName}：${lo}~${hi})`)
       }
       else {
         if (String(inputVal) !== String(row[colName])) { ok = false; break }
@@ -182,7 +182,7 @@ function doLookup(rule, lookupTables, inputs, results) {
     }
     if (ok) {
       const val = Number(row[rule.输出列]) || 0
-      const trace = `查表「${rule.查表名称}」：${condParts.join('，')} → ${rule.输出列}=${val}`
+      const trace = `查表「${rule.查表名称}」→ ${condParts.join('，')} → ${rule.输出列}=${val}`
       return { val, trace }
     }
   }
