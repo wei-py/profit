@@ -62,14 +62,14 @@ const listColumns = computed(() => {
           <div class="flex gap-4 flex-wrap items-end">
             <div class="form-control">
               <label class="label py-1"><span class="label-text">国家平台</span></label>
-              <select class="select select-bordered" @change="handleCountryChange">
+              <select class="select select-bordered" :value="createStore.selectedCountryId" @change="handleCountryChange">
                 <option value="">-- 选择 --</option>
                 <option v-for="c in enabledCountries" :key="c.编号" :value="c.编号">{{ c.国家 }} - {{ c.平台 }}</option>
               </select>
             </div>
             <div class="form-control" v-if="createStore.selectedCountryId">
               <label class="label py-1"><span class="label-text">模板</span></label>
-              <select class="select select-bordered" @change="handleTemplateChange">
+              <select class="select select-bordered" :value="createStore.selectedTemplateId" @change="handleTemplateChange">
                 <option value="">-- 选择 --</option>
                 <option v-for="t in availableTemplates" :key="t.编号" :value="t.编号">{{ t.名称 }}</option>
               </select>

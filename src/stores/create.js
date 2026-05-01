@@ -19,7 +19,7 @@ export const useCreateStore = defineStore('create', () => {
   const variantAttributes = ref([]) // [{name:'颜色', values:'红,蓝'}, ...]
 
   // ── SKU ──
-  const skus = ref([]) // [{key:'红,S', attrs:{颜色:'红',尺码:'S'}, inputs:{售价:99,成本价:25,...}, results:{}, error:''}]
+  const skus = reactive([]) // [{key, attrs, inputs, results, error, images, skuCode}]
 
   const calculating = ref(false)
   const lastCalculatedAt = ref('')
@@ -68,7 +68,7 @@ export const useCreateStore = defineStore('create', () => {
     productName.value = ''
     for (const k of Object.keys(productInputs)) delete productInputs[k]
     variantAttributes.value = []
-    skus.value = []
+    skus.splice(0, skus.length)
     calculating.value = false
     lastCalculatedAt.value = ''
   }
@@ -76,7 +76,7 @@ export const useCreateStore = defineStore('create', () => {
   function resetForTemplate() {
     for (const k of Object.keys(productInputs)) delete productInputs[k]
     variantAttributes.value = []
-    skus.value = []
+    skus.splice(0, skus.length)
     calculating.value = false
     lastCalculatedAt.value = ''
 
@@ -115,14 +115,14 @@ export const useCreateStore = defineStore('create', () => {
 
     if (!attrs.length) {
       // 无变体：单个 SKU
-      skus.value = [{
+      skus.splice(0, skus.length, {
         key: productName.value || '默认',
         attrs: {},
         inputs: makeDefaultSkuInputs(),
         results: {},
         error: '',
         images: '',
-      }]
+      })
       return
     }
 
@@ -134,11 +134,11 @@ export const useCreateStore = defineStore('create', () => {
 
     // 保留已有 SKU 的输入值
     const oldSkus = {}
-    for (const s of skus.value) {
+    for (const s of skus) {
       if (s.key) oldSkus[s.key] = s.inputs
     }
 
-    skus.value = combos.map(combo => {
+    const newSkus = combos.map(combo => {
       const key = attrs.map(a => combo[a.name]).join(',')
       return {
         key,
@@ -149,6 +149,7 @@ export const useCreateStore = defineStore('create', () => {
         images: '',
       }
     })
+    skus.splice(0, skus.length, ...newSkus)
   }
 
   function makeDefaultSkuInputs() {
@@ -161,14 +162,14 @@ export const useCreateStore = defineStore('create', () => {
   }
 
   function updateSkuInput(skuIndex, fieldKey, value) {
-    if (!skus.value[skuIndex]) return
-    skus.value[skuIndex].inputs[fieldKey] = value
+    if (!skus[skuIndex]) return
+    skus[skuIndex].inputs[fieldKey] = value
   }
 
   function updateSkuField(skuIndex, field, value) {
-    if (!skus.value[skuIndex]) return
-    if (field === 'sku') skus.value[skuIndex].skuCode = value
-    else if (field === 'images') skus.value[skuIndex].images = value
+    if (!skus[skuIndex]) return
+    if (field === 'sku') skus[skuIndex].skuCode = value
+    else if (field === 'images') skus[skuIndex].images = value
     else updateSkuInput(skuIndex, field, value)
   }
 
@@ -177,12 +178,12 @@ export const useCreateStore = defineStore('create', () => {
     calculating.value = true
 
     // 确保已生成 SKU
-    if (!skus.value.length) generateSkus()
+    if (!skus.length) generateSkus()
 
     const rules = currentRules.value
     const tables = configStore.lookupTables
 
-    for (const sku of skus.value) {
+    for (const sku of skus) {
       try {
         const merged = { ...productInputs, ...sku.inputs }
         const { results, errors } = execute(rules, tables, merged)
@@ -204,7 +205,7 @@ export const useCreateStore = defineStore('create', () => {
     const now = lastCalculatedAt.value || new Date().toISOString().slice(0, 10)
     const cp = configStore['国家平台'].find(c => c.编号 === selectedCountryId.value)
 
-    return skus.value.map(sku => ({
+    return skus.map(sku => ({
       '商品ID': productId.value,
       '商品名称': productName.value,
       '国家平台编号': selectedCountryId.value,
