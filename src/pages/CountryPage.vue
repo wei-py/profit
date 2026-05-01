@@ -27,8 +27,8 @@ function addColumn() {
   newColName.value = ''; showAddCol.value = false
 }
 function removeColumn(k) { if (!CORE_KEYS.includes(k)) for (const r of store['国家平台']) delete r[k] }
-function moveUp(arr, i) { if (i > 0) { const tmp = arr[i]; arr[i] = arr[i - 1]; arr[i - 1] = tmp } }
-function moveDown(arr, i) { if (i < arr.length - 1) { const tmp = arr[i]; arr[i] = arr[i + 1]; arr[i + 1] = tmp } }
+function moveUp(arr, i) { if (i > 0) { const item = arr.splice(i, 1)[0]; arr.splice(i - 1, 0, item) } }
+function moveDown(arr, i) { if (i < arr.length - 1) { const item = arr.splice(i, 1)[0]; arr.splice(i + 1, 0, item) } }
 function addRow() { const r = {}; for (const k of allKeys.value) r[k] = ''; r.启用 = '是'; store['国家平台'].push(r) }
 function deleteRow(id) { const i = store['国家平台'].findIndex(r => r.编号 === id); if (i !== -1) store['国家平台'].splice(i, 1) }
 function toggleExpand(id) { expandedId.value = expandedId.value === id ? null : id }

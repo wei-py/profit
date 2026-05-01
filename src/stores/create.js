@@ -17,6 +17,7 @@ export const useCreateStore = defineStore('create', () => {
 
   // ── 变体 ──
   const variantAttributes = ref([]) // [{name:'颜色', values:'红,蓝'}, ...]
+  const skuPrefix = ref('')         // SKU 前缀
 
   // ── SKU ──
   const skus = reactive([]) // [{key, attrs, inputs, results, error, images, skuCode}]
@@ -113,8 +114,9 @@ export const useCreateStore = defineStore('create', () => {
       .filter(a => a.name.trim() && a.values.trim())
       .map(a => ({ name: a.name.trim(), values: a.values.split(',').map(s => s.trim()).filter(Boolean) }))
 
+    const prefix = skuPrefix.value
+
     if (!attrs.length) {
-      // 无变体：单个 SKU
       skus.splice(0, skus.length, {
         key: productName.value || '默认',
         attrs: {},
@@ -122,24 +124,26 @@ export const useCreateStore = defineStore('create', () => {
         results: {},
         error: '',
         images: '',
+        skuCode: prefix ? `${prefix}001` : '',
       })
       return
     }
 
-    // 笛卡尔积
     const combos = attrs.reduce((rows, attr) =>
       rows.flatMap(row => attr.values.map(v => ({ ...row, [attr.name]: v }))),
       [{}],
     )
 
-    // 保留已有 SKU 的输入值
     const oldSkus = {}
     for (const s of skus) {
       if (s.key) oldSkus[s.key] = s.inputs
     }
 
-    const newSkus = combos.map(combo => {
+    const newSkus = combos.map((combo, idx) => {
       const key = attrs.map(a => combo[a.name]).join(',')
+      const num = String(idx + 1).padStart(3, '0')
+      const parts = attrs.map(a => combo[a.name]).join('-')
+      const code = prefix ? `${prefix}${num}-${parts}` : `${num}-${parts}`
       return {
         key,
         attrs: combo,
@@ -147,6 +151,7 @@ export const useCreateStore = defineStore('create', () => {
         results: {},
         error: '',
         images: '',
+        skuCode: code,
       }
     })
     skus.splice(0, skus.length, ...newSkus)
@@ -229,7 +234,7 @@ export const useCreateStore = defineStore('create', () => {
 
   return {
     productId, productName, selectedCountryId, selectedTemplateId,
-    productInputs, variantAttributes, skus, calculating, lastCalculatedAt,
+    productInputs, variantAttributes, skus, skuPrefix, calculating, lastCalculatedAt,
     selectedTemplate, currentRules, productFields, skuInputFields, skuOutputFields,
     selectCountry, selectTemplate, reset, resetForm,
     addVariantAttribute, updateVariantAttribute, removeVariantAttribute,
