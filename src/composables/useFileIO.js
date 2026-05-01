@@ -1,176 +1,155 @@
-import { open, save } from '@tauri-apps/plugin-dialog'
-import { readFile, writeFile } from '@tauri-apps/plugin-fs'
-import { load } from '@tauri-apps/plugin-store'
 import { ref } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useListStore } from '@/stores/list'
 
-/** @type {import('vue').Ref<boolean>} store 是否已初始化 */
-const storeInitialized = ref(false)
-/** @type {object | null} Tauri Store 实例缓存 */
-let storeInstance = null
-
-/**
- * 获取（懒初始化）Tauri Store 实例。
- * @returns {Promise<object>} Store 实例
- */
-async function getStore() {
-  if (!storeInstance) {
-    storeInstance = await load('settings.json', { autoSave: true })
-  }
-  return storeInstance
-}
+const isTauri = () => !!(window.__TAURI_INTERNALS__ || window.__TAURI__)
 
 export function useFileIO() {
   const configStore = useConfigStore()
   const listStore = useListStore()
 
-  /**
-   * 从持久化存储恢复上次打开的配置路径并加载文件。
-   * @returns {Promise<void>}
-   */
-  async function restoreLastPath() {
-    try {
-      const store = await getStore()
-      const path = await store.get('lastConfigPath')
-      if (path) {
-        try {
-          const bytes = await readFile(path)
-          configStore.loadFromBuffer(bytes, path)
-        }
-        catch (e) {
-          console.error('restoreLastPath: failed to read file', path, e)
-          configStore.setFilePath(path)
-        }
+  // ── Tauri 实现 ──
+  async function tauriOpen(filterName, ext) {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const { readFile } = await import('@tauri-apps/plugin-fs')
+    const selected = await open({ title: filterName, filters: [{ name: 'Excel', extensions: [ext, 'xls'] }], multiple: false })
+    if (!selected) return null
+    const p = typeof selected === 'string' ? selected : selected.path
+    return { path: p, bytes: await readFile(p) }
+  }
+  async function tauriSave(name, ext, buffer) {
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    const { writeFile } = await import('@tauri-apps/plugin-fs')
+    const selected = await save({ title: name, filters: [{ name: 'Excel', extensions: [ext] }] })
+    if (!selected) return false
+    const p = typeof selected === 'string' ? selected : selected.path
+    await writeFile(p, new Uint8Array(buffer))
+    return p
+  }
+
+  // ── 浏览器实现 ──
+  function browserOpen() {
+    return new Promise((resolve) => {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = '.xlsx,.xls'
+      input.onchange = async () => {
+        const file = input.files[0]
+        if (!file) return resolve(null)
+        resolve({ path: file.name, bytes: new Uint8Array(await file.arrayBuffer()) })
       }
+      input.click()
+    })
+  }
+  function browserSave(name, buffer) {
+    return new Promise((resolve) => {
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = name.includes('.xlsx') ? name : name + '.xlsx'
+      a.click(); URL.revokeObjectURL(url)
+      resolve(true)
+    })
+  }
+
+  // ── 持久化路径（Tauri Store / localStorage） ──
+  async function getLastPaths() {
+    if (isTauri()) {
+      try {
+        const { load } = await import('@tauri-apps/plugin-store')
+        const store = await load('settings.json', { autoSave: true })
+        return { config: await store.get('lastConfigPath') || '', list: await store.get('lastListPath') || '' }
+      } catch { return {} }
     }
-    catch (e) {
-      console.error('restoreLastPath: store unavailable', e)
+    return { config: localStorage.getItem('lastConfigPath') || '', list: localStorage.getItem('lastListPath') || '' }
+  }
+  async function saveLastPath(key, path) {
+    if (isTauri()) {
+      try {
+        const { load } = await import('@tauri-apps/plugin-store')
+        const store = await load('settings.json', { autoSave: true })
+        await store.set(key, path); await store.save()
+      } catch {}
+    } else {
+      localStorage.setItem(key, path)
     }
   }
 
-  /**
-   * 将当前配置路径保存到持久化存储。
-   * @param {string} path - 文件路径
-   * @returns {Promise<void>}
-   */
-  async function saveLastPath(path) {
-    try {
-      const store = await getStore()
-      await store.set('lastConfigPath', path)
-      await store.save()
-    }
-    catch {
-      // ignore
-    }
-  }
-
-  /**
-   * 打开系统文件对话框选择配置 Excel 并加载。
-   * @returns {Promise<{ success: boolean, error?: string }>} 操作结果
-   */
+  // ── 公共接口 ──
   async function openConfigExcel() {
-    try {
-      const selected = await open({
-        title: '打开配置 Excel',
-        filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
-        multiple: false,
-      })
-
-      if (!selected)
-        return { success: false }
-
-      const filePath = typeof selected === 'string' ? selected : selected.path
-      const bytes = await readFile(filePath)
-      await configStore.loadFromBuffer(bytes, filePath)
-      await saveLastPath(filePath)
-      return { success: true }
-    }
-    catch (e) {
-      console.error('openConfigExcel failed:', e)
-      return { success: false, error: String(e) }
-    }
+    const result = isTauri() ? await tauriOpen('打开配置 Excel', 'xlsx') : await browserOpen()
+    if (!result) return { success: false }
+    await configStore.loadFromBuffer(result.bytes, result.path)
+    await saveLastPath('lastConfigPath', result.path)
+    return { success: true }
   }
 
-  /**
-   * 保存配置 Excel，若未设置路径则弹出保存对话框。
-   * @returns {Promise<{ success: boolean, error?: string }>} 操作结果
-   */
   async function saveConfigExcel() {
-    if (!configStore.loaded)
-      return { success: false, error: '没有已加载的配置' }
-
-    try {
+    if (!configStore.loaded) return { success: false, error: '没有已加载的配置' }
+    const buffer = configStore.getExportBuffer()
+    if (isTauri()) {
       let path = configStore.filePath
       if (!path) {
-        const selected = await save({
-          title: '保存配置 Excel',
-          filters: [{ name: 'Excel', extensions: ['xlsx'] }],
-        })
-        if (!selected)
-          return { success: false }
-        path = selected
+        const p = await tauriSave('保存配置 Excel', 'xlsx', buffer)
+        if (!p) return { success: false }
+        path = p
+      } else {
+        const { writeFile } = await import('@tauri-apps/plugin-fs')
+        await writeFile(path, new Uint8Array(buffer))
       }
-
-      const buffer = configStore.getExportBuffer()
-      await writeFile(path, buffer)
       configStore.setFilePath(path)
-      await saveLastPath(path)
-      return { success: true }
+      await saveLastPath('lastConfigPath', path)
+    } else {
+      const name = configStore.filePath || 'config.xlsx'
+      await browserSave(name, buffer)
+      localStorage.setItem('lastConfigPath', name)
+      configStore.setFilePath(name)
     }
-    catch (e) {
-      console.error('saveConfigExcel failed:', e)
-      return { success: false, error: String(e) }
-    }
+    return { success: true }
   }
 
-  /**
-   * 打开系统文件对话框选择列表 Excel 并加载。
-   * @returns {Promise<boolean>} 是否成功
-   */
   async function openListExcel() {
-    const selected = await open({
-      title: '打开列表 Excel',
-      filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }],
-      multiple: false,
-    })
-
-    if (!selected)
-      return false
-
-    const path = typeof selected === 'string' ? selected : selected.path
-    const bytes = await readFile(path)
-    listStore.loadFromBuffer(bytes, path)
+    const result = isTauri() ? await tauriOpen('打开列表 Excel', 'xlsx') : await browserOpen()
+    if (!result) return false
+    await listStore.loadFromBuffer(result.bytes, result.path)
+    await saveLastPath('lastListPath', result.path)
     return true
   }
 
-  /**
-   * 保存列表 Excel，若未设置路径则弹出保存对话框。
-   * @param {Array} [headers] - 列头映射
-   * @returns {Promise<boolean>} 是否成功
-   */
   async function saveListExcel() {
-    let path = listStore.filePath
-    if (!path) {
-      const selected = await save({
-        title: '保存商品列表',
-        filters: [{ name: 'Excel', extensions: ['xlsx'] }],
-      })
-      if (!selected) return false
-      path = typeof selected === 'string' ? selected : selected.path
-      listStore.filePath = path
-    }
     const buffer = listStore.getExportBuffer()
-    await writeFile(path, buffer)
+    if (isTauri()) {
+      let path = listStore.filePath
+      if (!path) {
+        const p = await tauriSave('保存商品列表', 'xlsx', buffer)
+        if (!p) return false
+        path = p
+      } else {
+        const { writeFile } = await import('@tauri-apps/plugin-fs')
+        await writeFile(path, new Uint8Array(buffer))
+      }
+      listStore.filePath = path
+      await saveLastPath('lastListPath', path)
+    } else {
+      const name = listStore.filePath || 'products.xlsx'
+      await browserSave(name, buffer)
+      localStorage.setItem('lastListPath', name)
+      listStore.filePath = name
+    }
     return true
   }
 
-  return {
-    restoreLastPath,
-    openConfigExcel,
-    saveConfigExcel,
-    openListExcel,
-    saveListExcel,
-    storeInitialized,
+  async function restoreLastPath() {
+    const paths = await getLastPaths()
+    if (isTauri() && paths.config) {
+      try {
+        const { readFile } = await import('@tauri-apps/plugin-fs')
+        const bytes = await readFile(paths.config)
+        await configStore.loadFromBuffer(bytes, paths.config)
+      } catch { configStore.setFilePath(paths.config) }
+    }
+    if (paths.list) listStore.filePath = paths.list
   }
+
+  return { openConfigExcel, saveConfigExcel, openListExcel, saveListExcel, restoreLastPath }
 }
