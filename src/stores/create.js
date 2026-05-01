@@ -186,8 +186,9 @@ export const useCreateStore = defineStore('create', () => {
     for (const sku of skus) {
       try {
         const merged = { ...productInputs, ...sku.inputs }
-        const { results, errors } = execute(rules, tables, merged)
+        const { results, errors, traces } = execute(rules, tables, merged)
         sku.results = results
+        sku.traces = traces
         sku.error = errors.length ? errors.join('; ') : ''
       }
       catch (e) {

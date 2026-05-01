@@ -32,6 +32,23 @@ function handleSaveToList() {
   if (rows.length) listStore.addRecords(rows)
 }
 
+function batchSetSkuInput(fieldKey) {
+  const val = createStore.skus[0]?.inputs[fieldKey]
+  if (val === undefined || val === '') return
+  for (const sku of createStore.skus) sku.inputs[fieldKey] = val
+}
+
+// ── 计算过程弹窗 ──
+const showTraceModal = ref(false)
+const traceField = ref('')
+const traceSkuKey = ref('')
+
+function openTrace(sku, fieldKey) {
+  traceSkuKey.value = sku.key
+  traceField.value = fieldKey
+  showTraceModal.value = true
+}
+
 const listColumns = computed(() => {
   if (!listStore.records.length) return []
   const keys = new Set()
@@ -121,7 +138,10 @@ const listColumns = computed(() => {
                     <tr>
                       <th>SKU码</th>
                       <th v-for="a in createStore.variantAttributes.filter(a=>a.name.trim())" :key="a.name">{{ a.name.trim() }}</th>
-                      <th v-for="f in createStore.skuInputFields" :key="f.字段键">{{ f.字段名称 }}</th>
+                      <th v-for="f in createStore.skuInputFields" :key="f.字段键">
+                        {{ f.字段名称 }}
+                        <button class="btn btn-ghost btn-xs text-base-content/40" title="统一" @click="batchSetSkuInput(f.字段键)">⇅</button>
+                      </th>
                       <th>图片</th>
                       <th v-for="f in createStore.skuOutputFields" :key="f.字段键">{{ f.字段名称 }}</th>
                     </tr>
@@ -136,7 +156,10 @@ const listColumns = computed(() => {
                       <td><input v-model="sku.images" class="input input-bordered input-xs w-20" placeholder="url"></td>
                       <td v-for="f in createStore.skuOutputFields" :key="f.字段键" class="text-xs whitespace-nowrap">
                         <span v-if="sku.error" class="text-error text-xs">{{ sku.error }}</span>
-                        <span v-else-if="sku.results[f.字段键] !== undefined">{{ typeof sku.results[f.字段键] === 'number' ? sku.results[f.字段键].toFixed(2) : sku.results[f.字段键] }}</span>
+                        <template v-else-if="sku.results[f.字段键] !== undefined">
+                          {{ f.单位 === '%' ? (sku.results[f.字段键] * 100).toFixed(2) + '%' : typeof sku.results[f.字段键] === 'number' ? sku.results[f.字段键].toFixed(2) : sku.results[f.字段键] }}
+                          <button v-if="sku.traces?.[f.字段键]" class="btn btn-ghost btn-xs text-base-content/40 ml-1" @click="openTrace(sku, f.字段键)">?</button>
+                        </template>
                         <span v-else class="text-base-content/30">—</span>
                       </td>
                     </tr>
@@ -159,7 +182,7 @@ const listColumns = computed(() => {
               <thead><tr><th v-for="col in listColumns" :key="col">{{ col }}</th><th class="sticky right-0 bg-base-100">操作</th></tr></thead>
               <tbody>
                 <tr v-for="(row, idx) in listStore.records" :key="idx">
-                  <td v-for="col in listColumns" :key="col" class="whitespace-nowrap">{{ col === '利润率' && row[col] ? (Number(row[col])*100).toFixed(2)+'%' : row[col] }}</td>
+                  <td v-for="col in listColumns" :key="col" class="whitespace-nowrap">{{ row[col] }}</td>
                   <td class="sticky right-0 bg-base-100"><button class="btn btn-ghost btn-xs text-error" @click="listStore.removeRecord(idx)">🗑️</button></td>
                 </tr>
               </tbody>
@@ -168,5 +191,18 @@ const listColumns = computed(() => {
         </div>
       </div>
     </div>
+    <!-- ═══ 计算过程弹窗 ═══ -->
+    <dialog :open="showTraceModal" class="modal">
+      <div class="modal-box max-w-lg">
+        <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">计算过程：{{ traceField }}</h3><button class="btn btn-ghost btn-sm btn-circle" @click="showTraceModal = false">✕</button></div>
+        <div class="text-sm leading-relaxed whitespace-pre-wrap">
+          {{ createStore.skus.find(s => s.key === traceSkuKey)?.traces?.[traceField] || '无计算记录' }}
+        </div>
+        <div class="modal-action">
+          <button class="btn btn-sm" @click="showTraceModal = false">关闭</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showTraceModal = false"><button>关闭</button></form>
+    </dialog>
   </div>
 </template>

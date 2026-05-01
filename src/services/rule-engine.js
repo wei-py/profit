@@ -1,13 +1,14 @@
 /**
  * 执行费用计算。
- * @param {object[]} feeRules - 费用规则列表（已按模板过滤）
- * @param {object} lookupTables - { sheet名: 行数据[] }
- * @param {object} userInputs - { 字段键: 值 }
- * @returns {{ results: object, errors: string[] }}
+ * @param {object[]} feeRules
+ * @param {object} lookupTables
+ * @param {object} userInputs
+ * @returns {{ results: object, errors: string[], traces: object }}
  */
 export function execute(feeRules, lookupTables, userInputs) {
   const results = {}
   const errors = []
+  const traces = {}
 
   const enabled = feeRules.filter(r => r.启用 === '是' || r.启用 === 'TRUE')
   const sorted = enabled.sort((a, b) => Number(a.计算顺序) - Number(b.计算顺序))
@@ -27,21 +28,35 @@ export function execute(feeRules, lookupTables, userInputs) {
       if (!key) continue
 
       switch (rule.计算方式) {
-        case '查表':
-          results[key] = doLookup(rule, lookupTables, userInputs, results)
+        case '查表': {
+          const { val, trace } = doLookup(rule, lookupTables, userInputs, results)
+          results[key] = val
+          traces[key] = trace
           break
-        case '百分比':
-          results[key] = doPercent(rule, userInputs, results)
+        }
+        case '百分比': {
+          const { val, trace } = doPercent(rule, userInputs, results)
+          results[key] = val
+          traces[key] = trace
           break
-        case '固定值':
+        }
+        case '固定值': {
           results[key] = Number(rule.固定金额) || 0
+          traces[key] = `${rule.费用名称 || key} = ${results[key]}（固定值）`
           break
-        case '加总':
-          results[key] = doSum(rule, userInputs, results)
+        }
+        case '加总': {
+          const { val, trace } = doSum(rule, userInputs, results)
+          results[key] = val
+          traces[key] = trace
           break
-        case '公式':
-          results[key] = doFormula(rule, userInputs, results, allKeys)
+        }
+        case '公式': {
+          const { val, trace } = doFormula(rule, userInputs, results, allKeys)
+          results[key] = val
+          traces[key] = trace
           break
+        }
       }
     }
     catch (e) {
@@ -49,7 +64,7 @@ export function execute(feeRules, lookupTables, userInputs) {
     }
   }
 
-  return { results, errors }
+  return { results, errors, traces }
 }
 
 // ── helpers ──
@@ -147,6 +162,7 @@ function doLookup(rule, lookupTables, inputs, results) {
 
   const mappings = parseMappings(rule.输入映射)
   const isRange = rule.匹配方式 === '区间'
+  const condParts = []
 
   for (const row of table) {
     let ok = true
@@ -157,53 +173,73 @@ function doLookup(rule, lookupTables, inputs, results) {
         const lo = Number(row[colName + '下限'])
         const hi = Number(row[colName + '上限'])
         if (v < lo || v > hi) { ok = false; break }
+        condParts.push(`${fieldKey}=${inputVal} ∈ [${lo}, ${hi}]`)
       }
       else {
         if (String(inputVal) !== String(row[colName])) { ok = false; break }
+        condParts.push(`${fieldKey}=${inputVal}`)
       }
     }
-    if (ok) return Number(row[rule.输出列]) || 0
+    if (ok) {
+      const val = Number(row[rule.输出列]) || 0
+      const trace = `查表「${rule.查表名称}」：${condParts.join('，')} → ${rule.输出列}=${val}`
+      return { val, trace }
+    }
   }
   throw new Error(`查表「${rule.查表名称}」未找到匹配行`)
 }
 
 function doPercent(rule, inputs, results) {
   const base = Number(getVal(rule.百分比基数, inputs, results)) || 0
-  let rate
+  let rate, rateDesc
   if (rule.百分比来源字段) {
     rate = Number(getVal(rule.百分比来源字段, inputs, results)) || 0
-  }
-  else {
+    rateDesc = `${rule.百分比来源字段}(${rate})`
+  } else {
     rate = Number(rule.百分比值) / 100 || 0
+    rateDesc = `${rule.百分比值}%`
   }
-  return base * rate
+  const val = base * rate
+  const trace = `${rule.百分比基数}(${base}) × ${rateDesc} = ${val.toFixed(2)}`
+  return { val, trace }
 }
 
 function doSum(rule, inputs, results) {
-  if (!rule.加总字段) return 0
-  return rule.加总字段.split(',').reduce((s, fk) => {
-    return s + (Number(getVal(fk.trim(), inputs, results)) || 0)
-  }, 0)
+  if (!rule.加总字段) return { val: 0, trace: '' }
+  const fields = rule.加总字段.split(',').map(s => s.trim())
+  const parts = []
+  let total = 0
+  for (const fk of fields) {
+    const v = Number(getVal(fk, inputs, results)) || 0
+    parts.push(`${fk}(${v.toFixed(2)})`)
+    total += v
+  }
+  const trace = `加总：${parts.join(' + ')} = ${total.toFixed(2)}`
+  return { val: total, trace }
 }
 
 function doFormula(rule, inputs, results, allKeys) {
   let expr = rule.公式
-  if (!expr) return 0
+  if (!expr) return { val: 0, trace: '' }
+  const traceParts = []
 
-  // 按字段键长度从长到短替换，避免短名误匹配
   const sorted = [...allKeys].sort((a, b) => b.length - a.length)
   for (const fk of sorted) {
     const val = Number(getVal(fk, inputs, results)) || 0
-    expr = expr.replaceAll(fk, val)
+    if (expr.includes(fk)) {
+      traceParts.push(`${fk}=${val}`)
+      expr = expr.replaceAll(fk, val)
+    }
   }
 
-  // 安全校验
   if (!/^[\d\s+\-*/().]+$/.test(expr)) {
     throw new Error(`公式含非法字符：${rule.公式}`)
   }
 
   // eslint-disable-next-line no-new-func
-  return Function('"use strict"; return (' + expr + ')')()
+  const val = Function('"use strict"; return (' + expr + ')')()
+  const trace = `公式「${rule.公式}」：${traceParts.join('，')} → ${Number(val).toFixed(4)}`
+  return { val, trace }
 }
 
 function parseMappings(inputMap) {

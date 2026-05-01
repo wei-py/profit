@@ -10,8 +10,14 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
+const ftype = computed(() => props.field.type || props.field.类型)
+const fname = computed(() => props.field.fieldName || props.field.字段名称)
+const funit = computed(() => props.field.unit || props.field.单位)
+const frequired = computed(() => props.field.required || props.field.必填 === '是')
+const fdesc = computed(() => props.field.description || props.field.说明 || '')
+
 const options = computed(() => {
-  const gid = props.field.optionGroupId
+  const gid = props.field.optionGroupId || props.field.选项组编号
   if (!gid) return []
   // 新数据模型：optionItems [{所属分组, 选项值, 显示名, 启用}]
   if (props.optionItems.length) {
@@ -32,54 +38,22 @@ function onCheck(e) { emit('update:modelValue', e.target.checked) }
 <template>
   <div class="form-control">
     <label class="label py-1">
-      <span class="label-text">{{ field.fieldName || field.字段名称 }}</span>
-      <span v-if="field.unit || field.单位" class="label-text-alt opacity-60">{{ field.unit || field.单位 }}</span>
+      <span class="label-text">{{ fname }}</span>
+      <span v-if="funit" class="label-text-alt opacity-60">{{ funit }}</span>
     </label>
 
-    <!-- 下拉 -->
-    <select
-      v-if="field.type === 'select' || field.type === '下拉'"
-      class="select select-bordered"
-      :value="modelValue"
-      :required="field.required || field.必填 === '是'"
-      @change="onInput"
-    >
+    <select v-if="ftype === 'select' || ftype === '下拉'" class="select select-bordered" :value="modelValue" :required="frequired" @change="onInput">
       <option value="">-- 选择 --</option>
       <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
     </select>
 
-    <!-- 布尔 / 勾选 -->
-    <div v-else-if="field.type === 'boolean' || field.type === '布尔'" class="flex items-center gap-2">
-      <input
-        type="checkbox"
-        class="toggle toggle-sm"
-        :checked="modelValue === '是' || modelValue === true || modelValue === 'true'"
-        @change="emit('update:modelValue', $event.target.checked ? '是' : '否')"
-      >
+    <div v-else-if="ftype === 'boolean' || ftype === '布尔'" class="flex items-center gap-2">
+      <input type="checkbox" class="toggle toggle-sm" :checked="modelValue === '是' || modelValue === true || modelValue === 'true'" @change="emit('update:modelValue', $event.target.checked ? '是' : '否')">
       <span class="text-sm">{{ modelValue === '是' || modelValue === true || modelValue === 'true' ? '是' : '否' }}</span>
     </div>
 
-    <!-- 数字 -->
-    <input
-      v-else-if="field.type === 'number' || field.type === '数字'"
-      type="number"
-      step="any"
-      class="input input-bordered"
-      :value="modelValue"
-      :required="field.required || field.必填 === '是'"
-      :placeholder="field.description || field.说明 || ''"
-      @input="onInput"
-    >
+    <input v-else-if="ftype === 'number' || ftype === '数字'" type="number" step="any" class="input input-bordered" :value="modelValue" :required="frequired" :placeholder="fdesc" @input="onInput">
 
-    <!-- 文本 / 默认 -->
-    <input
-      v-else
-      type="text"
-      class="input input-bordered"
-      :value="modelValue"
-      :required="field.required || field.必填 === '是'"
-      :placeholder="field.description || field.说明 || ''"
-      @input="onInput"
-    >
+    <input v-else type="text" class="input input-bordered" :value="modelValue" :required="frequired" :placeholder="fdesc" @input="onInput">
   </div>
 </template>
