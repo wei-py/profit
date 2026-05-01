@@ -1,29 +1,11 @@
-name: Build
+name: Build EXE
 
 on:
   push:
     branches: [master, main]
-  pull_request:
-    branches: [master, main]
   workflow_dispatch:
 
 jobs:
-  # ═══ Web 版 ═══
-  build-web:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 9 }
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: 'pnpm' }
-      - run: pnpm install && pnpm build
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: dist }
-      - uses: actions/deploy-pages@v4
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
-  # ═══ Windows EXE ═══
   build-exe:
     runs-on: windows-latest
     steps:
