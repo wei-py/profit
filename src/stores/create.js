@@ -1,194 +1,236 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { execute } from '@/services/rule-engine'
 import { useConfigStore } from './config'
 
 export const useCreateStore = defineStore('create', () => {
   const configStore = useConfigStore()
 
+  // ── 商品基本信息 ──
+  const productId = ref('')
+  const productName = ref('')
   const selectedCountryId = ref('')
   const selectedTemplateId = ref('')
-  const productInputs = ref({})
-  const results = ref({})
-  const errors = ref([])
+
+  // ── 商品级字段值 ──
+  const productInputs = reactive({})
+
+  // ── 变体 ──
+  const variantAttributes = ref([]) // [{name:'颜色', values:'红,蓝'}, ...]
+
+  // ── SKU ──
+  const skus = ref([]) // [{key:'红,S', attrs:{颜色:'红',尺码:'S'}, inputs:{售价:99,成本价:25,...}, results:{}, error:''}]
+
   const calculating = ref(false)
-  const basicInfo = ref({ name: '', sku: '', cost: '', weight: '' })
-  const images = ref('')
+  const lastCalculatedAt = ref('')
 
-  // 变体
-  const variantRows = ref([])
-  let variantIdCounter = 0
-
-  // SKU 数据
-  const skuData = ref({})
-  const skuResults = ref({})
-
-  /** 笛卡尔积生成 SKU 组合 */
-  const generatedSkuCombos = computed(() => {
-    const rows = variantRows.value.filter(r => r.key.trim() && r.options.trim())
-    if (!rows.length) return []
-    const arrays = rows.map(r => r.options.split(',').map(s => s.trim()).filter(Boolean))
-    if (arrays.some(a => !a.length)) return []
-    const result = []
-    function cartesian(idx, current) {
-      if (idx === arrays.length) {
-        const key = current.join(',')
-        const values = {}
-        rows.forEach((r, i) => { values[r.key.trim()] = current[i] })
-        result.push({ key, values })
-        return
-      }
-      for (const val of arrays[idx]) cartesian(idx + 1, [...current, val])
-    }
-    cartesian(0, [])
-    return result
-  })
-
-  /** 当前选中模板 */
+  // ── 计算属性 ──
   const selectedTemplate = computed(() =>
     configStore['计算模板'].find(t => t.编号 === selectedTemplateId.value),
   )
 
-  /** 当前费用规则 */
   const currentRules = computed(() =>
     configStore.getFeeRulesByTemplate(selectedTemplateId.value),
   )
 
-  /** 选择国家+模板 */
-  function selectTemplate(countryId, templateId) {
+  const productFields = computed(() =>
+    selectedCountryId.value
+      ? configStore.getFieldsByCountry(selectedCountryId.value).filter(f => f.层级 === '商品级' && f.输入输出 === '输入')
+      : [],
+  )
+
+  const skuInputFields = computed(() =>
+    selectedCountryId.value
+      ? configStore.getFieldsByCountry(selectedCountryId.value).filter(f => f.层级 === 'SKU级' && f.输入输出 === '输入')
+      : [],
+  )
+
+  const skuOutputFields = computed(() =>
+    selectedCountryId.value
+      ? configStore.getFieldsByCountry(selectedCountryId.value).filter(f => f.层级 === 'SKU级' && f.输入输出 === '输出')
+      : [],
+  )
+
+  // ── 选择国家+模板 ──
+  function selectCountry(countryId) {
     selectedCountryId.value = countryId
+    selectedTemplateId.value = ''
+    resetForm()
+  }
+
+  function selectTemplate(templateId) {
     selectedTemplateId.value = templateId
-    productInputs.value = {}
-    results.value = {}
-    errors.value = []
-    basicInfo.value = { name: '', sku: '', cost: '', weight: '' }
-    images.value = ''
-    skuData.value = {}
-    skuResults.value = {}
-    variantRows.value = []
-    variantIdCounter = 0
-
-    // 加载模板参数默认值
-    const params = configStore.getTemplateParams(templateId)
-    for (const p of params) {
-      productInputs.value[p.字段键] = p.默认值
-    }
+    resetForTemplate()
   }
 
-  function updateProductInput(fieldKey, value) {
-    productInputs.value[fieldKey] = value
+  function resetForm() {
+    productId.value = ''
+    productName.value = ''
+    for (const k of Object.keys(productInputs)) delete productInputs[k]
+    variantAttributes.value = []
+    skus.value = []
+    calculating.value = false
+    lastCalculatedAt.value = ''
   }
 
-  /** 逐 SKU 计算 */
-  function calculate() {
-    calculating.value = true
-    errors.value = []
+  function resetForTemplate() {
+    for (const k of Object.keys(productInputs)) delete productInputs[k]
+    variantAttributes.value = []
+    skus.value = []
+    calculating.value = false
+    lastCalculatedAt.value = ''
 
-    try {
-      const combos = generatedSkuCombos.value
-      const defaults = { ...basicInfo.value, ...productInputs.value }
-      const lookupTbls = configStore.lookupTables
-
-      if (combos.length > 0) {
-        const newSkuResults = {}
-        for (const combo of combos) {
-          const sd = skuData.value[combo.key] || {}
-          const mergedInputs = { ...defaults, ...(sd.overrides || {}) }
-          try {
-            const { results: r, errors: e } = execute(currentRules.value, lookupTbls, mergedInputs)
-            newSkuResults[combo.key] = r
-            errors.value.push(...e.map(err => `[${combo.key}] ${err}`))
-          }
-          catch (e) {
-            errors.value.push(`[${combo.key}] ${e.message}`)
-          }
-        }
-        skuResults.value = newSkuResults
-        results.value = {}
+    // 加载默认值（从选项组取第一个，或模板参数）
+    for (const f of productFields.value) {
+      if (f.默认值) productInputs[f.字段键] = f.默认值
+      else if (f.类型 === '下拉' && f.选项组编号) {
+        const items = configStore.getOptionItemsByGroup(f.选项组编号)
+        if (items.length) productInputs[f.字段键] = items[0].选项值
       }
-      else {
-        const { results: r, errors: e } = execute(currentRules.value, lookupTbls, defaults)
-        results.value = r
-        errors.value = e
-        skuResults.value = {}
-      }
-    }
-    catch (e) {
-      errors.value = [e.message]
-    }
-    finally {
-      calculating.value = false
+      else if (f.类型 === '数字') productInputs[f.字段键] = ''
+      else productInputs[f.字段键] = ''
     }
   }
 
   // ── 变体操作 ──
-  function addVariantRow() {
-    variantRows.value.push({ id: ++variantIdCounter, key: '', options: '' })
-  }
-  function updateVariantRow(id, data) {
-    const idx = variantRows.value.findIndex(r => r.id === id)
-    if (idx !== -1) variantRows.value[idx] = { ...variantRows.value[idx], ...data }
-  }
-  function deleteVariantRow(id) {
-    variantRows.value = variantRows.value.filter(r => r.id !== id)
+  function addVariantAttribute() {
+    variantAttributes.value = [...variantAttributes.value, { name: '', values: '' }]
   }
 
-  // ── SKU 数据操作 ──
-  function initSkuData() {
-    const combos = generatedSkuCombos.value
-    const merged = { ...skuData.value }
-    for (const combo of combos) {
-      if (!merged[combo.key]) merged[combo.key] = { sku: '', images: '', overrides: {} }
-    }
-    skuData.value = merged
-  }
-  function updateSkuField(comboKey, field, value) {
-    if (!skuData.value[comboKey]) return
-    if (field === 'sku' || field === 'images') {
-      skuData.value[comboKey][field] = value
-    }
-    else {
-      if (!skuData.value[comboKey].overrides) skuData.value[comboKey].overrides = {}
-      skuData.value[comboKey].overrides[field] = value
-    }
-    skuData.value = { ...skuData.value }
-  }
-  function updateSkuImages(comboKey, imagesString) {
-    updateSkuField(comboKey, 'images', imagesString)
+  function updateVariantAttribute(index, attr) {
+    const arr = [...variantAttributes.value]
+    arr[index] = { ...arr[index], ...attr }
+    variantAttributes.value = arr
   }
 
-  function getRecord() {
-    return {
-      ...basicInfo.value,
-      ...productInputs.value,
-      ...results.value,
-      images: images.value,
-      skuResults: skuResults.value,
-      variants: variantRows.value,
-      skuData: skuData.value,
+  function removeVariantAttribute(index) {
+    variantAttributes.value = variantAttributes.value.filter((_, i) => i !== index)
+  }
+
+  // ── 笛卡尔积生成 SKU ──
+  function generateSkus() {
+    const attrs = variantAttributes.value
+      .filter(a => a.name.trim() && a.values.trim())
+      .map(a => ({ name: a.name.trim(), values: a.values.split(',').map(s => s.trim()).filter(Boolean) }))
+
+    if (!attrs.length) {
+      // 无变体：单个 SKU
+      skus.value = [{
+        key: productName.value || '默认',
+        attrs: {},
+        inputs: makeDefaultSkuInputs(),
+        results: {},
+        error: '',
+        images: '',
+      }]
+      return
     }
+
+    // 笛卡尔积
+    const combos = attrs.reduce((rows, attr) =>
+      rows.flatMap(row => attr.values.map(v => ({ ...row, [attr.name]: v }))),
+      [{}],
+    )
+
+    // 保留已有 SKU 的输入值
+    const oldSkus = {}
+    for (const s of skus.value) {
+      if (s.key) oldSkus[s.key] = s.inputs
+    }
+
+    skus.value = combos.map(combo => {
+      const key = attrs.map(a => combo[a.name]).join(',')
+      return {
+        key,
+        attrs: combo,
+        inputs: oldSkus[key] || makeDefaultSkuInputs(),
+        results: {},
+        error: '',
+        images: '',
+      }
+    })
+  }
+
+  function makeDefaultSkuInputs() {
+    const inputs = {}
+    for (const f of skuInputFields.value) {
+      if (f.默认值) inputs[f.字段键] = f.默认值
+      else inputs[f.字段键] = ''
+    }
+    return inputs
+  }
+
+  function updateSkuInput(skuIndex, fieldKey, value) {
+    if (!skus.value[skuIndex]) return
+    skus.value[skuIndex].inputs[fieldKey] = value
+  }
+
+  function updateSkuField(skuIndex, field, value) {
+    if (!skus.value[skuIndex]) return
+    if (field === 'sku') skus.value[skuIndex].skuCode = value
+    else if (field === 'images') skus.value[skuIndex].images = value
+    else updateSkuInput(skuIndex, field, value)
+  }
+
+  // ── 计算 ──
+  function calculateAll() {
+    calculating.value = true
+
+    // 确保已生成 SKU
+    if (!skus.value.length) generateSkus()
+
+    const rules = currentRules.value
+    const tables = configStore.lookupTables
+
+    for (const sku of skus.value) {
+      try {
+        const merged = { ...productInputs, ...sku.inputs }
+        const { results, errors } = execute(rules, tables, merged)
+        sku.results = results
+        sku.error = errors.length ? errors.join('; ') : ''
+      }
+      catch (e) {
+        sku.error = e.message
+        sku.results = {}
+      }
+    }
+
+    calculating.value = false
+    lastCalculatedAt.value = new Date().toISOString().slice(0, 19).replace('T', ' ')
+  }
+
+  // ── 展平为保存行 ──
+  function productRows() {
+    const now = lastCalculatedAt.value || new Date().toISOString().slice(0, 10)
+    const cp = configStore['国家平台'].find(c => c.编号 === selectedCountryId.value)
+
+    return skus.value.map(sku => ({
+      '商品ID': productId.value,
+      '商品名称': productName.value,
+      '国家平台编号': selectedCountryId.value,
+      '模板编号': selectedTemplateId.value,
+      'SKU码': sku.skuCode || '',
+      ...sku.attrs,
+      ...productInputs,
+      ...sku.inputs,
+      ...sku.results,
+      '图片': sku.images || '',
+      '计算时间': now,
+    }))
   }
 
   function reset() {
     selectedCountryId.value = ''
     selectedTemplateId.value = ''
-    productInputs.value = {}
-    results.value = {}
-    errors.value = []
-    basicInfo.value = { name: '', sku: '', cost: '', weight: '' }
-    images.value = ''
-    skuData.value = {}
-    skuResults.value = {}
-    variantRows.value = []
-    variantIdCounter = 0
+    resetForm()
   }
 
   return {
-    selectedCountryId, selectedTemplateId, productInputs, results, errors, calculating,
-    basicInfo, images, variantRows, skuData, skuResults,
-    generatedSkuCombos, selectedTemplate, currentRules,
-    selectTemplate, updateProductInput, calculate, getRecord, reset,
-    addVariantRow, updateVariantRow, deleteVariantRow,
-    initSkuData, updateSkuField, updateSkuImages,
+    productId, productName, selectedCountryId, selectedTemplateId,
+    productInputs, variantAttributes, skus, calculating, lastCalculatedAt,
+    selectedTemplate, currentRules, productFields, skuInputFields, skuOutputFields,
+    selectCountry, selectTemplate, reset, resetForm,
+    addVariantAttribute, updateVariantAttribute, removeVariantAttribute,
+    generateSkus, updateSkuInput, updateSkuField, calculateAll, productRows,
   }
 })
