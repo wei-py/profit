@@ -216,7 +216,7 @@ export const useCreateStore = defineStore('create', () => {
       ...productInputs,
       ...sku.inputs,
       ...sku.results,
-      '图片': sku.images || '',
+      '图片': sku.images || '',  // 写入时嵌入浮动画片，单元格文本留空
       '计算时间': now,
     }))
   }

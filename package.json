@@ -19,6 +19,7 @@
     "dayjs": "^1",
     "driver.js": "^1.4.0",
     "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
     "pinia": "^2",
     "vue": "^3",
     "vue-router": "^4",

@@ -68,9 +68,16 @@
 <!--5. 要有这样的操作可以，点击 售价统一（成本价，重量）,内容就变一样
 6. 单位为 % 号， 要 * 0.01-->
 
+<!--算了，还是不行，excel文件需要多一个字段图片路径, 需要有一个能保存到软件内容的图片路径，统一到一起，图片字段还是嵌入表格 ，
+  图片路径字段就是保存到软件内部的图片路径，打开列表就是去读取这个图片路径的图片，现在到页面上去，我看了一下之前是这样解决的-->
+
 
 <!--能不能也兼容 web 端呢-->
 
 <!--3. 商品列表 持久化 (国家平台、模板)
 4. 商品列表 持久化 (国家平台、模板)，我选完之后，点击去配置页面，回来就丢失了
 5. 商品列表，商品级字段， 刊登类型、商品类目、是否包邮 这些在配置中是属于下拉类型的，就变成下拉选项呀，不要输入 -->
+
+
+ <!--build-exe
+Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/-->

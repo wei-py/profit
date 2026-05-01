@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { readListWorkbook } from '@/services/excel-reader'
+import { readListWorkbook } from '@/services/list-excel-reader'
 import { buildListWorkbookBuffer } from '@/services/list-excel-writer'
 
 export const useListStore = defineStore('list', () => {
@@ -14,7 +14,7 @@ export const useListStore = defineStore('list', () => {
     error.value = ''
     if (p) filePath.value = p
     try {
-      records.value = readListWorkbook(buffer)
+      records.value = await readListWorkbook(buffer)
     }
     catch (e) {
       error.value = e.message

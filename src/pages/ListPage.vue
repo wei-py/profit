@@ -61,13 +61,26 @@ function handleImageUpload(sku, event) {
   const file = event.target.files[0]
   if (!file) return
   const reader = new FileReader()
-  reader.onload = () => { sku.images = reader.result }
+  reader.onload = () => {
+    sku.images = reader.result  // 仅用于应用内预览和写入 Excel 时嵌入
+  }
   reader.readAsDataURL(file)
 }
 function openImagePreview(src) { previewImage.value = src; imageZoom.value = 1; showImageModal.value = true }
 function clearImage(sku) { sku.images = '' }
 
-function isImage(val) { return typeof val === 'string' && val.startsWith('data:image/') }
+function isImage(val) {
+  if (typeof val === 'string' && val.startsWith('data:image/')) return true
+  if (typeof val === 'string' && (val.startsWith('asset://') || val.includes('/images/'))) return true
+  return false
+}
+
+function isDispimg(val) { return typeof val === 'string' && val.startsWith('=DISPIMG(') }
+
+function cellDisplay(val) {
+  if (isDispimg(val)) return '📷 WPS嵌入图片'
+  return val
+}
 
 // ── 加载已有商品回新建面板 ──
 function loadRecordBack(idx) {
@@ -263,6 +276,7 @@ const listColumns = computed(() => {
                     <template v-if="isImage(row[col])">
                       <img :src="row[col]" class="w-10 h-10 object-cover rounded cursor-pointer border" @click="openImagePreview(row[col])">
                     </template>
+                    <template v-else-if="isDispimg(row[col])">📷</template>
                     <template v-else>{{ row[col] }}</template>
                   </td>
                   <td class="sticky right-0 bg-base-100">
