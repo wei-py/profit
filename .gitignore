@@ -16,3 +16,9 @@ node_modules/.vite-temp/
 src-tauri/target/
 
 *.log
+
+# pnpm
+.pnpm-store/
+
+# worker
+worker/.wrangler/
