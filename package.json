@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "deploy": "wrangler pages deploy dist --project-name=profit",
     "tauri": "tauri",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "code": "node scripts/code.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
