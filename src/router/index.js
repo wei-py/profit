@@ -2,6 +2,11 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   {
+    path: '/activate',
+    name: 'activate',
+    component: () => import('@/pages/ActivationPage.vue'),
+  },
+  {
     path: '/',
     component: () => import('@/layouts/DefaultLayout.vue'),
     redirect: '/list',
