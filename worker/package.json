@@ -1,0 +1,7 @@
+{
+  "name": "profit-worker",
+  "private": true,
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}
