@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const API_BASE: &str = "https://profit-api.rabbwei.workers.dev";
+const API_BASE: &str = "https://profit-api.xu-wei.space";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActivateRequest {
