@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { VueDraggableNext } from 'vue-draggable-next'
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { useConfigStore } from '@/stores/config'
@@ -27,8 +28,6 @@ function addColumn() {
   newColName.value = ''; showAddCol.value = false
 }
 function removeColumn(k) { if (!CORE_KEYS.includes(k)) for (const r of store['国家平台']) delete r[k] }
-function moveUp(arr, i) { if (i > 0) { const item = arr.splice(i, 1)[0]; arr.splice(i - 1, 0, item) } }
-function moveDown(arr, i) { if (i < arr.length - 1) { const item = arr.splice(i, 1)[0]; arr.splice(i + 1, 0, item) } }
 function addRow() { const r = {}; for (const k of allKeys.value) r[k] = ''; r.启用 = '是'; store['国家平台'].push(r) }
 function deleteRow(id) { const i = store['国家平台'].findIndex(r => r.编号 === id); if (i !== -1) store['国家平台'].splice(i, 1) }
 function toggleExpand(id) { expandedId.value = expandedId.value === id ? null : id }
@@ -162,9 +161,6 @@ function deleteTpl(idx) {
 const showRuleSubModal = ref(false)
 const ruleForm = reactive({})
 const editingRuleIdx = ref(-1)
-// 条件树：每个节点自带 op（与前一兄弟的连接关系）。第一个节点 op 为空。
-// cond: { type:'cond', idx, op:'AND'|'OR'|'' }
-// group: { type:'group', op:'AND'|'OR', children: [cond|group], linkOp:'AND'|'OR'|'' }  // op=组内关系, linkOp=与前一兄弟关系
 const condPool = ref([])
 const condTree = ref({ type: 'group', op: 'AND', children: [], linkOp: '' })
 
@@ -172,7 +168,6 @@ function initCondTree() {
   condPool.value = [{ 字段: '', 运算符: '', 值: '' }]
   condTree.value = { type: 'group', op: 'AND', children: [{ type: 'cond', idx: 0, op: '' }], linkOp: '' }
 }
-// 展平条件树 → [{type:'group'|'cond', node, depth, parent, idxInParent}]
 function flattenTree(node, depth = 0, parent = null, idx = 0) {
   const items = [{ type: node.type === 'group' ? 'group-open' : 'cond', node, depth, parent, idx }]
   if (node.type === 'group') {
@@ -211,7 +206,7 @@ function serializeCondTree() {
     const parts = []
     for (const ch of node.children) {
       let prefix = ''
-      if (ch.type === 'cond' && ch.op) prefix = ch.op[0] // A or O
+      if (ch.type === 'cond' && ch.op) prefix = ch.op[0]
       else if (ch.type === 'group' && ch.linkOp) prefix = ch.linkOp[0]
       parts.push(prefix + dfs(ch))
     }
@@ -231,9 +226,7 @@ function serializeCondTree() {
   return form
 }
 
-// 从 rule 反序列化条件树
 function deserializeCondTree(r) {
-  // 优先从 条件数据 JSON 加载完整树
   if (r.条件数据) {
     try {
       const d = JSON.parse(r.条件数据)
@@ -242,7 +235,6 @@ function deserializeCondTree(r) {
       return
     } catch { /* fall through */ }
   }
-  // 向后兼容：从条件1-4列构建
   condPool.value = []
   for (let i = 1; i <= 4; i++) {
     condPool.value.push({ 字段: r['条件' + i + '字段'] || '', 运算符: r['条件' + i + '运算符'] || '', 值: r['条件' + i + '值'] || '' })
@@ -252,20 +244,6 @@ function deserializeCondTree(r) {
     if (condPool.value[i].字段) condTree.value.children.push({ type: 'cond', idx: i, op: i > 0 ? 'AND' : '' })
   }
   if (!condTree.value.children.length) condTree.value.children.push({ type: 'cond', idx: 0, op: '' })
-}
-
-function parseCondStruct(s) {
-  // "0,1|2,3" → group(OR) with group(AND)[0,1] and group(AND)[2,3]
-  function parse(seg) {
-    if (!seg.includes('|') && !seg.includes(',')) {
-      return { type: 'cond', idx: Number(seg.trim()) }
-    }
-    if (seg.includes('|')) {
-      return { type: 'group', op: 'OR', children: seg.split('|').map(s => parse(s.trim())) }
-    }
-    return { type: 'group', op: 'AND', children: seg.split(',').map(s => parse(s.trim())) }
-  }
-  return parse(s)
 }
 
 function openNewRule() {
@@ -309,12 +287,12 @@ const fieldEditSteps = [
 
 const optionEditSteps = [
   { popover: { title: '编辑选项组', description: '选项组为下拉字段提供可选值。编号建议带国家前缀（如 br_刊登类型）。' } },
-  { element: '[data-tour="opt-items"]', popover: { title: '选项值', description: '选项值=存储值（code），显示名=用户看到的文本。启用=否则该选项不出现在下拉框中。' } },
+  { element: '[data-tour="opt-items"]', popover: { title: '选项值', description: '选项值=存储值（code），显示名=用户看到的文本。启用=否则该选项不出现在下拉框中。拖拽左侧三条杠可排序。' } },
 ]
 
 const templateEditSteps = [
   { popover: { title: '编辑模板', description: '计算模板定义一套费用计算方案，包含多条费用规则和查表数据。一个模板归属一个国家平台。' } },
-  { element: '[data-tour="tpl-rules"]', popover: { title: '费用规则', description: '按计算顺序执行。点击规则行可编辑详细条件与计算方式。同行多个条件默认AND，多行同输出字段默认OR。' } },
+  { element: '[data-tour="tpl-rules"]', popover: { title: '费用规则', description: '按计算顺序执行。点击规则行可编辑详细条件与计算方式。同行多个条件默认AND，多行同输出字段默认OR。拖拽左侧三条杠可排序。' } },
   { element: '[data-tour="tpl-lookups"]', popover: { title: '查表数据', description: '新建或编辑费率表。规则中的"查表"计算方式会引用这些表。可自由增删行列，改表名。' } },
 ]
 
@@ -341,7 +319,6 @@ const lookupTableName = ref('')
 const lookupTableNewName = ref('')
 const lookupRowsLocal = ref([])
 
-// 扫描当前模板规则引用的所有查表名称
 const allLookupNames = computed(() => Object.keys(store.lookupTables))
 const newLookupName = ref('')
 const showNewLookupInput = ref(false)
@@ -363,11 +340,9 @@ function saveLookup() {
   const oldName = lookupTableName.value
   const newName = lookupTableNewName.value.trim()
   if (!newName) return
-  // rename: 更新 lookupTables key 及规则中的引用
   if (oldName !== newName) {
     store.lookupTables = { ...store.lookupTables, [newName]: lookupRowsLocal.value }
     delete store.lookupTables[oldName]
-    // 更新所有引用
     for (const r of store['费用规则']) { if (r.查表名称 === oldName) r.查表名称 = newName }
     for (const r of tplRulesLocal.value) { if (r.查表名称 === oldName) r.查表名称 = newName }
   } else {
@@ -379,7 +354,6 @@ function deleteLookup(name) {
   if (!confirm(`删除查表「${name}」？`)) return
   delete store.lookupTables[name]
   store.lookupTables = { ...store.lookupTables }
-  // 清空引用
   for (const r of store['费用规则']) { if (r.查表名称 === name) r.查表名称 = '' }
   for (const r of tplRulesLocal.value) { if (r.查表名称 === name) r.查表名称 = '' }
 }
@@ -402,6 +376,22 @@ function delLookupCol(col) {
   for (const row of lookupRowsLocal.value) delete row[col]
   lookupRowsLocal.value = [...lookupRowsLocal.value]
 }
+
+// ═══ 配置列编辑弹窗 ═══
+const showConfigColModal = ref(false)
+const configColOrder = ref([])
+
+const configColumns = computed(() => {
+  if (!store['国家平台'].length) return []
+  if (!configColOrder.value.length || configColOrder.value.length !== allKeys.value.length) {
+    configColOrder.value = [...allKeys.value]
+  }
+  return configColOrder.value
+})
+
+function openConfigColEditor() {
+  showConfigColModal.value = true
+}
 </script>
 
 <template>
@@ -411,6 +401,7 @@ function delLookupCol(col) {
       <div class="flex gap-2">
         <button class="btn btn-outline btn-sm" @click="openConfigExcel">打开配置</button>
         <button class="btn btn-outline btn-sm" @click="saveConfigExcel">保存配置</button>
+        <button class="btn btn-ghost btn-sm" @click="openConfigColEditor">⚙️ 编辑列</button>
         <button v-if="!showAddCol" class="btn btn-ghost btn-sm" @click="showAddCol = true">＋ 添加列</button>
         <div v-else class="flex gap-1 items-center">
           <input v-model="newColName" class="input input-bordered input-sm w-32" placeholder="列名" @keyup.enter="addColumn" />
@@ -428,7 +419,7 @@ function delLookupCol(col) {
               <thead>
                 <tr>
                   <th class="w-8"></th>
-                  <th v-for="k in allKeys" :key="k" class="relative group">{{ k }}
+                  <th v-for="k in configColumns" :key="k" class="relative group">{{ k }}
                     <button v-if="!CORE_KEYS.includes(k)" class="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 text-error absolute -top-1 -right-1" @click="removeColumn(k)">✕</button>
                   </th>
                   <th class="w-24">操作</th>
@@ -438,22 +429,18 @@ function delLookupCol(col) {
                 <template v-for="(row, ri) in store['国家平台']" :key="row.编号 || ri">
                   <tr class="hover" :class="{ 'bg-base-200': expandedId === row.编号 }">
                     <td><button class="btn btn-ghost btn-xs" @click="toggleExpand(row.编号)">{{ expandedId === row.编号 ? '▼' : '▶' }}</button></td>
-                    <td v-for="k in allKeys" :key="k" class="cursor-pointer" @click="toggleExpand(row.编号)">
+                    <td v-for="k in configColumns" :key="k" class="cursor-pointer" @click="toggleExpand(row.编号)">
                       {{ k === '启用' ? (row[k] === '是' || row[k] === 'TRUE' ? '是' : '否') : (row[k] || '—') }}
                     </td>
                     <td class="flex items-center gap-1">
-                      <span class="flex flex-col leading-none">
-                        <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(store['国家平台'], ri)">▲</button>
-                        <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(store['国家平台'], ri)">▼</button>
-                      </span>
                       <button class="btn btn-ghost btn-xs" @click="openEditCountry(row)">✏️</button>
                       <button class="btn btn-ghost btn-xs text-error" @click="deleteRow(row.编号)">✕</button>
                     </td>
                   </tr>
                   <tr v-if="expandedId === row.编号">
-                    <td :colspan="allKeys.length + 2" class="p-4 bg-base-200/50">
+                    <td :colspan="configColumns.length + 2" class="p-4 bg-base-200/50">
                       <div class="grid grid-cols-3 gap-4">
-                        <!-- 计算字段 -->
+                        <!-- 计算字段 — 拖拽排序 -->
                         <div class="card card-sm bg-base-100">
                           <div class="card-body p-3">
                             <div class="flex justify-between items-center mb-2">
@@ -461,13 +448,27 @@ function delLookupCol(col) {
                               <button class="btn btn-xs btn-primary" @click="openNewField">＋</button>
                             </div>
                             <div v-if="!expFields.length" class="text-xs text-base-content/40">暂无</div>
-                            <div v-for="(f, i) in expFields" :key="f.字段键 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
-                              <span class="cursor-pointer hover:text-primary" @click="openEditField(i)">{{ f.字段键 || '(新)' }} <span class="text-base-content/40">{{ f.层级 }}·{{ f.输入输出 }}</span></span>
-                              <span class="flex items-center gap-1"><span class="flex flex-col leading-none"><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(expFields, i)">▲</button><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(expFields, i)">▼</button></span><button class="btn btn-ghost btn-xs text-error" @click="deleteField(i)">✕</button></span>
-                            </div>
+                            <VueDraggableNext
+                              v-else
+                              v-model="expFields"
+                              :animation="200"
+                              handle=".drag-handle"
+                              ghost-class="bg-base-300"
+                              item-key="字段键"
+                            >
+                              <div v-for="(f, i) in expFields" :key="f.字段键 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
+                                <span class="flex items-center gap-2">
+                                  <span class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center px-1.5 py-0.5 select-none" title="拖拽排序">☰</span>
+                                  <span class="cursor-pointer hover:text-primary" @click="openEditField(i)">{{ f.字段键 || '(新)' }} <span class="text-base-content/40">{{ f.层级 }}·{{ f.输入输出 }}</span></span>
+                                </span>
+                                <span class="flex items-center gap-1">
+                                  <button class="btn btn-ghost btn-xs text-error" @click="deleteField(i)">✕</button>
+                                </span>
+                              </div>
+                            </VueDraggableNext>
                           </div>
                         </div>
-                        <!-- 选项组 -->
+                        <!-- 选项组 — 拖拽排序 -->
                         <div class="card card-sm bg-base-100">
                           <div class="card-body p-3">
                             <div class="flex justify-between items-center mb-2">
@@ -475,13 +476,27 @@ function delLookupCol(col) {
                               <button class="btn btn-xs btn-primary" @click="openNewOpt">＋</button>
                             </div>
                             <div v-if="!expOptGroups.length" class="text-xs text-base-content/40">暂无</div>
-                            <div v-for="(g, i) in expOptGroups" :key="g.编号 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
-                              <span class="cursor-pointer hover:text-primary" @click="openEditOpt(i)">{{ g.名称 || '(新)' }} <span class="text-base-content/40">{{ g.编号 }}</span></span>
-                              <span class="flex items-center gap-1"><span class="flex flex-col leading-none"><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(expOptGroups, i)">▲</button><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(expOptGroups, i)">▼</button></span><button class="btn btn-ghost btn-xs text-error" @click="deleteOpt(i)">✕</button></span>
-                            </div>
+                            <VueDraggableNext
+                              v-else
+                              v-model="expOptGroups"
+                              :animation="200"
+                              handle=".drag-handle"
+                              ghost-class="bg-base-300"
+                              item-key="编号"
+                            >
+                              <div v-for="(g, i) in expOptGroups" :key="g.编号 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
+                                <span class="flex items-center gap-2">
+                                  <span class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center px-1.5 py-0.5 select-none" title="拖拽排序">☰</span>
+                                  <span class="cursor-pointer hover:text-primary" @click="openEditOpt(i)">{{ g.名称 || '(新)' }} <span class="text-base-content/40">{{ g.编号 }}</span></span>
+                                </span>
+                                <span class="flex items-center gap-1">
+                                  <button class="btn btn-ghost btn-xs text-error" @click="deleteOpt(i)">✕</button>
+                                </span>
+                              </div>
+                            </VueDraggableNext>
                           </div>
                         </div>
-                        <!-- 计算模板 -->
+                        <!-- 计算模板 — 拖拽排序 -->
                         <div class="card card-sm bg-base-100">
                           <div class="card-body p-3">
                             <div class="flex justify-between items-center mb-2">
@@ -489,10 +504,24 @@ function delLookupCol(col) {
                               <button class="btn btn-xs btn-primary" @click="openNewTpl">＋</button>
                             </div>
                             <div v-if="!expTemplates.length" class="text-xs text-base-content/40">暂无</div>
-                            <div v-for="(t, i) in expTemplates" :key="t.编号 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
-                              <span class="cursor-pointer hover:text-primary" @click="openEditTpl(i)">{{ t.名称 || '(新)' }} <span class="badge badge-xs">{{ t.启用 === '是' ? '启用' : '—' }}</span></span>
-                              <span class="flex items-center gap-1"><span class="flex flex-col leading-none"><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveUp(expTemplates, i)">▲</button><button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click="moveDown(expTemplates, i)">▼</button></span><button class="btn btn-ghost btn-xs text-error" @click="deleteTpl(i)">✕</button></span>
-                            </div>
+                            <VueDraggableNext
+                              v-else
+                              v-model="expTemplates"
+                              :animation="200"
+                              handle=".drag-handle"
+                              ghost-class="bg-base-300"
+                              item-key="编号"
+                            >
+                              <div v-for="(t, i) in expTemplates" :key="t.编号 || i" class="flex items-center justify-between py-1 border-b border-base-200 text-xs">
+                                <span class="flex items-center gap-2">
+                                  <span class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center px-1.5 py-0.5 select-none" title="拖拽排序">☰</span>
+                                  <span class="cursor-pointer hover:text-primary" @click="openEditTpl(i)">{{ t.名称 || '(新)' }} <span class="badge badge-xs">{{ t.启用 === '是' ? '启用' : '—' }}</span></span>
+                                </span>
+                                <span class="flex items-center gap-1">
+                                  <button class="btn btn-ghost btn-xs text-error" @click="deleteTpl(i)">✕</button>
+                                </span>
+                              </div>
+                            </VueDraggableNext>
                           </div>
                         </div>
                       </div>
@@ -506,6 +535,31 @@ function delLookupCol(col) {
         </div>
       </div>
     </div>
+
+    <!-- ═══ 配置列编辑弹窗（拖拽排序） ═══ -->
+    <dialog :open="showConfigColModal" class="modal">
+      <div class="modal-box max-w-lg">
+        <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">编辑列顺序</h3><button class="btn btn-ghost btn-sm btn-circle" @click="showConfigColModal = false">✕</button></div>
+        <div class="text-xs text-base-content/50 mb-2">拖拽左侧三条杠调整列顺序</div>
+        <VueDraggableNext
+          v-model="configColOrder"
+          :animation="200"
+          handle=".drag-handle"
+          ghost-class="bg-base-300"
+          item-key="col"
+        >
+          <div v-for="col in configColOrder" :key="col" class="flex items-center gap-2 p-2 bg-base-200 rounded text-sm mb-1">
+            <span class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center px-1.5 py-0.5 select-none" title="拖拽排序">☰</span>
+            <span class="flex-1 truncate text-xs" :title="col">{{ col }}</span>
+          </div>
+        </VueDraggableNext>
+        <div class="modal-action mt-4">
+          <button class="btn btn-ghost btn-sm" @click="showConfigColModal = false">取消</button>
+          <button class="btn btn-primary btn-sm" @click="showConfigColModal = false">完成</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showConfigColModal = false"><button>关闭</button></form>
+    </dialog>
 
     <!-- ═══ 国家编辑弹窗 ═══ -->
     <dialog :open="showCountryModal" class="modal">
@@ -561,7 +615,7 @@ function delLookupCol(col) {
       <form method="dialog" class="modal-backdrop" @click="showFieldModal = false"><button>关闭</button></form>
     </dialog>
 
-    <!-- ═══ 选项组弹窗 ═══ -->
+    <!-- ═══ 选项组弹窗（选项值拖拽排序） ═══ -->
     <dialog :open="showOptModal" class="modal">
       <div class="modal-box max-w-2xl max-h-[85vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">{{ editingOptIdx >= 0 ? '编辑选项组' : '新建选项组' }}</h3><button class="btn btn-ghost btn-sm btn-circle" @click="startTour(optionEditSteps)">?</button></div>
@@ -576,16 +630,25 @@ function delLookupCol(col) {
             <button class="btn btn-xs btn-primary" @click="addOptItem">＋</button>
           </div>
           <table v-if="optItemsLocal.length" class="table table-xs">
-            <thead><tr><th>选项值</th><th>显示名</th><th>排序</th><th>启用</th><th></th></tr></thead>
-            <tbody>
+            <thead><tr><th class="w-8"></th><th>选项值</th><th>显示名</th><th>排序</th><th>启用</th><th></th></tr></thead>
+            <VueDraggableNext
+              v-model="optItemsLocal"
+              tag="tbody"
+              :animation="200"
+              handle=".drag-handle"
+              ghost-class="bg-base-300"
+              item-key="选项值"
+              no-transition-on-drag
+            >
               <tr v-for="(item, i) in optItemsLocal" :key="i">
+                <td><span class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center justify-center select-none text-xs px-0.5" title="拖拽排序">☰</span></td>
                 <td><input v-model="item.选项值" class="input input-bordered input-xs w-20"></td>
                 <td><input v-model="item.显示名" class="input input-bordered input-xs w-24"></td>
                 <td><input v-model="item.排序" class="input input-bordered input-xs w-12"></td>
                 <td><select v-model="item.启用" class="select select-bordered select-xs w-16"><option>是</option><option>否</option></select></td>
                 <td><button class="btn btn-ghost btn-xs text-error" @click="delOptItem(i)">🗑️</button></td>
               </tr>
-            </tbody>
+            </VueDraggableNext>
           </table>
         </div>
         <div class="modal-action">
@@ -597,7 +660,7 @@ function delLookupCol(col) {
       <form method="dialog" class="modal-backdrop" @click="showOptModal = false"><button>关闭</button></form>
     </dialog>
 
-    <!-- ═══ 模板弹窗 ═══ -->
+    <!-- ═══ 模板弹窗（费用规则拖拽排序） ═══ -->
     <dialog :open="showTplModal" class="modal">
       <div class="modal-box w-11/12 max-w-4xl max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold">{{ editingTplIdx >= 0 ? '编辑模板' : '新建模板' }}</h3><button class="btn btn-ghost btn-sm btn-circle" @click="startTour(templateEditSteps)">?</button></div>
@@ -608,51 +671,62 @@ function delLookupCol(col) {
           <div><label class="label py-0 text-xs">说明</label><input v-model="tplForm.说明" class="input input-bordered input-sm w-full"></div>
         </div>
 
-        <!-- 费用规则 -->
+        <!-- 费用规则 — 拖拽排序 -->
         <div class="mb-4">
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-semibold">费用规则（{{ tplRulesLocal.length }} 条）</span>
             <button class="btn btn-xs btn-primary" @click="openNewRule">＋</button>
           </div>
           <table v-if="tplRulesLocal.length" class="table table-xs">
-            <thead><tr><th>编号</th><th>输出到</th><th>计算方式</th><th>条件</th><th>顺序</th><th></th></tr></thead>
-            <tbody>
-              <tr v-for="(r, i) in tplRulesLocal" :key="r.编号 || i" class="hover cursor-pointer" @click="openEditRule(i)">
-                <td class="font-mono text-xs">{{ r.编号 }}</td>
-                <td>{{ r.输出字段键 }}</td>
-                <td><span class="badge badge-xs">{{ r.计算方式 }}</span></td>
-                <td class="text-xs text-base-content/60">{{ condSummary(r) }}</td>
-                <td>{{ r.计算顺序 }}</td>
+            <thead><tr data-tour="tpl-rules"><th class="w-8"></th><th>编号</th><th>输出到</th><th>计算方式</th><th>条件</th><th>顺序</th><th></th></tr></thead>
+            <VueDraggableNext
+              v-model="tplRulesLocal"
+              tag="tbody"
+              :animation="200"
+              handle=".drag-handle"
+              ghost-class="bg-base-300"
+              item-key="编号"
+              no-transition-on-drag
+            >
+              <tr v-for="(r, i) in tplRulesLocal" :key="r.编号 || i" class="hover cursor-pointer">
+                <td><span class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center justify-center select-none text-xs" title="拖拽排序">☰</span></td>
+                <td class="font-mono text-xs" @click="openEditRule(i)">{{ r.编号 }}</td>
+                <td @click="openEditRule(i)">{{ r.输出字段键 }}</td>
+                <td @click="openEditRule(i)"><span class="badge badge-xs">{{ r.计算方式 }}</span></td>
+                <td class="text-xs text-base-content/60" @click="openEditRule(i)">{{ condSummary(r) }}</td>
+                <td @click="openEditRule(i)">{{ r.计算顺序 }}</td>
                 <td>
-                  <span class="flex items-center gap-1">
-                    <span class="flex flex-col leading-none">
-                      <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click.stop="moveUp(tplRulesLocal, i)">▲</button>
-                      <button class="btn btn-ghost btn-xs px-0 h-4 min-h-0" @click.stop="moveDown(tplRulesLocal, i)">▼</button>
-                    </span>
-                    <button class="btn btn-ghost btn-xs text-error" @click.stop="deleteRuleInline(i)">✕</button>
-                  </span>
+                  <button class="btn btn-ghost btn-xs text-error" @click.stop="deleteRuleInline(i)">✕</button>
                 </td>
               </tr>
-            </tbody>
+            </VueDraggableNext>
           </table>
           <div v-else class="text-xs text-base-content/40">暂无规则</div>
         </div>
 
-        <!-- 查表数据 -->
+        <!-- 查表数据 — table展示 -->
         <div class="mb-4">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold">查表数据（{{ allLookupNames.length }} 个）</span>
+            <span class="text-sm font-semibold" data-tour="tpl-lookups">查表数据（{{ allLookupNames.length }} 个）</span>
             <div class="flex gap-1 items-center">
               <input v-if="showNewLookupInput" v-model="newLookupName" class="input input-bordered input-xs w-32" placeholder="表名" @keyup.enter="openNewLookup" />
               <button class="btn btn-xs btn-primary" @click="openNewLookup">＋ 新建表</button>
             </div>
           </div>
-          <div v-for="name in allLookupNames" :key="name" class="flex items-center gap-2 py-1">
-            <span class="text-xs font-mono">{{ name }}</span>
-            <button class="btn btn-ghost btn-xs" @click="openLookup(name)">📊 编辑</button>
-            <button class="btn btn-ghost btn-xs text-error" @click="deleteLookup(name)">🗑️</button>
-          </div>
-          <div v-if="!allLookupNames.length" class="text-xs text-base-content/40">无</div>
+          <table v-if="allLookupNames.length" class="table table-xs">
+            <thead><tr><th>表名</th><th>行数</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="name in allLookupNames" :key="name">
+                <td class="font-mono text-xs">{{ name }}</td>
+                <td class="text-xs text-base-content/60">{{ (store.lookupTables[name] || []).length }} 行</td>
+                <td class="flex gap-1">
+                  <button class="btn btn-ghost btn-xs" @click="openLookup(name)">📊 编辑</button>
+                  <button class="btn btn-ghost btn-xs text-error" @click="deleteLookup(name)">🗑️</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="text-xs text-base-content/40">无</div>
         </div>
 
         <div class="modal-action">
@@ -676,11 +750,9 @@ function delLookupCol(col) {
         </div>
         <div class="mb-3"><label class="label py-0 text-xs">输出字段键</label><input v-model="ruleForm.输出字段键" class="input input-bordered input-sm w-full" list="rOutputKeys"><datalist id="rOutputKeys"><option v-for="k in outputKeys" :key="k" :value="k" /></datalist></div>
 
-        <!-- 条件树 — 无限嵌套 -->
         <fieldset class="fieldset p-3 bg-base-200 rounded mb-3">
           <legend class="font-semibold text-sm">条件</legend>
           <template v-for="(item, i) in flatTree" :key="i">
-            <!-- 组头 -->
             <div v-if="item.type === 'group-open'" :style="{ marginLeft: item.depth * 16 + 'px' }" class="flex items-center gap-2 mb-1 mt-1">
               <button v-if="item.depth > 0" class="btn btn-xs" @click="toggleGroupOp(item.node)">{{ item.node.op }}</button>
               <button class="btn btn-xs btn-ghost" @click="addCond(item.node, 'AND')">＋ AND</button>
@@ -688,7 +760,6 @@ function delLookupCol(col) {
               <button class="btn btn-xs btn-ghost" @click="addSubGroup(item.node)">＋子组</button>
               <button v-if="item.depth > 0" class="btn btn-ghost btn-xs text-error" @click="delNode(item.parent, item.idx)">✕</button>
             </div>
-            <!-- 条件 -->
             <div v-else-if="item.type === 'cond'" :style="{ marginLeft: item.depth * 16 + 'px' }" class="flex items-center gap-2 mb-1">
               <button v-if="item.idx > 0" class="btn btn-xs btn-ghost font-bold text-primary w-8" @click="toggleLinkOp(item)">{{ item.node.op }}</button>
               <span v-else class="w-8"></span>
@@ -701,7 +772,6 @@ function delLookupCol(col) {
         </fieldset>
         <datalist id="rFieldKeys"><option v-for="k in countryFieldKeys" :key="k" :value="k" /></datalist>
 
-        <!-- 计算配置 -->
         <fieldset class="fieldset mb-3">
           <legend class="font-semibold text-sm">计算配置</legend>
           <select v-model="ruleForm.计算方式" class="select select-bordered select-sm mb-2"><option value="">— 选择 —</option><option>查表</option><option>百分比</option><option>固定值</option><option>加总</option><option>公式</option></select>
