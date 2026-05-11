@@ -16,23 +16,32 @@ const showUrlInput = ref(false)
 const urlInput = ref('')
 
 function parseImages(val) {
-  if (!val || typeof val !== 'string') return []
-  return val.split(',').map(s => s.trim()).filter(Boolean)
+  if (!val || typeof val !== 'string')
+    return []
+  return val
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
 }
 
 async function refreshPreviews() {
   previewUrls.value = await getImageUrls(props.modelValue)
 }
 
-watch(() => props.modelValue, () => {
-  refreshPreviews()
-}, { immediate: true })
+watch(
+  () => props.modelValue,
+  () => {
+    refreshPreviews()
+  },
+  { immediate: true },
+)
 
 async function handleAdd() {
   loading.value = true
   try {
     const sourcePaths = await pickImages()
-    if (!sourcePaths.length) return
+    if (!sourcePaths.length)
+      return
     const newPaths = await addImages(sourcePaths)
     const current = parseImages(props.modelValue)
     const combined = [...current, ...newPaths]
@@ -59,7 +68,8 @@ function handleAddUrl() {
 
 function confirmUrl() {
   const trimmed = urlInput.value.trim()
-  if (!trimmed) return
+  if (!trimmed)
+    return
   const current = parseImages(props.modelValue)
   emit('update:modelValue', [...current, trimmed].join(','))
   cancelUrl()
@@ -74,15 +84,11 @@ function cancelUrl() {
 <template>
   <div>
     <div v-if="previewUrls.length" class="flex gap-2 flex-wrap mb-2">
-      <div
-        v-for="(url, i) in previewUrls"
-        :key="i"
-        class="relative group"
-      >
+      <div v-for="(url, i) in previewUrls" :key="i" class="relative group">
         <img
           :src="url"
           class="w-20 h-20 object-cover rounded border border-base-300"
-          @error="($event.target).style.display = 'none'"
+          @error="$event.target.style.display = 'none'"
         >
         <button
           class="absolute -top-2 -right-2 btn btn-circle btn-xs btn-error opacity-0 group-hover:opacity-100 transition-opacity"
@@ -96,19 +102,11 @@ function cancelUrl() {
       暂无图片
     </div>
     <div class="flex gap-2">
-      <button
-        class="btn btn-sm btn-outline"
-        :disabled="loading"
-        @click="handleAdd"
-      >
+      <button class="btn btn-sm btn-outline" :disabled="loading" @click="handleAdd">
         <span v-if="loading" class="loading loading-spinner loading-xs mr-1" />
         添加本地图片
       </button>
-      <button
-        v-if="!showUrlInput"
-        class="btn btn-sm btn-ghost"
-        @click="handleAddUrl"
-      >
+      <button v-if="!showUrlInput" class="btn btn-sm btn-ghost" @click="handleAddUrl">
         添加图片链接
       </button>
       <div v-else class="flex items-center gap-1">
@@ -120,8 +118,12 @@ function cancelUrl() {
           @keydown.enter="confirmUrl"
           @keydown.escape="cancelUrl"
         >
-        <button class="btn btn-sm btn-ghost" @click="confirmUrl">确认</button>
-        <button class="btn btn-sm btn-ghost" @click="cancelUrl">取消</button>
+        <button class="btn btn-sm btn-ghost" @click="confirmUrl">
+          确认
+        </button>
+        <button class="btn btn-sm btn-ghost" @click="cancelUrl">
+          取消
+        </button>
       </div>
     </div>
   </div>

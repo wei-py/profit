@@ -1,6 +1,6 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
 import { Store } from '@tauri-apps/plugin-store'
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
 import { activateCode, validateCode } from '@/services/activation'
 
 const STORE_PATH = 'activation.json'
@@ -31,7 +31,8 @@ export const useActivationStore = defineStore('activation', () => {
         lastVerifiedAt.value = cached.lastVerifiedAt || 0
         return true
       }
-    } catch {
+    }
+    catch {
       // 首次运行，无缓存
     }
     return false
@@ -49,7 +50,8 @@ export const useActivationStore = defineStore('activation', () => {
         lastVerifiedAt: lastVerifiedAt.value,
       })
       await store.save()
-    } catch {
+    }
+    catch {
       // 静默失败
     }
   }
@@ -76,7 +78,8 @@ export const useActivationStore = defineStore('activation', () => {
 
       // 超出宽限期，强制在线校验
       const ok = await tryOnlineValidate()
-      if (ok) return true
+      if (ok)
+        return true
     }
 
     // 无缓存或校验失败 → 需要激活
@@ -88,7 +91,8 @@ export const useActivationStore = defineStore('activation', () => {
    * 后台在线校验，不改变 status（由调用方决定）
    */
   async function tryOnlineValidate() {
-    if (!code.value) return false
+    if (!code.value)
+      return false
     try {
       const resp = await validateCode(code.value)
       if (resp.success) {
@@ -99,14 +103,16 @@ export const useActivationStore = defineStore('activation', () => {
           status.value = 'activated'
         }
         return true
-      } else {
+      }
+      else {
         error.value = resp.error || '验证失败'
         if (resp.error?.includes('撤销') || resp.error?.includes('过期')) {
           status.value = 'expired'
         }
         return false
       }
-    } catch (e) {
+    }
+    catch (e) {
       // 网络错误不改变状态，宽限期内仍可用
       return false
     }
@@ -128,12 +134,14 @@ export const useActivationStore = defineStore('activation', () => {
         await saveCache()
         status.value = 'activated'
         return { success: true }
-      } else {
+      }
+      else {
         error.value = resp.error || '激活失败'
         status.value = 'unactivated'
         return { success: false, error: resp.error }
       }
-    } catch (e) {
+    }
+    catch (e) {
       error.value = e.message || '网络错误'
       status.value = 'unactivated'
       return { success: false, error: e.message }
@@ -151,14 +159,22 @@ export const useActivationStore = defineStore('activation', () => {
       const store = await Store.load(STORE_PATH)
       await store.delete(CACHE_KEY)
       await store.save()
-    } catch {
+    }
+    catch {
       // 静默
     }
   }
 
   return {
-    status, code, error, lastVerifiedAt,
+    status,
+    code,
+    error,
+    lastVerifiedAt,
     isActivated,
-    checkActivation, activate, deactivate, loadCache, saveCache,
+    checkActivation,
+    activate,
+    deactivate,
+    loadCache,
+    saveCache,
   }
 })

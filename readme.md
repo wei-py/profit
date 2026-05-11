@@ -1,16 +1,16 @@
 ## 🛠 技术栈规范
 
-| 类别 | 技术选型 | 说明 |
-|------|----------|------|
-| 前端框架 | Vue 3 + JavaScript | ❌ 不使用 TypeScript |
-| 构建工具 | Vite + pnpm | 包管理统一使用 pnpm |
-| 桌面框架 | Tauri | 本地文件读写、系统集成 |
-| UI 框架 | daisyUI | 我已经写了src/style.css了 |
-| 状态管理 | Pinia | 全局状态集中管理 |
-| 代码规范 | eslint + @antfu/eslint-config | 统一代码风格 |
-| 工具库 | xe-utils | 所有计算、判空、数据处理统一使用 |
-| 日期处理 | dayjs | 所有日期相关操作统一使用 |
-| 数据源 | Excel (.xlsx) | 配置与业务数据分离存储 |
+| 类别     | 技术选型                      | 说明                             |
+| -------- | ----------------------------- | -------------------------------- |
+| 前端框架 | Vue 3 + JavaScript            | ❌ 不使用 TypeScript             |
+| 构建工具 | Vite + pnpm                   | 包管理统一使用 pnpm              |
+| 桌面框架 | Tauri                         | 本地文件读写、系统集成           |
+| UI 框架  | daisyUI                       | 我已经写了src/style.css了        |
+| 状态管理 | Pinia                         | 全局状态集中管理                 |
+| 代码规范 | eslint + @antfu/eslint-config | 统一代码风格                     |
+| 工具库   | xe-utils                      | 所有计算、判空、数据处理统一使用 |
+| 日期处理 | dayjs                         | 所有日期相关操作统一使用         |
+| 数据源   | Excel (.xlsx)                 | 配置与业务数据分离存储           |
 
 ---
 
@@ -41,7 +41,7 @@
 - 参数项使用可编辑表格维护。
 - 表格字段包括：参数名称、类型、单位、值 / 规则、操作。
 - 支持新增、修改、删除参数项，以及补齐默认项。
-参考 excel-rule-engine-example.xlsx
+  参考 excel-rule-engine-example.xlsx
 
 ## 选项页补充
 
@@ -52,7 +52,7 @@
 - 表格字段包括：显示名称、实际值、排序、启用、备注、操作。
 - 支持新增、修改、删除选项。
 - 预设页、模板页、创建页中需要固定候选值的字段，应优先复用选项页分组。
-参考 excel-rule-engine-example.xlsx
+  参考 excel-rule-engine-example.xlsx
 
 ## 模板页补充
 

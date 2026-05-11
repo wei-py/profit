@@ -1,5 +1,5 @@
 <!--1. 预设选中的国家平台，要有持久缓存
-2. 选项页面分组选中也是持久缓存，还有分组这里的布局宽度小一点 
+2. 选项页面分组选中也是持久缓存，还有分组这里的布局宽度小一点
 3. 预设和选项页面都和模板页面左边的规则集一样宽就行
 4. 新建页面右侧的也是宽度小一点
 5. 名称就是字段键，后续不需要显示字段键这个，记得 excel-rule-engine-example.xlsx 跟进一下-->
@@ -52,7 +52,7 @@
 <!--2. 图片要可以上传，到 excel 文件中去(也可以删除，点击图片可以预览大图支持缩放)，并且要能嵌入到单元格中去（wps）-->
 <!--3. 计算过程-->
 
-4. 配合生成 sku 按钮
+<!--4. 配合生成 sku 按钮
 自定义前缀添加一下，可以输入
 款号就是从 001 开始加起来
 sku = 自定义前缀 + 款号 + 变体属性
@@ -60,7 +60,7 @@ sku = 自定义前缀 + 款号 + 变体属性
 
 6. 还要加一个功能，通过利润率、净利润、售价 三者互相运算求值(修改其中 1 位自动算其他 2 位，这里要注意代码容易混乱逻辑运算)，你觉得在 sku 列表中每一项加一个弹窗去运行好，还是有什么更好的其他方案呢
 7. 编辑列弹窗变成使用输入排序值，来改变吧，保存后， 还有弹窗里的项使用grid,3 * 3
-  布局，还有sku的编辑列也要包括计算字段呀，准确来说是全部字段
+  布局，还有sku的编辑列也要包括计算字段呀，准确来说是全部字段-->
 
 <!--商品记录也要可以上下移动，里面的图片也要可以预览，还要加一个按钮，可以获取到相同的商品ID到新建商品中去-->
 <!--你会保存图片使用的是 base64 吧，不要这样的呀-->
@@ -80,13 +80,13 @@ sku = 自定义前缀 + 款号 + 变体属性
 <!--算了，还是不行，excel文件需要多一个字段图片路径, 需要有一个能保存到软件内容的图片路径，统一到一起，图片字段还是嵌入表格 ，
   图片路径字段就是保存到软件内部的图片路径，打开列表就是去读取这个图片路径的图片，现在到页面上去，我看了一下之前是这样解决的-->
 
-
 <!--能不能也兼容 web 端呢-->
 
 <!--3. 商品列表 持久化 (国家平台、模板)
 4. 商品列表 持久化 (国家平台、模板)，我选完之后，点击去配置页面，回来就丢失了
 5. 商品列表，商品级字段， 刊登类型、商品类目、是否包邮 这些在配置中是属于下拉类型的，就变成下拉选项呀，不要输入 -->
 
+ <!--build-exe-->
+<!--Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/-->
 
- build-exe
-Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+拖拽三条杠无法移动位置，注意要能同步到 excel 文件中去，还有编辑列配合能够改为表格的列顺序

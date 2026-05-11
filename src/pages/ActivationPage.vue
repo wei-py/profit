@@ -1,7 +1,9 @@
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useActivationStore } from '@/stores/activation'
 
+const router = useRouter()
 const store = useActivationStore()
 const code = ref('')
 const loading = ref(false)
@@ -25,7 +27,7 @@ async function handleActivate() {
   loading.value = false
   if (result.success) {
     // 激活成功，跳转主页面
-    window.location.href = '/'
+    router.push('/')
   }
 }
 </script>
@@ -35,13 +37,17 @@ async function handleActivate() {
     <div class="card bg-base-100 shadow-xl w-full max-w-sm">
       <div class="card-body gap-5">
         <div class="text-center">
-          <h1 class="text-2xl font-bold">Profit</h1>
-          <p class="text-sm text-base-content/60 mt-1">请输入激活码以继续使用</p>
+          <h1 class="text-2xl font-bold">
+            Profit
+          </h1>
+          <p class="text-sm text-base-content/60 mt-1">
+            请输入激活码以继续使用
+          </p>
         </div>
 
         <!-- 已过期 -->
         <div v-if="store.status === 'expired'" class="alert alert-warning">
-          <span>{{ store.error || '激活码已失效，请联系管理员' }}</span>
+          <span>{{ store.error || "激活码已失效，请联系管理员" }}</span>
         </div>
 
         <!-- 错误提示 -->
@@ -51,11 +57,11 @@ async function handleActivate() {
 
         <!-- 加载中 -->
         <div v-if="store.status === 'checking'" class="flex justify-center">
-          <span class="loading loading-spinner loading-md"></span>
+          <span class="loading loading-spinner loading-md" />
         </div>
 
         <!-- 输入框 -->
-        <label class="form-control" v-if="store.status !== 'checking'">
+        <label v-if="store.status !== 'checking'" class="form-control">
           <div class="label">
             <span class="label-text">激活码</span>
           </div>
@@ -66,7 +72,7 @@ async function handleActivate() {
             class="input input-bordered"
             :disabled="loading"
             @keyup.enter="handleActivate"
-          />
+          >
         </label>
 
         <button

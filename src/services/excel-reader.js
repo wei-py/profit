@@ -16,27 +16,30 @@ function readConfigWorkbook(wb) {
   const names = wb.SheetNames
 
   for (const s of STD_SHEETS) {
-    if (!names.includes(s)) throw new Error(`配置缺少 sheet：「${s}」`)
+    if (!names.includes(s))
+      throw new Error(`配置缺少 sheet：「${s}」`)
   }
 
   const config = {
-    '国家平台': s2j(wb, '国家平台'),
-    '计算字段': s2j(wb, '计算字段'),
-    '选项组': s2j(wb, '选项组'),
-    '选项值': s2j(wb, '选项值'),
-    '计算模板': s2j(wb, '计算模板'),
-    '费用规则': s2j(wb, '费用规则'),
-    '模板参数': s2j(wb, '模板参数', true),
+    国家平台: s2j(wb, '国家平台'),
+    计算字段: s2j(wb, '计算字段'),
+    选项组: s2j(wb, '选项组'),
+    选项值: s2j(wb, '选项值'),
+    计算模板: s2j(wb, '计算模板'),
+    费用规则: s2j(wb, '费用规则'),
+    模板参数: s2j(wb, '模板参数', true),
     lookupTables: {},
   }
 
   // 动态费率表：扫描费用规则中的查表名称
   const refs = new Set()
   for (const r of config['费用规则']) {
-    if (r.查表名称) refs.add(r.查表名称)
+    if (r.查表名称)
+      refs.add(r.查表名称)
   }
   for (const n of refs) {
-    if (names.includes(n)) config.lookupTables[n] = s2j(wb, n)
+    if (names.includes(n))
+      config.lookupTables[n] = s2j(wb, n)
   }
 
   return config
@@ -44,14 +47,19 @@ function readConfigWorkbook(wb) {
 
 function s2j(wb, name, optional) {
   const ws = wb.Sheets[name]
-  if (!ws) return optional ? [] : (() => { throw new Error(`Sheet「${name}」不存在`) })()
+  if (!ws) {
+    return optional
+      ? []
+      : (() => {
+          throw new Error(`Sheet「${name}」不存在`)
+        })()
+  }
   return XLSX.utils.sheet_to_json(ws, { defval: '' })
 }
 
 /**
- * 读取商品工作簿。
- * @param {ArrayBuffer} buffer
- * @returns {object[]} SKU 行数组
+ * @deprecated Use `list-excel-reader.js` instead — this version lacks WPS DISPIMG image
+ * extraction and columnOrder support.
  */
 export function readListWorkbook(buffer) {
   const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' })

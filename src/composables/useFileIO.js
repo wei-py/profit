@@ -1,4 +1,3 @@
-import { ref } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useListStore } from '@/stores/list'
 
@@ -12,8 +11,13 @@ export function useFileIO() {
   async function tauriOpen(filterName, ext) {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const { readFile } = await import('@tauri-apps/plugin-fs')
-    const selected = await open({ title: filterName, filters: [{ name: 'Excel', extensions: [ext, 'xls'] }], multiple: false })
-    if (!selected) return null
+    const selected = await open({
+      title: filterName,
+      filters: [{ name: 'Excel', extensions: [ext, 'xls'] }],
+      multiple: false,
+    })
+    if (!selected)
+      return null
     const p = typeof selected === 'string' ? selected : selected.path
     return { path: p, bytes: await readFile(p) }
   }
@@ -21,7 +25,8 @@ export function useFileIO() {
     const { save } = await import('@tauri-apps/plugin-dialog')
     const { writeFile } = await import('@tauri-apps/plugin-fs')
     const selected = await save({ title: name, filters: [{ name: 'Excel', extensions: [ext] }] })
-    if (!selected) return false
+    if (!selected)
+      return false
     const p = typeof selected === 'string' ? selected : selected.path
     await writeFile(p, new Uint8Array(buffer))
     return p
@@ -34,17 +39,31 @@ export function useFileIO() {
     if (window.showOpenFilePicker) {
       try {
         const [handle] = await window.showOpenFilePicker({
-          types: [{ description: 'Excel', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx', '.xls'] } }]
+          types: [
+            {
+              description: 'Excel',
+              accept: {
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [
+                  '.xlsx',
+                  '.xls',
+                ],
+              },
+            },
+          ],
         })
         browserFileHandle = handle
         const file = await handle.getFile()
         return { path: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }
-      } catch (e) {
-        if (e.name === 'AbortError') return null
+      }
+      catch (e) {
+        if (e.name === 'AbortError')
+          return null
       }
     }
     return new Promise((resolve) => {
-      const input = document.createElement('input'); input.type = 'file'; input.accept = '.xlsx,.xls'
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = '.xlsx,.xls'
       input.onchange = async () => {
         const file = input.files[0]
         resolve(file ? { path: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : null)
@@ -54,14 +73,28 @@ export function useFileIO() {
   }
 
   async function browserSave(name, buffer) {
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
     if (browserFileHandle) {
-      try { const w = await browserFileHandle.createWritable(); await w.write(blob); await w.close(); return true } catch { browserFileHandle = null }
+      try {
+        const w = await browserFileHandle.createWritable()
+        await w.write(blob)
+        await w.close()
+        return true
+      }
+      catch {
+        browserFileHandle = null
+      }
     }
     return new Promise((resolve) => {
-      const url = URL.createObjectURL(blob); const a = document.createElement('a')
-      a.href = url; a.download = name.includes('.xlsx') ? name : name + '.xlsx'
-      a.click(); URL.revokeObjectURL(url); resolve(true)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name.includes('.xlsx') ? name : `${name}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+      resolve(true)
     })
   }
 
@@ -71,46 +104,65 @@ export function useFileIO() {
       try {
         const { load } = await import('@tauri-apps/plugin-store')
         const store = await load('settings.json', { autoSave: true })
-        return { config: await store.get('lastConfigPath') || '', list: await store.get('lastListPath') || '' }
-      } catch { return {} }
+        return {
+          config: (await store.get('lastConfigPath')) || '',
+          list: (await store.get('lastListPath')) || '',
+        }
+      }
+      catch {
+        return {}
+      }
     }
-    return { config: localStorage.getItem('lastConfigPath') || '', list: localStorage.getItem('lastListPath') || '' }
+    return {
+      config: localStorage.getItem('lastConfigPath') || '',
+      list: localStorage.getItem('lastListPath') || '',
+    }
   }
   async function saveLastPath(key, path) {
     if (isTauri()) {
       try {
         const { load } = await import('@tauri-apps/plugin-store')
         const store = await load('settings.json', { autoSave: true })
-        await store.set(key, path); await store.save()
-      } catch {}
-    } else { localStorage.setItem(key, path) }
+        await store.set(key, path)
+        await store.save()
+      }
+      catch {}
+    }
+    else {
+      localStorage.setItem(key, path)
+    }
   }
 
   // ── 公共接口 ──
   async function openConfigExcel() {
     const result = isTauri() ? await tauriOpen('打开配置 Excel', 'xlsx') : await browserOpen()
-    if (!result) return { success: false }
+    if (!result)
+      return { success: false }
     await configStore.loadFromBuffer(result.bytes, result.path)
     await saveLastPath('lastConfigPath', result.path)
     return { success: true }
   }
 
   async function saveConfigExcel() {
-    if (!configStore.loaded) return { success: false, error: '没有已加载的配置' }
+    if (!configStore.loaded)
+      return { success: false, error: '没有已加载的配置' }
     const buffer = configStore.getExportBuffer()
     if (isTauri()) {
       let path = configStore.filePath
       if (!path) {
         const p = await tauriSave('保存配置 Excel', 'xlsx', buffer)
-        if (!p) return { success: false }
+        if (!p)
+          return { success: false }
         path = p
-      } else {
+      }
+      else {
         const { writeFile } = await import('@tauri-apps/plugin-fs')
         await writeFile(path, new Uint8Array(buffer))
       }
       configStore.setFilePath(path)
       await saveLastPath('lastConfigPath', path)
-    } else {
+    }
+    else {
       const name = configStore.filePath || 'config.xlsx'
       await browserSave(name, buffer)
       localStorage.setItem('lastConfigPath', name)
@@ -121,7 +173,8 @@ export function useFileIO() {
 
   async function openListExcel() {
     const result = isTauri() ? await tauriOpen('打开列表 Excel', 'xlsx') : await browserOpen()
-    if (!result) return false
+    if (!result)
+      return false
     await listStore.loadFromBuffer(result.bytes, result.path)
     await saveLastPath('lastListPath', result.path)
     return true
@@ -131,11 +184,20 @@ export function useFileIO() {
     const buffer = await listStore.getExportBuffer()
     if (isTauri()) {
       let path = listStore.filePath
-      if (!path) { const p = await tauriSave('保存商品列表', 'xlsx', buffer); if (!p) return false; path = p }
-      else { const { writeFile } = await import('@tauri-apps/plugin-fs'); await writeFile(path, new Uint8Array(buffer)) }
+      if (!path) {
+        const p = await tauriSave('保存商品列表', 'xlsx', buffer)
+        if (!p)
+          return false
+        path = p
+      }
+      else {
+        const { writeFile } = await import('@tauri-apps/plugin-fs')
+        await writeFile(path, new Uint8Array(buffer))
+      }
       listStore.filePath = path
       await saveLastPath('lastListPath', path)
-    } else {
+    }
+    else {
       const name = listStore.filePath || 'products.xlsx'
       await browserSave(name, buffer)
       localStorage.setItem('lastListPath', name)
@@ -152,7 +214,10 @@ export function useFileIO() {
           const { readFile } = await import('@tauri-apps/plugin-fs')
           const bytes = await readFile(paths.config)
           await configStore.loadFromBuffer(bytes, paths.config)
-        } catch { configStore.setFilePath(paths.config) }
+        }
+        catch {
+          configStore.setFilePath(paths.config)
+        }
       }
     }
     // Web 端不支持自动恢复，需手动打开文件

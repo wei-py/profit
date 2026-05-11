@@ -33,6 +33,9 @@ tauri-plugin-store = "2"
 zip = "2"
 roxmltree = "0.20"
 base64 = "0.22"
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.12", features = [
+  "json",
+  "rustls-tls"
+], default-features = false }
 sha2 = "0.10"
 hostname = "0.4"

@@ -24,7 +24,8 @@ export function buildWorkbookBuffer(config) {
   // 动态费率表
   if (config.lookupTables) {
     for (const [name, data] of Object.entries(config.lookupTables)) {
-      if (data && data.length) appendSheet(wb, name, data)
+      if (data && data.length)
+        appendSheet(wb, name, data)
     }
   }
 
@@ -32,9 +33,8 @@ export function buildWorkbookBuffer(config) {
 }
 
 /**
- * 将商品记录数组序列化为商品工作簿 ArrayBuffer。
- * @param {object[]} records - 展平的 SKU 行数组
- * @returns {Uint8Array}
+ * @deprecated Use `list-excel-writer.js` instead — this version lacks WPS DISPIMG image
+ * embedding and columnOrder support.
  */
 export function buildListWorkbookBuffer(records) {
   const wb = XLSX.utils.book_new()

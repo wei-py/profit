@@ -1,6 +1,6 @@
-const XLSX = require('xlsx');
-const path = require('path');
-const fs = require('fs');
+const fs = require('node:fs')
+const path = require('node:path')
+const XLSX = require('xlsx')
 
 // Complete Mercado Livre Brazil shipping cost table from knowledge-hub/40538
 // Format: [weight_lower, weight_upper, price_0_18.99, price_19_48.99, price_49_78.99, price_79_99.99, price_100_119.99, price_120_149.99, price_150_199.99, price_200_plus]
@@ -35,7 +35,7 @@ const shippingData = [
   [100, 125, 8.55, 12.75, 13.95, 119.25, 138.05, 156.05, 173.95, 187.95],
   [125, 150, 8.65, 12.75, 14.15, 126.55, 146.15, 165.65, 184.65, 199.45],
   [150, 99999, 8.75, 12.95, 14.35, 166.15, 192.45, 217.55, 242.55, 261.95],
-];
+]
 
 const priceRanges = [
   [0, 18.99],
@@ -46,79 +46,80 @@ const priceRanges = [
   [120, 149.99],
   [150, 199.99],
   [200, 99999],
-];
+]
 
 // Build the flattened rows for the shipping_cost_table sheet
 function buildShippingRows() {
-  const rows = [];
+  const rows = []
   for (const row of shippingData) {
-    const weightLower = row[0];
-    const weightUpper = row[1];
+    const weightLower = row[0]
+    const weightUpper = row[1]
     for (let i = 0; i < priceRanges.length; i++) {
-      const cost = row[i + 2];
+      const cost = row[i + 2]
       rows.push({
-        '范围1下限': priceRanges[i][0],
-        '范围1上限': priceRanges[i][1],
-        '范围2下限': weightLower,
-        '范围2上限': weightUpper,
-        '输出值': cost,
-        'note': `售价R$${priceRanges[i][0]}-${priceRanges[i][1] === 99999 ? '以上' : 'R$' + priceRanges[i][1]}, 重量${weightLower}-${weightUpper === 99999 ? 'kg以上' : weightUpper + 'kg'}`,
-      });
+        范围1下限: priceRanges[i][0],
+        范围1上限: priceRanges[i][1],
+        范围2下限: weightLower,
+        范围2上限: weightUpper,
+        输出值: cost,
+        note: `售价R$${priceRanges[i][0]}-${priceRanges[i][1] === 99999 ? '以上' : `R$${priceRanges[i][1]}`}, 重量${weightLower}-${weightUpper === 99999 ? 'kg以上' : `${weightUpper}kg`}`,
+      })
     }
   }
-  return rows;
+  return rows
 }
 
 const files = [
   'docs/excel-rule-engine-example.xlsx',
   'docs/excel-rule-engine-example备份.xlsx',
   'public/examples/excel-rule-engine-example.xlsx',
-];
+]
 
 function processExcel(filePath) {
-  console.log(`\nProcessing: ${filePath}`);
-  const wb = XLSX.readFile(filePath);
+  console.log(`\nProcessing: ${filePath}`)
+  const wb = XLSX.readFile(filePath)
 
   // Check if shipping_cost_table sheet exists
   if (!wb.SheetNames.includes('shipping_cost_table')) {
-    console.log('  ERROR: shipping_cost_table sheet not found, skipping');
-    return;
+    console.log('  ERROR: shipping_cost_table sheet not found, skipping')
+    return
   }
 
-  const rows = buildShippingRows();
-  console.log(`  Generated ${rows.length} rows for shipping_cost_table`);
+  const rows = buildShippingRows()
+  console.log(`  Generated ${rows.length} rows for shipping_cost_table`)
 
   // Create new sheet from the rows
-  const headerRow = ['范围1下限', '范围1上限', '范围2下限', '范围2上限', '输出值', 'note'];
-  const data = [headerRow];
+  const headerRow = ['范围1下限', '范围1上限', '范围2下限', '范围2上限', '输出值', 'note']
+  const data = [headerRow]
   for (const row of rows) {
-    data.push(headerRow.map(h => row[h]));
+    data.push(headerRow.map(h => row[h]))
   }
 
-  const newWs = XLSX.utils.aoa_to_sheet(data);
+  const newWs = XLSX.utils.aoa_to_sheet(data)
 
   // Set column widths for better readability
   newWs['!cols'] = [
-    { wch: 12 },  // 范围1下限
-    { wch: 12 },  // 范围1上限
-    { wch: 12 },  // 范围2下限
-    { wch: 12 },  // 范围2上限
-    { wch: 10 },  // 输出值
-    { wch: 60 },  // note
-  ];
+    { wch: 12 }, // 范围1下限
+    { wch: 12 }, // 范围1上限
+    { wch: 12 }, // 范围2下限
+    { wch: 12 }, // 范围2上限
+    { wch: 10 }, // 输出值
+    { wch: 60 }, // note
+  ]
 
-  wb.Sheets.shipping_cost_table = newWs;
-  XLSX.writeFile(wb, filePath, { bookType: 'xlsx' });
-  console.log(`  Saved: ${filePath} (${rows.length} data rows)`);
+  wb.Sheets.shipping_cost_table = newWs
+  XLSX.writeFile(wb, filePath, { bookType: 'xlsx' })
+  console.log(`  Saved: ${filePath} (${rows.length} data rows)`)
 }
 
 for (const file of files) {
-  const fullPath = path.resolve(__dirname, '..', file);
+  const fullPath = path.resolve(__dirname, '..', file)
   if (fs.existsSync(fullPath)) {
-    processExcel(fullPath);
-  } else {
-    console.log(`File not found: ${fullPath}`);
+    processExcel(fullPath)
+  }
+  else {
+    console.log(`File not found: ${fullPath}`)
   }
 }
 
-console.log('\nDone. All example Excel files updated with complete Brazil ML shipping cost table.');
+console.log('\nDone. All example Excel files updated with complete Brazil ML shipping cost table.')

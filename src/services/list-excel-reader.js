@@ -5,19 +5,22 @@ export async function readListWorkbook(buffer) {
   const zip = await JSZip.loadAsync(buffer)
   const files = {}
   for (const [name, entry] of Object.entries(zip.files)) {
-    if (!entry.dir) files[name] = entry
+    if (!entry.dir)
+      files[name] = entry
   }
 
-  // ExcelJS 读单元格
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.load(buffer)
   const ws = wb.getWorksheet('商品记录')
-  if (!ws) return []
+  if (!ws)
+    return { records: [], columnOrder: [] }
 
   const hRow = ws.getRow(1)
   const colN = ws.columnCount || hRow.cellCount || 0
   const headers = []
   for (let c = 1; c <= colN; c++) headers.push(String(hRow.getCell(c).value ?? ''))
+
+  const columnOrder = headers.filter(h => h)
 
   // JSZip 解析 WPS cellimages.xml → 提取嵌入图片（DISPIMG）
   const wps = await extractWpsImages(files)
@@ -37,7 +40,8 @@ export async function readListWorkbook(buffer) {
           wps[key] = `data:image/${ext};base64,${Buffer.from(obj.buffer).toString('base64')}`
         }
       }
-    } catch {}
+    }
+    catch {}
   }
 
   // 构建记录
@@ -47,29 +51,35 @@ export async function readListWorkbook(buffer) {
     for (let c = 1; c <= colN; c++) {
       let val = ws.getRow(r).getCell(c).value ?? ''
       if (val && typeof val === 'object') {
-        if (val.richText) val = val.richText.map(t => t.text).join('')
-        else if (val.text) val = val.text
+        if (val.richText)
+          val = val.richText.map(t => t.text).join('')
+        else if (val.text)
+          val = val.text
         else val = String(val.result ?? val)
       }
       const key = `${r}-${c}`
-      if (wps[key]) val = wps[key]
+      if (wps[key])
+        val = wps[key]
       rec[headers[c - 1] || `col_${c}`] = String(val ?? '')
     }
-    if (Object.values(rec).some(v => v)) rows.push(rec)
+    if (Object.values(rec).some(v => v))
+      rows.push(rec)
   }
-  return rows
+  return { records: rows, columnOrder }
 }
 
 /** 用正则解析 cellimages.xml 提取 WPS 嵌入图片 */
 async function extractWpsImages(files) {
   const map = {}
   const ciEntry = files['xl/cellimages.xml']
-  if (!ciEntry) return map
+  if (!ciEntry)
+    return map
 
   try {
     const ciXml = await ciEntry.async('text')
     const ciRelsXml = files['xl/_rels/cellimages.xml.rels']
-      ? await files['xl/_rels/cellimages.xml.rels'].async('text') : ''
+      ? await files['xl/_rels/cellimages.xml.rels'].async('text')
+      : ''
 
     // rId → media/file path
     const rid2file = {}
@@ -83,27 +93,32 @@ async function extractWpsImages(files) {
     for (const b of blocks) {
       const nm = b.match(/name="([^"]*)"/)
       const em = b.match(/embed="([^"]*)"/)
-      if (nm && em) name2rid[nm[1]] = em[1]
+      if (nm && em)
+        name2rid[nm[1]] = em[1]
     }
 
     // name → media file
     const name2file = {}
     for (const [rid, file] of Object.entries(rid2file)) {
       for (const [name, embed] of Object.entries(name2rid)) {
-        if (embed === rid) name2file[name] = `xl/${file}`
+        if (embed === rid)
+          name2file[name] = `xl/${file}`
       }
     }
-    if (!Object.keys(name2file).length) return map
+    if (!Object.keys(name2file).length)
+      return map
 
     // 匹配 DISPIMG 单元格：<c r="V4" t="str">...<v>=DISPIMG(&quot;ID_...&quot;,1)</v></c>
     const sheetXml = files['xl/worksheets/sheet1.xml']
-      ? await files['xl/worksheets/sheet1.xml'].async('text') : ''
+      ? await files['xl/worksheets/sheet1.xml'].async('text')
+      : ''
     if (sheetXml) {
-      const dispRe = /<c r="([A-Z]+)(\d+)"[^>]*>[^<]*(?:<f[^>]*>[^<]*<\/f>)?<v[^>]*>=\s*DISPIMG\s*\(\s*&quot;\s*(ID_[0-9A-F]{32})\s*&quot;/gi
+      const dispRe
+        = /<c r="([A-Z]+)(\d+)"[^>]*>[^<]*(?:<f[^>]*>[^<]*<\/f>)?<v[^>]*>=\s*DISPIMG\s*\(\s*&quot;\s*(ID_[0-9A-F]{32})\s*&quot;/gi
       let dm
       while ((dm = dispRe.exec(sheetXml))) {
-        const colN = colToNum(dm[1]) + 1  // 1-based 对齐 ExcelJS
-        const rowNum = parseInt(dm[2])
+        const colN = colToNum(dm[1]) + 1 // 1-based 对齐 ExcelJS
+        const rowNum = Number.parseInt(dm[2])
         const imgId = dm[3]
         if (name2file[imgId]) {
           const mp = name2file[imgId]
@@ -117,7 +132,8 @@ async function extractWpsImages(files) {
         }
       }
     }
-  } catch (e) {
+  }
+  catch (e) {
     console.warn('WPS extract:', e)
   }
   return map

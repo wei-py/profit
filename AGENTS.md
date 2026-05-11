@@ -5,6 +5,7 @@ This file provides context for AI assistants working on this project.
 ## Project Type: Node.js
 
 ### Commands
+
 - Install: `pnpm install`
 - Test: `pnpm test`
 - Build: `pnpm build`
@@ -13,11 +14,12 @@ This file provides context for AI assistants working on this project.
 ### Framework: Vite
 
 ### Documentation
+
 See README.md for project overview.
 
 ### Version Control
-This project uses Git. See .gitignore for excluded files.
 
+This project uses Git. See .gitignore for excluded files.
 
 ## Guidelines
 

@@ -1,7 +1,7 @@
-import { ref } from 'vue'
 import { appDataDir, join } from '@tauri-apps/api/path'
-import { readFile, writeFile, mkdir, exists, remove } from '@tauri-apps/plugin-fs'
 import { open } from '@tauri-apps/plugin-dialog'
+import { exists, mkdir, readFile, remove, writeFile } from '@tauri-apps/plugin-fs'
+import { ref } from 'vue'
 
 const imageDir = ref('')
 const initialized = ref(false)
@@ -35,7 +35,8 @@ function uid() {
 }
 
 async function initImageDir() {
-  if (initialized.value) return
+  if (initialized.value)
+    return
   const dir = await join(await appDataDir(), 'images')
   imageDir.value = dir
   if (!(await exists(dir))) {
@@ -48,13 +49,16 @@ async function pickImages() {
   await initImageDir()
   const selected = await open({
     title: '选择图片',
-    filters: [{
-      name: '图片',
-      extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico'],
-    }],
+    filters: [
+      {
+        name: '图片',
+        extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico'],
+      },
+    ],
     multiple: true,
   })
-  if (!selected) return []
+  if (!selected)
+    return []
   const paths = Array.isArray(selected) ? selected : [selected]
   return paths.map(p => (typeof p === 'string' ? p : p.path))
 }
@@ -104,8 +108,12 @@ async function removeLocalImage(imagePath) {
 }
 
 async function getImageUrls(imagesString) {
-  if (!imagesString || typeof imagesString !== 'string') return []
-  const parts = imagesString.split(',').map(s => s.trim()).filter(Boolean)
+  if (!imagesString || typeof imagesString !== 'string')
+    return []
+  const parts = imagesString
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
   const result = []
   for (const p of parts) {
     if (isURL(p)) {
@@ -113,7 +121,8 @@ async function getImageUrls(imagesString) {
     }
     else {
       const dataUrl = await readLocalImageAsDataUrl(p)
-      if (dataUrl) result.push(dataUrl)
+      if (dataUrl)
+        result.push(dataUrl)
     }
   }
   return result

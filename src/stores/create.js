@@ -17,7 +17,7 @@ export const useCreateStore = defineStore('create', () => {
 
   // ── 变体 ──
   const variantAttributes = ref([]) // [{name:'颜色', values:'红,蓝'}, ...]
-  const skuPrefix = ref('')         // SKU 前缀
+  const skuPrefix = ref('') // SKU 前缀
 
   // ── SKU ──
   const skus = reactive([]) // [{key, attrs, inputs, results, error, images, skuCode}]
@@ -30,25 +30,29 @@ export const useCreateStore = defineStore('create', () => {
     configStore['计算模板'].find(t => t.编号 === selectedTemplateId.value),
   )
 
-  const currentRules = computed(() =>
-    configStore.getFeeRulesByTemplate(selectedTemplateId.value),
-  )
+  const currentRules = computed(() => configStore.getFeeRulesByTemplate(selectedTemplateId.value))
 
   const productFields = computed(() =>
     selectedCountryId.value
-      ? configStore.getFieldsByCountry(selectedCountryId.value).filter(f => f.层级 === '商品级' && f.输入输出 === '输入')
+      ? configStore
+          .getFieldsByCountry(selectedCountryId.value)
+          .filter(f => f.层级 === '商品级' && f.输入输出 === '输入')
       : [],
   )
 
   const skuInputFields = computed(() =>
     selectedCountryId.value
-      ? configStore.getFieldsByCountry(selectedCountryId.value).filter(f => f.层级 === 'SKU级' && f.输入输出 === '输入')
+      ? configStore
+          .getFieldsByCountry(selectedCountryId.value)
+          .filter(f => f.层级 === 'SKU级' && f.输入输出 === '输入')
       : [],
   )
 
   const skuOutputFields = computed(() =>
     selectedCountryId.value
-      ? configStore.getFieldsByCountry(selectedCountryId.value).filter(f => f.层级 === 'SKU级' && f.输入输出 === '输出')
+      ? configStore
+          .getFieldsByCountry(selectedCountryId.value)
+          .filter(f => f.层级 === 'SKU级' && f.输入输出 === '输出')
       : [],
   )
 
@@ -83,13 +87,20 @@ export const useCreateStore = defineStore('create', () => {
 
     // 加载默认值（从选项组取第一个，或模板参数）
     for (const f of productFields.value) {
-      if (f.默认值) productInputs[f.字段键] = f.默认值
+      if (f.默认值) {
+        productInputs[f.字段键] = f.默认值
+      }
       else if (f.类型 === '下拉' && f.选项组编号) {
         const items = configStore.getOptionItemsByGroup(f.选项组编号)
-        if (items.length) productInputs[f.字段键] = items[0].选项值
+        if (items.length)
+          productInputs[f.字段键] = items[0].选项值
       }
-      else if (f.类型 === '数字') productInputs[f.字段键] = ''
-      else productInputs[f.字段键] = ''
+      else if (f.类型 === '数字') {
+        productInputs[f.字段键] = ''
+      }
+      else {
+        productInputs[f.字段键] = ''
+      }
     }
   }
 
@@ -112,7 +123,13 @@ export const useCreateStore = defineStore('create', () => {
   function generateSkus() {
     const attrs = variantAttributes.value
       .filter(a => a.name.trim() && a.values.trim())
-      .map(a => ({ name: a.name.trim(), values: a.values.split(',').map(s => s.trim()).filter(Boolean) }))
+      .map(a => ({
+        name: a.name.trim(),
+        values: a.values
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean),
+      }))
 
     const prefix = skuPrefix.value
 
@@ -129,14 +146,15 @@ export const useCreateStore = defineStore('create', () => {
       return
     }
 
-    const combos = attrs.reduce((rows, attr) =>
-      rows.flatMap(row => attr.values.map(v => ({ ...row, [attr.name]: v }))),
+    const combos = attrs.reduce(
+      (rows, attr) => rows.flatMap(row => attr.values.map(v => ({ ...row, [attr.name]: v }))),
       [{}],
     )
 
     const oldSkus = {}
     for (const s of skus) {
-      if (s.key) oldSkus[s.key] = s.inputs
+      if (s.key)
+        oldSkus[s.key] = s.inputs
     }
 
     const newSkus = combos.map((combo, idx) => {
@@ -160,21 +178,26 @@ export const useCreateStore = defineStore('create', () => {
   function makeDefaultSkuInputs() {
     const inputs = {}
     for (const f of skuInputFields.value) {
-      if (f.默认值) inputs[f.字段键] = f.默认值
+      if (f.默认值)
+        inputs[f.字段键] = f.默认值
       else inputs[f.字段键] = ''
     }
     return inputs
   }
 
   function updateSkuInput(skuIndex, fieldKey, value) {
-    if (!skus[skuIndex]) return
+    if (!skus[skuIndex])
+      return
     skus[skuIndex].inputs[fieldKey] = value
   }
 
   function updateSkuField(skuIndex, field, value) {
-    if (!skus[skuIndex]) return
-    if (field === 'sku') skus[skuIndex].skuCode = value
-    else if (field === 'images') skus[skuIndex].images = value
+    if (!skus[skuIndex])
+      return
+    if (field === 'sku')
+      skus[skuIndex].skuCode = value
+    else if (field === 'images')
+      skus[skuIndex].images = value
     else updateSkuInput(skuIndex, field, value)
   }
 
@@ -183,7 +206,8 @@ export const useCreateStore = defineStore('create', () => {
     calculating.value = true
 
     // 确保已生成 SKU
-    if (!skus.length) generateSkus()
+    if (!skus.length)
+      generateSkus()
 
     const rules = currentRules.value
     const tables = configStore.lookupTables
@@ -212,17 +236,17 @@ export const useCreateStore = defineStore('create', () => {
     const cp = configStore['国家平台'].find(c => c.编号 === selectedCountryId.value)
 
     return skus.map(sku => ({
-      '商品ID': productId.value,
-      '商品名称': productName.value,
-      '国家平台编号': selectedCountryId.value,
-      '模板编号': selectedTemplateId.value,
-      'SKU码': sku.skuCode || '',
+      商品ID: productId.value,
+      商品名称: productName.value,
+      国家平台编号: selectedCountryId.value,
+      模板编号: selectedTemplateId.value,
+      SKU码: sku.skuCode || '',
       ...sku.attrs,
       ...productInputs,
       ...sku.inputs,
       ...sku.results,
-      '图片': sku.images || '',  // 写入时嵌入浮动画片，单元格文本留空
-      '计算时间': now,
+      图片: sku.images || '', // 写入时嵌入浮动画片，单元格文本留空
+      计算时间: now,
     }))
   }
 
@@ -233,11 +257,32 @@ export const useCreateStore = defineStore('create', () => {
   }
 
   return {
-    productId, productName, selectedCountryId, selectedTemplateId,
-    productInputs, variantAttributes, skus, skuPrefix, calculating, lastCalculatedAt,
-    selectedTemplate, currentRules, productFields, skuInputFields, skuOutputFields,
-    selectCountry, selectTemplate, reset, resetForm,
-    addVariantAttribute, updateVariantAttribute, removeVariantAttribute,
-    generateSkus, updateSkuInput, updateSkuField, calculateAll, productRows,
+    productId,
+    productName,
+    selectedCountryId,
+    selectedTemplateId,
+    productInputs,
+    variantAttributes,
+    skus,
+    skuPrefix,
+    calculating,
+    lastCalculatedAt,
+    selectedTemplate,
+    currentRules,
+    productFields,
+    skuInputFields,
+    skuOutputFields,
+    selectCountry,
+    selectTemplate,
+    reset,
+    resetForm,
+    addVariantAttribute,
+    updateVariantAttribute,
+    removeVariantAttribute,
+    generateSkus,
+    updateSkuInput,
+    updateSkuField,
+    calculateAll,
+    productRows,
   }
 })

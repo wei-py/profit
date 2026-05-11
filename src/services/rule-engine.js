@@ -14,18 +14,19 @@ export function execute(feeRules, lookupTables, userInputs) {
   const sorted = enabled.sort((a, b) => Number(a.计算顺序) - Number(b.计算顺序))
 
   // 所有可用字段键（输入 + 已计算结果），公式替换时用
-  const allKeys = [...new Set([
-    ...Object.keys(userInputs),
-    ...sorted.map(r => r.输出字段键).filter(Boolean),
-  ])]
+  const allKeys = [
+    ...new Set([...Object.keys(userInputs), ...sorted.map(r => r.输出字段键).filter(Boolean)]),
+  ]
 
   for (const rule of sorted) {
     try {
       // 条件判断 — 通过条件结构树递归求值
-      if (!evalConditions(rule, userInputs, results)) continue
+      if (!evalConditions(rule, userInputs, results))
+        continue
 
       const key = rule.输出字段键
-      if (!key) continue
+      if (!key)
+        continue
 
       switch (rule.计算方式) {
         case '查表': {
@@ -78,19 +79,32 @@ function evalConditions(rule, inputs, results) {
   if (rule.条件数据) {
     try {
       const d = JSON.parse(rule.条件数据)
-      if (d.tree) return evalTree(d.tree, d.pool || [], inputs, results)
-    } catch { /* fall through */ }
+      if (d.tree)
+        return evalTree(d.tree, d.pool || [], inputs, results)
+    }
+    catch {
+      /* fall through */
+    }
   }
 
   // 或：解析 条件结构
   const 结构 = (rule.条件结构 || '').trim()
-  if (结构) return evalStruct(结构, rule, inputs, results)
+  if (结构)
+    return evalStruct(结构, rule, inputs, results)
 
   // 兜底：所有非空条件 AND
   for (let i = 1; i <= 4; i++) {
-    const f = rule['条件' + i + '字段']
-    if (!f) continue
-    if (!matches(getVal(f, inputs, results), rule['条件' + i + '运算符'], rule['条件' + i + '值'], rule['条件' + i + '值2'])) {
+    const f = rule[`条件${i}字段`]
+    if (!f)
+      continue
+    if (
+      !matches(
+        getVal(f, inputs, results),
+        rule[`条件${i}运算符`],
+        rule[`条件${i}值`],
+        rule[`条件${i}值2`],
+      )
+    ) {
       return false
     }
   }
@@ -100,7 +114,8 @@ function evalConditions(rule, inputs, results) {
 function evalTree(node, pool, inputs, results) {
   if (node.type === 'cond') {
     const c = pool[node.idx]
-    if (!c || !c.字段) return true
+    if (!c || !c.字段)
+      return true
     return matches(getVal(c.字段, inputs, results), c.运算符, c.值, '')
   }
   // group: evaluate children with their individual connectors
@@ -109,9 +124,10 @@ function evalTree(node, pool, inputs, results) {
     const chResult = evalTree(ch, pool, inputs, results)
     if (result === null) {
       result = chResult
-    } else {
-      const op = ch.type === 'cond' ? (ch.op || 'AND') : (ch.linkOp || 'AND')
-      result = op === 'AND' ? (result && chResult) : (result || chResult)
+    }
+    else {
+      const op = ch.type === 'cond' ? ch.op || 'AND' : ch.linkOp || 'AND'
+      result = op === 'AND' ? result && chResult : result || chResult
     }
   }
   return result === null ? true : result
@@ -123,20 +139,32 @@ function evalStruct(结构, rule, inputs, results) {
     let ok = true
     for (const idx of group) {
       const i = Number(idx) + 1
-      if (i < 1 || i > 4) continue
-      const f = rule['条件' + i + '字段']
-      if (!f) continue
-      if (!matches(getVal(f, inputs, results), rule['条件' + i + '运算符'], rule['条件' + i + '值'], rule['条件' + i + '值2'])) {
-        ok = false; break
+      if (i < 1 || i > 4)
+        continue
+      const f = rule[`条件${i}字段`]
+      if (!f)
+        continue
+      if (
+        !matches(
+          getVal(f, inputs, results),
+          rule[`条件${i}运算符`],
+          rule[`条件${i}值`],
+          rule[`条件${i}值2`],
+        )
+      ) {
+        ok = false
+        break
       }
     }
-    if (ok) return true
+    if (ok)
+      return true
   }
   return false
 }
 
 function getVal(fieldKey, inputs, results) {
-  if (results[fieldKey] !== undefined && results[fieldKey] !== null) return results[fieldKey]
+  if (results[fieldKey] !== undefined && results[fieldKey] !== null)
+    return results[fieldKey]
   return inputs[fieldKey]
 }
 
@@ -146,19 +174,27 @@ function matches(val, op, target, target2) {
   const nVal = Number(val)
   const nTgt = Number(target)
   switch (op) {
-    case '等于': return sVal === sTgt
-    case '不等于': return sVal !== sTgt
-    case '大于': return nVal > nTgt
-    case '大于等于': return nVal >= nTgt
-    case '小于': return nVal < nTgt
-    case '小于等于': return nVal <= nTgt
-    default: return false
+    case '等于':
+      return sVal === sTgt
+    case '不等于':
+      return sVal !== sTgt
+    case '大于':
+      return nVal > nTgt
+    case '大于等于':
+      return nVal >= nTgt
+    case '小于':
+      return nVal < nTgt
+    case '小于等于':
+      return nVal <= nTgt
+    default:
+      return false
   }
 }
 
 function doLookup(rule, lookupTables, inputs, results) {
   const table = lookupTables[rule.查表名称]
-  if (!table || !table.length) throw new Error(`费率表「${rule.查表名称}」不存在或为空`)
+  if (!table || !table.length)
+    throw new Error(`费率表「${rule.查表名称}」不存在或为空`)
 
   const mappings = parseMappings(rule.输入映射)
   const isRange = rule.匹配方式 === '区间'
@@ -170,13 +206,19 @@ function doLookup(rule, lookupTables, inputs, results) {
       const inputVal = getVal(fieldKey, inputs, results)
       if (isRange) {
         const v = Number(inputVal)
-        const lo = Number(row[colName + '下限'])
-        const hi = Number(row[colName + '上限'])
-        if (v < lo || v > hi) { ok = false; break }
+        const lo = Number(row[`${colName}下限`])
+        const hi = Number(row[`${colName}上限`])
+        if (v < lo || v > hi) {
+          ok = false
+          break
+        }
         condParts.push(`${fieldKey}=${inputVal}(${colName}：${lo}~${hi})`)
       }
       else {
-        if (String(inputVal) !== String(row[colName])) { ok = false; break }
+        if (String(inputVal) !== String(row[colName])) {
+          ok = false
+          break
+        }
         condParts.push(`${fieldKey}=${inputVal}`)
       }
     }
@@ -195,7 +237,8 @@ function doPercent(rule, inputs, results) {
   if (rule.百分比来源字段) {
     rate = Number(getVal(rule.百分比来源字段, inputs, results)) || 0
     rateDesc = `${rule.百分比来源字段}(${rate})`
-  } else {
+  }
+  else {
     rate = Number(rule.百分比值) / 100 || 0
     rateDesc = `${rule.百分比值}%`
   }
@@ -205,7 +248,8 @@ function doPercent(rule, inputs, results) {
 }
 
 function doSum(rule, inputs, results) {
-  if (!rule.加总字段) return { val: 0, trace: '' }
+  if (!rule.加总字段)
+    return { val: 0, trace: '' }
   const fields = rule.加总字段.split(',').map(s => s.trim())
   const parts = []
   let total = 0
@@ -220,7 +264,8 @@ function doSum(rule, inputs, results) {
 
 function doFormula(rule, inputs, results, allKeys) {
   let expr = rule.公式
-  if (!expr) return { val: 0, trace: '' }
+  if (!expr)
+    return { val: 0, trace: '' }
   const traceParts = []
 
   const sorted = [...allKeys].sort((a, b) => b.length - a.length)
@@ -237,15 +282,19 @@ function doFormula(rule, inputs, results, allKeys) {
   }
 
   // eslint-disable-next-line no-new-func
-  const val = Function('"use strict"; return (' + expr + ')')()
+  const val = new Function(`"use strict"; return (${expr})`)()
   const trace = `公式「${rule.公式}」：${traceParts.join('，')} → ${Number(val).toFixed(4)}`
   return { val, trace }
 }
 
 function parseMappings(inputMap) {
-  if (!inputMap) return []
-  return inputMap.split(',').map(p => {
-    const parts = p.split('=').map(s => s.trim())
-    return [parts[0], parts[1]]
-  }).filter(m => m[0] && m[1])
+  if (!inputMap)
+    return []
+  return inputMap
+    .split(',')
+    .map((p) => {
+      const parts = p.split('=').map(s => s.trim())
+      return [parts[0], parts[1]]
+    })
+    .filter(m => m[0] && m[1])
 }

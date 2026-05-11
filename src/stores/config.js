@@ -25,7 +25,8 @@ export const useConfigStore = defineStore('config', () => {
   async function loadFromBuffer(buffer, p) {
     loading.value = true
     error.value = ''
-    if (p) filePath.value = p
+    if (p)
+      filePath.value = p
     try {
       const config = readWorkbookBuffer(buffer)
       国家平台.value = config['国家平台'] || []
@@ -48,13 +49,13 @@ export const useConfigStore = defineStore('config', () => {
 
   function getExportBuffer() {
     return buildWorkbookBuffer({
-      '国家平台': 国家平台.value,
-      '计算字段': 计算字段.value,
-      '选项组': 选项组.value,
-      '选项值': 选项值.value,
-      '计算模板': 计算模板.value,
-      '费用规则': 费用规则.value,
-      '模板参数': 模板参数.value,
+      国家平台: 国家平台.value,
+      计算字段: 计算字段.value,
+      选项组: 选项组.value,
+      选项值: 选项值.value,
+      计算模板: 计算模板.value,
+      费用规则: 费用规则.value,
+      模板参数: 模板参数.value,
       lookupTables: lookupTables.value,
     })
   }
@@ -63,7 +64,9 @@ export const useConfigStore = defineStore('config', () => {
 
   /** 某国家下的启用模板 */
   function getTemplatesByCountry(cpId) {
-    return 计算模板.value.filter(t => t.所属国家平台 === cpId && (t.启用 === '是' || t.启用 === 'TRUE'))
+    return 计算模板.value.filter(
+      t => t.所属国家平台 === cpId && (t.启用 === '是' || t.启用 === 'TRUE'),
+    )
   }
 
   /** 某模板下的费用规则（按计算顺序排序） */
@@ -100,7 +103,9 @@ export const useConfigStore = defineStore('config', () => {
 
   /** 某国家下的启用字段 */
   function getEnabledFieldsByCountry(cpId) {
-    return 计算字段.value.filter(f => f.所属国家平台 === cpId && (f.启用 === '是' || f.启用 === 'TRUE' || !f.启用))
+    return 计算字段.value.filter(
+      f => f.所属国家平台 === cpId && (f.启用 === '是' || f.启用 === 'TRUE' || !f.启用),
+    )
   }
 
   function clear() {
@@ -117,12 +122,32 @@ export const useConfigStore = defineStore('config', () => {
   }
 
   return {
-    filePath, workbook, loading, error, loaded,
-    '国家平台': 国家平台, '计算字段': 计算字段, '选项组': 选项组, '选项值': 选项值,
-    '计算模板': 计算模板, '费用规则': 费用规则, '模板参数': 模板参数, lookupTables,
-    loadFromBuffer, getExportBuffer, clear, setFilePath: (p) => { filePath.value = p },
-    getTemplatesByCountry, getFeeRulesByTemplate, getFieldsByCountry,
-    getOptionGroupsByCountry, getOptionItemsByGroup, getField, getTemplateParams,
+    filePath,
+    workbook,
+    loading,
+    error,
+    loaded,
+    国家平台,
+    计算字段,
+    选项组,
+    选项值,
+    计算模板,
+    费用规则,
+    模板参数,
+    lookupTables,
+    loadFromBuffer,
+    getExportBuffer,
+    clear,
+    setFilePath: (p) => {
+      filePath.value = p
+    },
+    getTemplatesByCountry,
+    getFeeRulesByTemplate,
+    getFieldsByCountry,
+    getOptionGroupsByCountry,
+    getOptionItemsByGroup,
+    getField,
+    getTemplateParams,
     getEnabledFieldsByCountry,
   }
 })

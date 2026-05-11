@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useFileIO } from '@/composables/useFileIO'
 import { useTheme } from '@/composables/useTheme'
 import { useActivationStore } from '@/stores/activation'
@@ -17,7 +17,8 @@ const activationStore = useActivationStore()
  */
 onMounted(async () => {
   // 激活页本身不校验
-  if (route.path === '/activate') return
+  if (route.path === '/activate')
+    return
 
   const ok = await activationStore.checkActivation()
   if (!ok) {

@@ -5,8 +5,7 @@ import JSZip from 'jszip'
  * 写入 Excel，图片真正嵌入单元格（WPS DISPIMG 兼容）。
  * 先用 ExcelJS 生成 xlsx，再用 JSZip 注入 cellimages.xml。
  */
-export async function buildListWorkbookBuffer(records) {
-  // 1. ExcelJS 生成基础 xlsx
+export async function buildListWorkbookBuffer(records, columnOrder) {
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('商品记录')
 
@@ -15,7 +14,20 @@ export async function buildListWorkbookBuffer(records) {
     return new Uint8Array(await wb.xlsx.writeBuffer())
   }
 
-  const cols = [...new Set(records.flatMap(r => Object.keys(r)))].filter(k => k !== '图片路径')
+  const allKeys = [...new Set(records.flatMap(r => Object.keys(r)))].filter(
+    k => k !== '图片路径' && k !== '_uid',
+  )
+  let cols
+  if (columnOrder && columnOrder.length) {
+    const ordered = columnOrder.filter(
+      k => allKeys.includes(k) && k !== '图片路径' && k !== '_uid',
+    )
+    const remaining = allKeys.filter(k => !ordered.includes(k))
+    cols = [...ordered, ...remaining]
+  }
+  else {
+    cols = allKeys
+  }
   const imgColIdx = cols.indexOf('图片') + 1
   const imgColLetter = colNumToLetter(imgColIdx - 1)
 
@@ -32,7 +44,7 @@ export async function buildListWorkbookBuffer(records) {
     const imgSrc = record['图片']
     if (imgSrc && typeof imgSrc === 'string' && imgSrc.startsWith('data:image/')) {
       cellImages.push({
-        row: ri + 2,  // 1-based Excel row
+        row: ri + 2, // 1-based Excel row
         col: imgColIdx,
         cellRef: `${imgColLetter}${ri + 2}`,
         base64: imgSrc.split(',')[1],
@@ -44,7 +56,8 @@ export async function buildListWorkbookBuffer(records) {
   }
 
   ws.columns.forEach((col, i) => {
-    if (i === imgColIdx - 1) col.width = 16  // 图片列加宽
+    if (i === imgColIdx - 1)
+      col.width = 16 // 图片列加宽
     else col.width = Math.max(8, Math.min(22, String(cols[i] || '').length * 2 + 4))
   })
   // 有图片的行加高
@@ -55,7 +68,8 @@ export async function buildListWorkbookBuffer(records) {
   const xlsxBuf = new Uint8Array(await wb.xlsx.writeBuffer())
 
   // 2. 如果没有图片，直接返回
-  if (!cellImages.length) return xlsxBuf
+  if (!cellImages.length)
+    return xlsxBuf
 
   // 3. JSZip 注入 cellimages.xml
   const zip = await JSZip.loadAsync(xlsxBuf)
@@ -70,7 +84,8 @@ export async function buildListWorkbookBuffer(records) {
 
   // 构建 cellimages.xml
   let ciXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-  ciXml += '<etc:cellImages xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:etc="http://www.wps.cn/officeDocument/2017/etCustomData">\n'
+  ciXml
+    += '<etc:cellImages xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:etc="http://www.wps.cn/officeDocument/2017/etCustomData">\n'
 
   for (const ci of imageIds) {
     ciXml += `<etc:cellImage><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="${ci.id}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="${ci.rId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="500000" cy="500000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic></etc:cellImage>\n`
@@ -81,7 +96,8 @@ export async function buildListWorkbookBuffer(records) {
 
   // 构建 cellimages.xml.rels（每张图一条 Relationship）
   let ciRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-  ciRels += '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
+  ciRels
+    += '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
   for (const ci of imageIds) {
     ciRels += `<Relationship Id="${ci.rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${ci.fileName}"/>\n`
   }
@@ -96,8 +112,10 @@ export async function buildListWorkbookBuffer(records) {
 
   // 更新 workbook.xml.rels — 添加 cellimages 引用
   const wbRelsXml = await zip.file('xl/_rels/workbook.xml.rels').async('text')
-  const updatedRels = wbRelsXml.replace('</Relationships>',
-    '<Relationship Id="rId99" Type="http://www.wps.cn/officeDocument/2020/cellImage" Target="cellimages.xml"/></Relationships>')
+  const updatedRels = wbRelsXml.replace(
+    '</Relationships>',
+    '<Relationship Id="rId99" Type="http://www.wps.cn/officeDocument/2020/cellImage" Target="cellimages.xml"/></Relationships>',
+  )
   zip.file('xl/_rels/workbook.xml.rels', updatedRels)
 
   // 更新 sheet1.xml — 将图片列单元格值替换为 DISPIMG 公式
@@ -116,8 +134,10 @@ export async function buildListWorkbookBuffer(records) {
   // 更新 [Content_Types].xml — 添加 cellimages 扩展
   const ctXml = await zip.file('[Content_Types].xml').async('text')
   if (!ctXml.includes('cellimages.xml')) {
-    const updatedCt = ctXml.replace('</Types>',
-      '<Override PartName="/xl/cellimages.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet+xml"/></Types>')
+    const updatedCt = ctXml.replace(
+      '</Types>',
+      '<Override PartName="/xl/cellimages.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet+xml"/></Types>',
+    )
     zip.file('[Content_Types].xml', updatedCt)
   }
 
@@ -129,7 +149,7 @@ function colNumToLetter(n) {
   let s = ''
   n++
   while (n > 0) {
-    s = String.fromCharCode(65 + (n - 1) % 26) + s
+    s = String.fromCharCode(65 + ((n - 1) % 26)) + s
     n = Math.floor((n - 1) / 26)
   }
   return s

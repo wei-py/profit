@@ -7,16 +7,19 @@
 let imageDir = ''
 
 async function getImageDir() {
-  if (imageDir) return imageDir
+  if (imageDir)
+    return imageDir
   try {
     const { appDataDir } = await import('@tauri-apps/api/path')
     const { exists, mkdir } = await import('@tauri-apps/plugin-fs')
     const base = await appDataDir()
     const dir = `${base}images`
-    if (!(await exists(dir))) await mkdir(dir, { recursive: true })
+    if (!(await exists(dir)))
+      await mkdir(dir, { recursive: true })
     imageDir = dir
     return dir
-  } catch {
+  }
+  catch {
     imageDir = ''
     return ''
   }
@@ -27,13 +30,19 @@ async function getImageDir() {
  * Web 环境返回空字符串。
  */
 export async function saveImage(base64) {
-  if (!base64 || !base64.startsWith('data:image/')) return ''
+  if (!base64 || !base64.startsWith('data:image/'))
+    return ''
   const dir = await getImageDir()
-  if (!dir) return ''
+  if (!dir)
+    return ''
 
   try {
     const { writeFile } = await import('@tauri-apps/plugin-fs')
-    const ext = base64.includes('image/png') ? 'png' : base64.includes('image/jpeg') ? 'jpg' : 'png'
+    const ext = base64.includes('image/png')
+      ? 'png'
+      : base64.includes('image/jpeg')
+        ? 'jpg'
+        : 'png'
     const b64 = base64.split(',')[1]
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     const filename = `${id}.${ext}`
@@ -42,7 +51,8 @@ export async function saveImage(base64) {
     const binary = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
     await writeFile(filepath, binary)
     return filepath
-  } catch {
+  }
+  catch {
     return ''
   }
 }
@@ -52,7 +62,8 @@ export async function saveImage(base64) {
  */
 export async function loadImageAsBase64(filepath) {
   const bytes = await readImageBytes(filepath)
-  if (!bytes) return ''
+  if (!bytes)
+    return ''
   const ext = filepath.endsWith('.jpg') || filepath.endsWith('.jpeg') ? 'jpeg' : 'png'
   const b64 = btoa(String.fromCharCode(...bytes))
   return `data:image/${ext};base64,${b64}`
@@ -62,20 +73,28 @@ export async function loadImageAsBase64(filepath) {
  * 读取图片文件的原始字节（ExcelJS 嵌入用）。
  */
 export async function readImageBytes(filepath) {
-  if (!filepath) return null
+  if (!filepath)
+    return null
   try {
     const { readFile } = await import('@tauri-apps/plugin-fs')
     return await readFile(filepath)
-  } catch { return null }
+  }
+  catch {
+    return null
+  }
 }
 
 /**
  * 获取 Tauri asset URL 用于直接显示图片（不经过 base64）。
  */
 export async function getImageUrl(filepath) {
-  if (!filepath) return ''
+  if (!filepath)
+    return ''
   try {
     const { convertFileSrc } = await import('@tauri-apps/api/core')
     return convertFileSrc(filepath)
-  } catch { return '' }
+  }
+  catch {
+    return ''
+  }
 }
