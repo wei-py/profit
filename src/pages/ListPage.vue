@@ -77,17 +77,26 @@ const skuAllFields = computed(() => {
 
 const skuColDisplay = computed(() => {
   const all = skuAllFields.value
-  if (!skuColOrder.value.length || skuColOrder.value.length !== all.length) {
-    skuColOrder.value = [...all]
-  }
-  return skuColOrder.value
+  return skuColOrder.value.length && skuColOrder.value.length === all.length
+    ? skuColOrder.value
+    : all
 })
+
+watch(skuAllFields, (v) => {
+  if (!skuColOrder.value.length || skuColOrder.value.length !== v.length) {
+    skuColOrder.value = [...v]
+  }
+}, { immediate: true })
 
 const listColumns = computed(() => {
   if (!listStore.records.length)
     return []
-  listStore.syncColumnOrder()
   return listStore.columnOrder.filter(k => k !== '_uid')
+})
+
+watch(() => listStore.records.length, () => {
+  if (listStore.records.length)
+    listStore.syncColumnOrder()
 })
 
 function openCalcModal(si) {

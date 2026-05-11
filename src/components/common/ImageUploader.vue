@@ -111,7 +111,6 @@ function cancelUrl() {
       </button>
       <div v-else class="flex items-center gap-1">
         <input
-          ref="urlInputRef"
           v-model="urlInput"
           class="input input-bordered input-sm"
           placeholder="请输入图片 URL"

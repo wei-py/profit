@@ -13,7 +13,7 @@ const emit = defineEmits(['close'])
 
 const store = useConfigStore()
 const form = reactive({})
-const CORE_KEYS = ['编号', '国家', '平台', '货币', '货币符号', '汇率', '启用', '排序']
+const _CORE_KEYS = ['编号', '国家', '平台', '货币', '货币符号', '汇率', '启用', '排序']
 
 const fieldEditSteps = [
   {

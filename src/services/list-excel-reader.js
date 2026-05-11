@@ -37,7 +37,7 @@ export async function readListWorkbook(buffer) {
         const obj = wb.getImage(img.imageId)
         if (obj?.buffer) {
           const ext = obj.extension || 'png'
-          wps[key] = `data:image/${ext};base64,${Buffer.from(obj.buffer).toString('base64')}`
+          wps[key] = `data:image/${ext};base64,${uint8ToBase64(new Uint8Array(obj.buffer))}`
         }
       }
     }
@@ -83,9 +83,12 @@ async function extractWpsImages(files) {
 
     // rId → media/file path
     const rid2file = {}
-    let m
     const relRe = /<Relationship[^>]*Id="([^"]*)"[^>]*Target="([^"]*)"/g
-    while ((m = relRe.exec(ciRelsXml))) rid2file[m[1]] = m[2]
+    let m2 = relRe.exec(ciRelsXml)
+    while (m2 !== null) {
+      rid2file[m2[1]] = m2[2]
+      m2 = relRe.exec(ciRelsXml)
+    }
 
     // image name (DISPIMG ID) → rId
     const name2rid = {}
@@ -115,11 +118,11 @@ async function extractWpsImages(files) {
     if (sheetXml) {
       const dispRe
         = /<c r="([A-Z]+)(\d+)"[^>]*>[^<]*(?:<f[^>]*>[^<]*<\/f>)?<v[^>]*>=\s*DISPIMG\s*\(\s*&quot;\s*(ID_[0-9A-F]{32})\s*&quot;/gi
-      let dm
-      while ((dm = dispRe.exec(sheetXml))) {
-        const colN = colToNum(dm[1]) + 1 // 1-based 对齐 ExcelJS
-        const rowNum = Number.parseInt(dm[2])
-        const imgId = dm[3]
+      let dm2 = dispRe.exec(sheetXml)
+      while (dm2 !== null) {
+        const colN = colToNum(dm2[1]) + 1
+        const rowNum = Number.parseInt(dm2[2])
+        const imgId = dm2[3]
         if (name2file[imgId]) {
           const mp = name2file[imgId]
           const entry = files[mp] || files[mp.replace('xl/', '')]
@@ -130,6 +133,7 @@ async function extractWpsImages(files) {
             map[`${rowNum}-${colN}`] = `data:image/${ext};base64,${b64}`
           }
         }
+        dm2 = dispRe.exec(sheetXml)
       }
     }
   }

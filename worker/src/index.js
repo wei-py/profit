@@ -18,15 +18,6 @@ async function signToken(secret, payload) {
   return `${payload}.${sigHex}`
 }
 
-async function verifyToken(secret, token) {
-  const idx = token.lastIndexOf('.')
-  if (idx === -1)
-    return null
-  const payload = token.slice(0, idx)
-  const expected = await signToken(secret, payload)
-  return expected === token ? payload : null
-}
-
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,

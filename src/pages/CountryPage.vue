@@ -26,16 +26,68 @@ const allKeys = computed(() => {
 const newColName = ref('')
 const showAddCol = ref(false)
 const expandedId = ref(null)
+const cpId = computed(() => expandedId.value)
 const configColOrder = ref([])
 
 const configColumns = computed(() => {
   if (!store['国家平台'].length)
     return []
-  if (!configColOrder.value.length || configColOrder.value.length !== allKeys.value.length) {
-    configColOrder.value = [...allKeys.value]
-  }
-  return configColOrder.value
+  return configColOrder.value.length && configColOrder.value.length === allKeys.value.length
+    ? configColOrder.value
+    : allKeys.value
 })
+
+watch(allKeys, (v) => {
+  if (!configColOrder.value.length || configColOrder.value.length !== v.length) {
+    configColOrder.value = [...v]
+  }
+}, { immediate: true })
+
+const expFieldsSource = computed(() => (cpId.value ? store.getFieldsByCountry(cpId.value) : []))
+const localFields = ref([])
+watch(
+  expFieldsSource,
+  (v) => {
+    localFields.value = [...v]
+  },
+  { immediate: true },
+)
+function onFieldsDragEnd() {
+  const other = store['计算字段'].filter(f => f.所属国家平台 !== cpId.value)
+  store['计算字段'] = [...other, ...localFields.value]
+}
+
+const expOptGroupsSource = computed(() =>
+  cpId.value ? store.getOptionGroupsByCountry(cpId.value) : [],
+)
+const localOptGroups = ref([])
+watch(
+  expOptGroupsSource,
+  (v) => {
+    localOptGroups.value = [...v]
+  },
+  { immediate: true },
+)
+function onOptGroupsDragEnd() {
+  const other = store['选项组'].filter(g => g.所属国家平台 !== cpId.value)
+  store['选项组'] = [...other, ...localOptGroups.value]
+}
+
+const expTemplatesSource = computed(() =>
+  cpId.value ? store.getTemplatesByCountry(cpId.value) : [],
+)
+const localTemplates = ref([])
+watch(
+  expTemplatesSource,
+  (v) => {
+    localTemplates.value = [...v]
+  },
+  { immediate: true },
+)
+function onTemplatesDragEnd() {
+  const other = store['计算模板'].filter(t => t.所属国家平台 !== cpId.value)
+  store['计算模板'] = [...other, ...localTemplates.value]
+}
 
 function addColumn() {
   const n = newColName.value.trim()
@@ -89,9 +141,6 @@ function toggleExpand(id) {
   expandedId.value = expandedId.value === id ? null : id
 }
 
-const cpId = computed(() => expandedId.value)
-
-// ── Modal state ──
 const showCountryModal = ref(false)
 const editingCountryId = ref('')
 const showFieldModal = ref(false)
@@ -132,53 +181,6 @@ function openEditTpl(idx) {
 }
 function openConfigColEditor() {
   showConfigColModal.value = true
-}
-
-// ── Drag list local refs (computed → local ref pattern) ──
-const expFieldsSource = computed(() => (cpId.value ? store.getFieldsByCountry(cpId.value) : []))
-const localFields = ref([])
-watch(
-  expFieldsSource,
-  (v) => {
-    localFields.value = [...v]
-  },
-  { immediate: true },
-)
-function onFieldsDragEnd() {
-  const other = store['计算字段'].filter(f => f.所属国家平台 !== cpId.value)
-  store['计算字段'] = [...other, ...localFields.value]
-}
-
-const expOptGroupsSource = computed(() =>
-  cpId.value ? store.getOptionGroupsByCountry(cpId.value) : [],
-)
-const localOptGroups = ref([])
-watch(
-  expOptGroupsSource,
-  (v) => {
-    localOptGroups.value = [...v]
-  },
-  { immediate: true },
-)
-function onOptGroupsDragEnd() {
-  const other = store['选项组'].filter(g => g.所属国家平台 !== cpId.value)
-  store['选项组'] = [...other, ...localOptGroups.value]
-}
-
-const expTemplatesSource = computed(() =>
-  cpId.value ? store.getTemplatesByCountry(cpId.value) : [],
-)
-const localTemplates = ref([])
-watch(
-  expTemplatesSource,
-  (v) => {
-    localTemplates.value = [...v]
-  },
-  { immediate: true },
-)
-function onTemplatesDragEnd() {
-  const other = store['计算模板'].filter(t => t.所属国家平台 !== cpId.value)
-  store['计算模板'] = [...other, ...localTemplates.value]
 }
 </script>
 

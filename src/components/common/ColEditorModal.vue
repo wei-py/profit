@@ -1,7 +1,7 @@
 <script setup>
 import { VueDraggableNext } from 'vue-draggable-next'
 
-const props = defineProps({
+const _props = defineProps({
   open: Boolean,
   title: { type: String, default: '编辑列顺序' },
   items: { type: Array, required: true },

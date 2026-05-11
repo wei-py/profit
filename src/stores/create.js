@@ -233,7 +233,6 @@ export const useCreateStore = defineStore('create', () => {
   // ── 展平为保存行 ──
   function productRows() {
     const now = lastCalculatedAt.value || new Date().toISOString().slice(0, 10)
-    const cp = configStore['国家平台'].find(c => c.编号 === selectedCountryId.value)
 
     return skus.map(sku => ({
       商品ID: productId.value,

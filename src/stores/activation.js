@@ -112,8 +112,7 @@ export const useActivationStore = defineStore('activation', () => {
         return false
       }
     }
-    catch (e) {
-      // 网络错误不改变状态，宽限期内仍可用
+    catch {
       return false
     }
   }

@@ -3,7 +3,7 @@
  * @param {object[]} feeRules
  * @param {object} lookupTables
  * @param {object} userInputs
- * @returns {{ results: object, errors: string[], traces: object }}
+ * @returns {{ results: object, errors: string[], traces: object }} Calculation results
  */
 export function execute(feeRules, lookupTables, userInputs) {
   const results = {}
@@ -168,7 +168,7 @@ function getVal(fieldKey, inputs, results) {
   return inputs[fieldKey]
 }
 
-function matches(val, op, target, target2) {
+function matches(val, op, target, _target2) {
   const sVal = String(val ?? '')
   const sTgt = String(target ?? '')
   const nVal = Number(val)

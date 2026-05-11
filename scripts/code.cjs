@@ -14,6 +14,7 @@
 const { execSync } = require('node:child_process')
 const crypto = require('node:crypto')
 const path = require('node:path')
+const process = require('node:process')
 
 const WORKER_DIR = path.resolve(__dirname, '../worker')
 

@@ -38,7 +38,7 @@ const options = computed(() => {
 function onInput(e) {
   emit('update:modelValue', e.target.value)
 }
-function onCheck(e) {
+function _onCheck(e) {
   emit('update:modelValue', e.target.checked)
 }
 </script>

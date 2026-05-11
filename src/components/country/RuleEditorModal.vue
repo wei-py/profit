@@ -133,28 +133,6 @@ function deserializeCondTree(r) {
     condTree.value.children.push({ type: 'cond', idx: 0, op: '' })
 }
 
-function condSummary(r) {
-  const a = [1, 2]
-    .map(i =>
-      r[`条件${i}字段`]
-        ? `${r[`条件${i}字段`]} ${r[`条件${i}运算符`] || ''} ${r[`条件${i}值`]}`
-        : '',
-    )
-    .filter(Boolean)
-    .join(' AND ')
-  const b = [3, 4]
-    .map(i =>
-      r[`条件${i}字段`]
-        ? `${r[`条件${i}字段`]} ${r[`条件${i}运算符`] || ''} ${r[`条件${i}值`]}`
-        : '',
-    )
-    .filter(Boolean)
-    .join(' AND ')
-  if (a && b)
-    return `(${a}) OR (${b})`
-  return a || b || '—'
-}
-
 watch(
   () => props.open,
   (v) => {
