@@ -1,36 +1,24 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useSortable } from '@/composables/useSortable'
-import { useConfigStore } from '@/stores/config'
 
 const props = defineProps({
   open: Boolean,
+  title: { type: String, default: '编辑列顺序' },
+  items: { type: Array, required: true },
 })
 const emit = defineEmits(['close', 'update'])
 
-const store = useConfigStore()
-const CORE_KEYS = ['编号', '国家', '平台', '货币', '货币符号', '汇率', '启用', '排序']
-const colOrder = ref([])
+const localOrder = ref([])
 const containerRef = ref(null)
 
-useSortable(containerRef, colOrder, { handle: '.drag-handle', animation: 200 })
-
-const allKeys = computed(() => {
-  const keys = new Set(CORE_KEYS)
-  for (const row of store['国家平台']) {
-    for (const k of Object.keys(row)) {
-      if (k)
-        keys.add(k)
-    }
-  }
-  return [...keys]
-})
+useSortable(containerRef, localOrder, { handle: '.drag-handle', animation: 200 })
 
 watch(
   () => props.open,
   (v) => {
     if (v)
-      colOrder.value = [...allKeys.value]
+      localOrder.value = [...props.items]
   },
 )
 </script>
@@ -40,7 +28,7 @@ watch(
     <div class="modal-box max-w-lg">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-bold">
-          编辑列顺序
+          {{ title }}
         </h3>
         <button class="btn btn-ghost btn-sm btn-circle" @click="emit('close')">
           ✕
@@ -51,7 +39,7 @@ watch(
       </div>
       <div ref="containerRef">
         <div
-          v-for="col in colOrder"
+          v-for="col in localOrder"
           :key="col"
           class="sortable-item flex items-center gap-2 p-2 bg-base-200 rounded text-sm mb-1"
         >
@@ -66,7 +54,7 @@ watch(
         <button class="btn btn-ghost btn-sm" @click="emit('close')">
           取消
         </button>
-        <button class="btn btn-primary btn-sm" @click="emit('update', colOrder); emit('close')">
+        <button class="btn btn-primary btn-sm" @click="emit('update', localOrder); emit('close')">
           完成
         </button>
       </div>

@@ -135,3 +135,10 @@ body {
   z-index: 1000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
+.virtual-scroll-spacer td {
+  border: none;
+  padding: 0;
+  line-height: 0;
+  font-size: 0;
+}

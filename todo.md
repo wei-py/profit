@@ -89,5 +89,7 @@ sku = 自定义前缀 + 款号 + 变体属性
  <!--build-exe-->
 <!--Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4, pnpm/action-setup@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/-->
 
-拖拽三条杠无法移动位置，注意要能同步到 excel 文件中去，还有编辑列配合能够改为表格的列顺序
-@shopify/draggable
+<!--拖拽三条杠无法移动位置，注意要能同步到 excel 文件中去，还有编辑列配合能够改为表格的列顺序
+@shopify/draggable-->
+
+拖拽修改位置顺序，保存配置后，再次打开配置，位置顺序就恢复了，没有保存到配置

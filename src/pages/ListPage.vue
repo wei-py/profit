@@ -1,6 +1,6 @@
 <script setup>
 import { previewImages } from 'hevue-img-preview/v3'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import ColEditorModal from '@/components/common/ColEditorModal.vue'
 import FieldInput from '@/components/common/FieldInput.vue'
 import ReverseCalcModal from '@/components/list/ReverseCalcModal.vue'
@@ -10,6 +10,7 @@ import { useSortable } from '@/composables/useSortable'
 import { useConfigStore } from '@/stores/config'
 import { useCreateStore } from '@/stores/create'
 import { useListStore } from '@/stores/list'
+import { measureTextHeight, FONT_TABLE_XS, LINE_HEIGHT_TABLE_XS } from '@/utils/textMeasure'
 
 const configStore = useConfigStore()
 const createStore = useCreateStore()
@@ -93,6 +94,65 @@ watch(skuAllFields, (v) => {
 useSortable(skuTableBodyRef, createStore.skus, { handle: '.drag-handle', animation: 200 })
 useSortable(recordsTableBodyRef, listStore.records, { handle: '.drag-handle', animation: 200 })
 
+const RECORD_ROW_HEIGHT = 40
+const VIRTUAL_SCROLL_THRESHOLD = 100
+const BUFFER = 3
+
+const scrollContainerRef = ref(null)
+const recordsScrollTop = ref(0)
+const containerHeight = ref(600)
+let resizeObserver = null
+
+watch(scrollContainerRef, (el) => {
+  if (resizeObserver) resizeObserver.disconnect()
+  if (el) {
+    containerHeight.value = el.clientHeight
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        containerHeight.value = entry.contentRect.height
+      }
+    })
+    resizeObserver.observe(el)
+  }
+})
+onUnmounted(() => {
+  if (resizeObserver) resizeObserver.disconnect()
+})
+
+const useVirtualScroll = computed(() => listStore.records.length > VIRTUAL_SCROLL_THRESHOLD)
+
+const totalRecordsHeight = computed(() => listStore.records.length * RECORD_ROW_HEIGHT)
+
+const visibleStartIndex = computed(() => {
+  if (!useVirtualScroll.value) return 0
+  const start = Math.floor(recordsScrollTop.value / RECORD_ROW_HEIGHT) - BUFFER
+  return Math.max(0, start)
+})
+
+const visibleEndIndex = computed(() => {
+  if (!useVirtualScroll.value) return listStore.records.length
+  const visibleCount = Math.ceil(containerHeight.value / RECORD_ROW_HEIGHT) + 2 * BUFFER
+  return Math.min(listStore.records.length, visibleStartIndex.value + visibleCount)
+})
+
+const visibleRecords = computed(() => {
+  if (!useVirtualScroll.value) return listStore.records
+  return listStore.records.slice(visibleStartIndex.value, visibleEndIndex.value)
+})
+
+const spacerBeforeHeight = computed(() => visibleStartIndex.value * RECORD_ROW_HEIGHT)
+const spacerAfterHeight = computed(() => Math.max(0, (listStore.records.length - visibleEndIndex.value) * RECORD_ROW_HEIGHT))
+
+const totalCols = computed(() => listColumns.value.length + 2)
+
+function onRecordsScroll(e) {
+  recordsScrollTop.value = e.target.scrollTop
+}
+
+function dataIdx(vIdx) {
+  return visibleStartIndex.value + vIdx
+}
+
 const listColumns = computed(() => {
   if (!listStore.records.length)
     return []
@@ -156,6 +216,34 @@ function isSkuInputCol(fk) {
 function isPercentCol(fk) {
   return createStore.skuOutputFields.some(f => f.字段键 === fk && f.单位 === '%')
 }
+
+function formatSkuResultText(sku, fk) {
+  if (sku.error) return sku.error
+  if (sku.results[fk] === undefined) return ''
+  if (isPercentCol(fk)) return `${(sku.results[fk] * 100).toFixed(2)}%`
+  if (typeof sku.results[fk] === 'number') return sku.results[fk].toFixed(2)
+  return String(sku.results[fk])
+}
+
+const skuRowHeights = computed(() => {
+  return createStore.skus.map((sku) => {
+    let maxH = 0
+    for (const a of createStore.variantAttributes) {
+      if (a.name.trim()) {
+        const h = measureTextHeight(String(sku.attrs[a.name.trim()] || ''), 60, LINE_HEIGHT_TABLE_XS, FONT_TABLE_XS)
+        if (h > maxH) maxH = h
+      }
+    }
+    for (const fk of skuColDisplay.value) {
+      if (fk === '图片' || isSkuInputCol(fk)) continue
+      const text = formatSkuResultText(sku, fk)
+      if (!text) continue
+      const h = measureTextHeight(text, 120, LINE_HEIGHT_TABLE_XS, FONT_TABLE_XS)
+      if (h > maxH) maxH = h
+    }
+    return Math.max(32, maxH + 8)
+  })
+})
 
 async function loadRecordBack(idx) {
   const row = listStore.records[idx]
@@ -359,7 +447,7 @@ async function loadRecordBack(idx) {
                     </tr>
                   </thead>
                   <tbody ref="skuTableBodyRef">
-                    <tr v-for="(sku, si) in createStore.skus" :key="sku.key" class="sortable-item">
+                    <tr v-for="(sku, si) in createStore.skus" :key="sku.key" class="sortable-item" :style="{ height: skuRowHeights[si] + 'px' }">
                       <td class="sticky left-0 bg-base-100 z-10">
                         <span
                           class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center justify-center select-none px-1 py-0.5"
@@ -470,7 +558,7 @@ async function loadRecordBack(idx) {
           <div v-if="!listStore.records.length" class="text-sm text-base-content/40">
             暂无
           </div>
-          <div v-else class="overflow-x-auto max-h-[70vh] overflow-y-auto">
+          <div v-else ref="scrollContainerRef" class="overflow-x-auto max-h-[70vh] overflow-y-auto" @scroll="onRecordsScroll">
             <table class="table table-sm">
               <thead>
                 <tr>
@@ -484,9 +572,11 @@ async function loadRecordBack(idx) {
                 </tr>
               </thead>
               <tbody ref="recordsTableBodyRef">
-                <tr v-for="(row, idx) in listStore.records" :key="row._uid" class="sortable-item">
+                <tr v-if="useVirtualScroll && spacerBeforeHeight > 0" class="virtual-scroll-spacer" :style="{ height: spacerBeforeHeight + 'px' }"><td :colspan="totalCols" /></tr>
+                <tr v-for="(row, vIdx) in visibleRecords" :key="row._uid" class="sortable-item">
                   <td class="sticky left-0 bg-base-100 z-10">
                     <span
+                      v-if="!useVirtualScroll"
                       class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center justify-center select-none px-1 py-0.5"
                       title="拖拽排序"
                     >☰</span>
@@ -509,21 +599,38 @@ async function loadRecordBack(idx) {
                   <td class="sticky right-0 bg-base-100 z-10">
                     <div class="flex gap-1">
                       <button
+                        v-if="useVirtualScroll"
+                        class="btn btn-ghost btn-xs"
+                        title="移到顶部"
+                        @click="listStore.moveRecordToTop(dataIdx(vIdx))"
+                      >
+                        ⇤
+                      </button>
+                      <button
+                        v-if="useVirtualScroll"
+                        class="btn btn-ghost btn-xs"
+                        title="移到底部"
+                        @click="listStore.moveRecordToBottom(dataIdx(vIdx))"
+                      >
+                        ⇥
+                      </button>
+                      <button
                         class="btn btn-ghost btn-xs"
                         title="加载到新建面板"
-                        @click="loadRecordBack(idx)"
+                        @click="loadRecordBack(dataIdx(vIdx))"
                       >
                         📋
                       </button>
                       <button
                         class="btn btn-ghost btn-xs text-error"
-                        @click="listStore.removeRecord(idx)"
+                        @click="listStore.removeRecord(dataIdx(vIdx))"
                       >
                         ✕
                       </button>
                     </div>
                   </td>
                 </tr>
+                <tr v-if="useVirtualScroll && spacerAfterHeight > 0" class="virtual-scroll-spacer" :style="{ height: spacerAfterHeight + 'px' }"><td :colspan="totalCols" /></tr>
               </tbody>
             </table>
           </div>

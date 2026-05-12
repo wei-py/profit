@@ -27,21 +27,15 @@ const newColName = ref('')
 const showAddCol = ref(false)
 const expandedId = ref(null)
 const cpId = computed(() => expandedId.value)
-const configColOrder = ref([])
 
 const configColumns = computed(() => {
   if (!store['国家平台'].length)
     return []
-  return configColOrder.value.length && configColOrder.value.length === allKeys.value.length
-    ? configColOrder.value
+  const order = store.国家平台ColOrder
+  return order.length === allKeys.value.length
+    ? order
     : allKeys.value
 })
-
-watch(allKeys, (v) => {
-  if (!configColOrder.value.length || configColOrder.value.length !== v.length) {
-    configColOrder.value = [...v]
-  }
-}, { immediate: true })
 
 const expFieldsSource = computed(() => (cpId.value ? store.getFieldsByCountry(cpId.value) : []))
 const localFields = ref([])
@@ -103,6 +97,7 @@ function addColumn() {
     if (!(n in r))
       r[n] = ''
   }
+  store.sync国家平台ColOrder()
   newColName.value = ''
   showAddCol.value = false
 }
@@ -437,6 +432,6 @@ function openConfigColEditor() {
       :cp-id="cpId"
       @close="showTplModal = false"
     />
-    <ConfigColEditorModal :open="showConfigColModal" @update="configColOrder = $event" @close="showConfigColModal = false" />
+    <ConfigColEditorModal :open="showConfigColModal" :items="configColumns" @update="store.国家平台ColOrder = $event" @close="showConfigColModal = false" />
   </div>
 </template>

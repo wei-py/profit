@@ -17,7 +17,8 @@ export const useConfigStore = defineStore('config', () => {
   const 计算模板 = ref([])
   const 费用规则 = ref([])
   const 模板参数 = ref([])
-  const lookupTables = ref({})
+const lookupTables = ref({})
+  const 国家平台ColOrder = ref([])
 
   const loaded = computed(() => 国家平台.value.length > 0)
 
@@ -37,6 +38,8 @@ export const useConfigStore = defineStore('config', () => {
       费用规则.value = config['费用规则'] || []
       模板参数.value = config['模板参数'] || []
       lookupTables.value = config.lookupTables || {}
+      国家平台ColOrder.value = config.国家平台ColOrder || []
+      sync国家平台ColOrder()
       workbook.value = buffer
     }
     catch (e) {
@@ -48,6 +51,7 @@ export const useConfigStore = defineStore('config', () => {
   }
 
   function getExportBuffer() {
+    sync国家平台ColOrder()
     return buildWorkbookBuffer({
       国家平台: 国家平台.value,
       计算字段: 计算字段.value,
@@ -57,7 +61,29 @@ export const useConfigStore = defineStore('config', () => {
       费用规则: 费用规则.value,
       模板参数: 模板参数.value,
       lookupTables: lookupTables.value,
+      国家平台ColOrder: 国家平台ColOrder.value,
     })
+  }
+
+  function sync国家平台ColOrder() {
+    if (!国家平台.value.length) {
+      国家平台ColOrder.value = []
+      return
+    }
+    const existing = new Set(国家平台ColOrder.value)
+    const allKeys = new Set()
+    for (const row of 国家平台.value) {
+      for (const k of Object.keys(row)) {
+        if (k)
+          allKeys.add(k)
+      }
+    }
+    const merged = [...国家平台ColOrder.value.filter(k => allKeys.has(k))]
+    for (const k of allKeys) {
+      if (!existing.has(k))
+        merged.push(k)
+    }
+    国家平台ColOrder.value = merged
   }
 
   // ── 便捷查询 ──
@@ -118,6 +144,7 @@ export const useConfigStore = defineStore('config', () => {
     计算模板.value = []
     费用规则.value = []
     模板参数.value = []
+    国家平台ColOrder.value = []
     lookupTables.value = {}
   }
 
@@ -135,6 +162,8 @@ export const useConfigStore = defineStore('config', () => {
     费用规则,
     模板参数,
     lookupTables,
+    国家平台ColOrder,
+    sync国家平台ColOrder,
     loadFromBuffer,
     getExportBuffer,
     clear,

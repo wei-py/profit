@@ -48,6 +48,18 @@ export const useListStore = defineStore('list', () => {
     records.value.splice(index, 1)
   }
 
+  function moveRecordToTop(index) {
+    if (index <= 0) return
+    const [moved] = records.value.splice(index, 1)
+    records.value.unshift(moved)
+  }
+
+  function moveRecordToBottom(index) {
+    if (index >= records.value.length - 1) return
+    const [moved] = records.value.splice(index, 1)
+    records.value.push(moved)
+  }
+
   function updateRecord(index, data) {
     records.value[index] = { ...records.value[index], ...data }
   }
@@ -89,6 +101,8 @@ export const useListStore = defineStore('list', () => {
     getExportBuffer,
     addRecords,
     removeRecord,
+    moveRecordToTop,
+    moveRecordToBottom,
     updateRecord,
     clear,
     syncColumnOrder,
