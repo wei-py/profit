@@ -1,12 +1,12 @@
 <script setup>
 import { previewImages } from 'hevue-img-preview/v3'
 import { computed, nextTick, ref, watch } from 'vue'
-import { VueDraggableNext } from 'vue-draggable-next'
 import ColEditorModal from '@/components/common/ColEditorModal.vue'
 import FieldInput from '@/components/common/FieldInput.vue'
 import ReverseCalcModal from '@/components/list/ReverseCalcModal.vue'
 import TraceModal from '@/components/list/TraceModal.vue'
 import { useFileIO } from '@/composables/useFileIO'
+import { useSortable } from '@/composables/useSortable'
 import { useConfigStore } from '@/stores/config'
 import { useCreateStore } from '@/stores/create'
 import { useListStore } from '@/stores/list'
@@ -66,6 +66,8 @@ const traceFieldKey = ref('')
 const showColModal = ref(false)
 const skuColModal = ref(false)
 const skuColOrder = ref([])
+const skuTableBodyRef = ref(null)
+const recordsTableBodyRef = ref(null)
 
 const skuAllFields = computed(() => {
   const fields = []
@@ -87,6 +89,9 @@ watch(skuAllFields, (v) => {
     skuColOrder.value = [...v]
   }
 }, { immediate: true })
+
+useSortable(skuTableBodyRef, createStore.skus, { handle: '.drag-handle', animation: 200 })
+useSortable(recordsTableBodyRef, listStore.records, { handle: '.drag-handle', animation: 200 })
 
 const listColumns = computed(() => {
   if (!listStore.records.length)
@@ -353,16 +358,8 @@ async function loadRecordBack(idx) {
                       </th>
                     </tr>
                   </thead>
-                  <VueDraggableNext
-                    :list="createStore.skus"
-                    tag="tbody"
-                    :animation="200"
-                    handle=".drag-handle"
-                    ghost-class="bg-base-300"
-                    item-key="key"
-                    no-transition-on-drag
-                  >
-                    <tr v-for="(sku, si) in createStore.skus" :key="sku.key">
+                  <tbody ref="skuTableBodyRef">
+                    <tr v-for="(sku, si) in createStore.skus" :key="sku.key" class="sortable-item">
                       <td class="sticky left-0 bg-base-100 z-10">
                         <span
                           class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center justify-center select-none px-1 py-0.5"
@@ -448,7 +445,7 @@ async function loadRecordBack(idx) {
                         </template>
                       </td>
                     </tr>
-                  </VueDraggableNext>
+                  </tbody>
                 </table>
                 <div v-else class="text-sm text-base-content/40 mt-2">
                   选择模板后自动生成 SKU，或点击「生成SKU」手动刷新
@@ -486,16 +483,8 @@ async function loadRecordBack(idx) {
                   </th>
                 </tr>
               </thead>
-              <VueDraggableNext
-                :list="listStore.records"
-                tag="tbody"
-                :animation="200"
-                handle=".drag-handle"
-                ghost-class="bg-base-300"
-                item-key="_uid"
-                no-transition-on-drag
-              >
-                <tr v-for="(row, idx) in listStore.records" :key="row._uid">
+              <tbody ref="recordsTableBodyRef">
+                <tr v-for="(row, idx) in listStore.records" :key="row._uid" class="sortable-item">
                   <td class="sticky left-0 bg-base-100 z-10">
                     <span
                       class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center justify-center select-none px-1 py-0.5"
@@ -535,7 +524,7 @@ async function loadRecordBack(idx) {
                     </div>
                   </td>
                 </tr>
-              </VueDraggableNext>
+              </tbody>
             </table>
           </div>
         </div>
@@ -557,12 +546,14 @@ async function loadRecordBack(idx) {
       :open="showColModal"
       title="编辑列顺序"
       :items="listStore.columnOrder"
+      @update="listStore.columnOrder = $event"
       @close="showColModal = false"
     />
     <ColEditorModal
       :open="skuColModal"
       title="SKU 列顺序"
       :items="skuColOrder"
+      @update="skuColOrder = $event"
       @close="skuColModal = false"
     />
   </div>

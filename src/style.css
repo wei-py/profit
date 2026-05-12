@@ -125,3 +125,13 @@ body {
 .card-body.flex-1 {
   flex: 1 1 0% !important;
 }
+
+/* @shopify/draggable styles */
+.draggable-source--is-dragging {
+  opacity: 0.3;
+}
+.draggable-mirror {
+  opacity: 0.9;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}

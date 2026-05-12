@@ -1,7 +1,7 @@
 <script setup>
 import { driver } from 'driver.js'
 import { computed, reactive, ref, watch } from 'vue'
-import { VueDraggableNext } from 'vue-draggable-next'
+import { useSortable } from '@/composables/useSortable'
 import { useConfigStore } from '@/stores/config'
 import ConfirmModal from './ConfirmModal.vue'
 import LookupTableModal from './LookupTableModal.vue'
@@ -18,7 +18,9 @@ const emit = defineEmits(['close'])
 const store = useConfigStore()
 const form = reactive({})
 const rules = ref([])
+const rulesTableBodyRef = ref(null)
 let _ruleUid = 0
+useSortable(rulesTableBodyRef, rules, { handle: '.drag-handle', animation: 200 })
 const editingRuleIdx = ref(-1)
 const showRuleModal = ref(false)
 const showLookupModal = ref(false)
@@ -263,16 +265,8 @@ function onConfirmOk() {
               <th />
             </tr>
           </thead>
-          <VueDraggableNext
-            :list="rules"
-            tag="tbody"
-            :animation="200"
-            handle=".drag-handle"
-            ghost-class="bg-base-300"
-            :item-key="(r) => r._uid || r.编号 || String(i)"
-            no-transition-on-drag
-          >
-            <tr v-for="(r, i) in rules" :key="r._uid || r.编号 || i" class="hover cursor-pointer">
+          <tbody ref="rulesTableBodyRef">
+            <tr v-for="(r, i) in rules" :key="r._uid || r.编号 || i" class="sortable-item hover cursor-pointer">
               <td>
                 <span
                   class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center justify-center select-none text-xs"
@@ -300,7 +294,7 @@ function onConfirmOk() {
                 </button>
               </td>
             </tr>
-          </VueDraggableNext>
+          </tbody>
         </table>
         <div v-else class="text-xs text-base-content/40">
           暂无规则

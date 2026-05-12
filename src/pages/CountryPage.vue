@@ -1,12 +1,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { VueDraggableNext } from 'vue-draggable-next'
 import ConfigColEditorModal from '@/components/country/ConfigColEditorModal.vue'
 import CountryModal from '@/components/country/CountryModal.vue'
 import FieldModal from '@/components/country/FieldModal.vue'
 import OptionGroupModal from '@/components/country/OptionGroupModal.vue'
 import TemplateModal from '@/components/country/TemplateModal.vue'
 import { useFileIO } from '@/composables/useFileIO'
+import { useSortable } from '@/composables/useSortable'
 import { useConfigStore } from '@/stores/config'
 
 const store = useConfigStore()
@@ -45,6 +45,8 @@ watch(allKeys, (v) => {
 
 const expFieldsSource = computed(() => (cpId.value ? store.getFieldsByCountry(cpId.value) : []))
 const localFields = ref([])
+const fieldsContainerRef = ref(null)
+useSortable(fieldsContainerRef, localFields, { handle: '.drag-handle', animation: 200, onEnd: onFieldsDragEnd })
 watch(
   expFieldsSource,
   (v) => {
@@ -61,6 +63,8 @@ const expOptGroupsSource = computed(() =>
   cpId.value ? store.getOptionGroupsByCountry(cpId.value) : [],
 )
 const localOptGroups = ref([])
+const optGroupsContainerRef = ref(null)
+useSortable(optGroupsContainerRef, localOptGroups, { handle: '.drag-handle', animation: 200, onEnd: onOptGroupsDragEnd })
 watch(
   expOptGroupsSource,
   (v) => {
@@ -77,6 +81,8 @@ const expTemplatesSource = computed(() =>
   cpId.value ? store.getTemplatesByCountry(cpId.value) : [],
 )
 const localTemplates = ref([])
+const templatesContainerRef = ref(null)
+useSortable(templatesContainerRef, localTemplates, { handle: '.drag-handle', animation: 200, onEnd: onTemplatesDragEnd })
 watch(
   expTemplatesSource,
   (v) => {
@@ -288,19 +294,11 @@ function openConfigColEditor() {
                             <div v-if="!localFields.length" class="text-xs text-base-content/40">
                               暂无
                             </div>
-                            <VueDraggableNext
-                              v-else
-                              :list="localFields"
-                              :animation="200"
-                              handle=".drag-handle"
-                              ghost-class="bg-base-300"
-                              :item-key="(f) => f.字段键 || f.编号 || String(i)"
-                              @end="onFieldsDragEnd"
-                            >
+                            <div v-else ref="fieldsContainerRef">
                               <div
                                 v-for="(f, i) in localFields"
                                 :key="f.字段键 || i"
-                                class="flex items-center justify-between py-1 border-b border-base-200 text-xs"
+                                class="sortable-item flex items-center justify-between py-1 border-b border-base-200 text-xs"
                               >
                                 <span class="flex items-center gap-2">
                                   <span
@@ -320,7 +318,7 @@ function openConfigColEditor() {
                                   ✕
                                 </button>
                               </div>
-                            </VueDraggableNext>
+                            </div>
                           </div>
                         </div>
                         <div class="card card-sm bg-base-100">
@@ -334,19 +332,11 @@ function openConfigColEditor() {
                             <div v-if="!localOptGroups.length" class="text-xs text-base-content/40">
                               暂无
                             </div>
-                            <VueDraggableNext
-                              v-else
-                              :list="localOptGroups"
-                              :animation="200"
-                              handle=".drag-handle"
-                              ghost-class="bg-base-300"
-                              item-key="编号"
-                              @end="onOptGroupsDragEnd"
-                            >
+                            <div v-else ref="optGroupsContainerRef">
                               <div
                                 v-for="(g, i) in localOptGroups"
                                 :key="g.编号 || i"
-                                class="flex items-center justify-between py-1 border-b border-base-200 text-xs"
+                                class="sortable-item flex items-center justify-between py-1 border-b border-base-200 text-xs"
                               >
                                 <span class="flex items-center gap-2">
                                   <span
@@ -366,7 +356,7 @@ function openConfigColEditor() {
                                   ✕
                                 </button>
                               </div>
-                            </VueDraggableNext>
+                            </div>
                           </div>
                         </div>
                         <div class="card card-sm bg-base-100">
@@ -380,19 +370,11 @@ function openConfigColEditor() {
                             <div v-if="!localTemplates.length" class="text-xs text-base-content/40">
                               暂无
                             </div>
-                            <VueDraggableNext
-                              v-else
-                              :list="localTemplates"
-                              :animation="200"
-                              handle=".drag-handle"
-                              ghost-class="bg-base-300"
-                              item-key="编号"
-                              @end="onTemplatesDragEnd"
-                            >
+                            <div v-else ref="templatesContainerRef">
                               <div
                                 v-for="(t, i) in localTemplates"
                                 :key="t.编号 || i"
-                                class="flex items-center justify-between py-1 border-b border-base-200 text-xs"
+                                class="sortable-item flex items-center justify-between py-1 border-b border-base-200 text-xs"
                               >
                                 <span class="flex items-center gap-2">
                                   <span
@@ -414,7 +396,7 @@ function openConfigColEditor() {
                                   ✕
                                 </button>
                               </div>
-                            </VueDraggableNext>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -455,6 +437,6 @@ function openConfigColEditor() {
       :cp-id="cpId"
       @close="showTplModal = false"
     />
-    <ConfigColEditorModal :open="showConfigColModal" @close="showConfigColModal = false" />
+    <ConfigColEditorModal :open="showConfigColModal" @update="configColOrder = $event" @close="showConfigColModal = false" />
   </div>
 </template>

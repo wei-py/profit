@@ -1,7 +1,7 @@
 <script setup>
 import { driver } from 'driver.js'
 import { reactive, ref, watch } from 'vue'
-import { VueDraggableNext } from 'vue-draggable-next'
+import { useSortable } from '@/composables/useSortable'
 import { useConfigStore } from '@/stores/config'
 import 'driver.js/dist/driver.css'
 
@@ -15,7 +15,10 @@ const emit = defineEmits(['close'])
 const store = useConfigStore()
 const form = reactive({})
 const items = ref([])
+const itemsTableBodyRef = ref(null)
 let _uid = 0
+
+useSortable(itemsTableBodyRef, items, { handle: '.drag-handle', animation: 200 })
 
 const optionEditSteps = [
   {
@@ -154,16 +157,8 @@ function deleteGroup() {
               <th />
             </tr>
           </thead>
-          <VueDraggableNext
-            :list="items"
-            tag="tbody"
-            :animation="200"
-            handle=".drag-handle"
-            ghost-class="bg-base-300"
-            :item-key="(item) => item._uid"
-            no-transition-on-drag
-          >
-            <tr v-for="(item, i) in items" :key="i">
+          <tbody ref="itemsTableBodyRef">
+            <tr v-for="(item, i) in items" :key="i" class="sortable-item">
               <td>
                 <span
                   class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center justify-center select-none text-xs px-0.5"
@@ -185,7 +180,7 @@ function deleteGroup() {
                 </button>
               </td>
             </tr>
-          </VueDraggableNext>
+          </tbody>
         </table>
       </div>
       <div class="modal-action">
