@@ -1,33 +1,33 @@
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { useActivationStore } from "@/stores/activation";
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useActivationStore } from '@/stores/activation'
 
-const router = useRouter();
-const store = useActivationStore();
-const code = ref("");
-const loading = ref(false);
+const router = useRouter()
+const store = useActivationStore()
+const code = ref('')
+const loading = ref(false)
 
 async function handleActivate() {
-  const trimmed = code.value.trim();
+  const trimmed = code.value.trim()
   if (!trimmed) {
-    store.error = "请输入激活码";
-    return;
+    store.error = '请输入激活码'
+    return
   }
   if (trimmed.length < 8) {
-    store.error = "激活码格式无效";
-    return;
+    store.error = '激活码格式无效'
+    return
   }
 
-  loading.value = true;
-  store.error = "";
+  loading.value = true
+  store.error = ''
 
-  const result = await store.activate(trimmed);
+  const result = await store.activate(trimmed)
 
-  loading.value = false;
+  loading.value = false
   if (result.success) {
     // 激活成功，跳转主页面
-    router.push("/");
+    router.push('/')
   }
 }
 </script>
@@ -37,8 +37,12 @@ async function handleActivate() {
     <div class="card bg-base-100 shadow-xl w-full max-w-sm">
       <div class="card-body gap-5">
         <div class="text-center">
-          <h1 class="text-2xl font-bold">Profit</h1>
-          <p class="text-sm text-base-content/60 mt-1">请输入激活码以继续使用</p>
+          <h1 class="text-2xl font-bold">
+            Profit
+          </h1>
+          <p class="text-sm text-base-content/60 mt-1">
+            请输入激活码以继续使用
+          </p>
         </div>
 
         <!-- 已过期 -->
@@ -68,7 +72,7 @@ async function handleActivate() {
             class="input input-bordered"
             :disabled="loading"
             @keyup.enter="handleActivate"
-          />
+          >
         </label>
 
         <button
