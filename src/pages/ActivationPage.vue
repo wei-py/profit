@@ -1,48 +1,44 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useActivationStore } from '@/stores/activation'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { useActivationStore } from "@/stores/activation";
 
-const router = useRouter()
-const store = useActivationStore()
-const code = ref('')
-const loading = ref(false)
+const router = useRouter();
+const store = useActivationStore();
+const code = ref("");
+const loading = ref(false);
 
 async function handleActivate() {
-  const trimmed = code.value.trim()
+  const trimmed = code.value.trim();
   if (!trimmed) {
-    store.error = '请输入激活码'
-    return
+    store.error = "请输入激活码";
+    return;
   }
   if (trimmed.length < 8) {
-    store.error = '激活码格式无效'
-    return
+    store.error = "激活码格式无效";
+    return;
   }
 
-  loading.value = true
-  store.error = ''
+  loading.value = true;
+  store.error = "";
 
-  const result = await store.activate(trimmed)
+  const result = await store.activate(trimmed);
 
-  loading.value = false
+  loading.value = false;
   if (result.success) {
     // 激活成功，跳转主页面
-    router.push('/')
+    router.push("/");
   }
 }
 </script>
 
 <template>
-  <div class="flex items-center justify-center h-screen bg-base-200">
-    <div class="card bg-base-100 shadow-xl w-full max-w-sm">
+  <div class="bg-base-200 flex h-screen items-center justify-center">
+    <div class="bg-base-100 card max-w-sm shadow-xl w-full">
       <div class="card-body gap-5">
         <div class="text-center">
-          <h1 class="text-2xl font-bold">
-            Profit
-          </h1>
-          <p class="text-sm text-base-content/60 mt-1">
-            请输入激活码以继续使用
-          </p>
+          <h1 class="font-bold text-2xl">Profit</h1>
+          <p class="mt-1 text-base-content/60 text-sm">请输入激活码以继续使用</p>
         </div>
 
         <!-- 已过期 -->
@@ -57,7 +53,7 @@ async function handleActivate() {
 
         <!-- 加载中 -->
         <div v-if="store.status === 'checking'" class="flex justify-center">
-          <span class="loading loading-spinner loading-md" />
+          <span class="loading loading-md loading-spinner" />
         </div>
 
         <!-- 输入框 -->
@@ -67,18 +63,18 @@ async function handleActivate() {
           </div>
           <input
             v-model="code"
-            type="text"
-            placeholder="PFT-XXXX-XXXX"
+            @keyup.enter="handleActivate"
             class="input input-bordered"
             :disabled="loading"
-            @keyup.enter="handleActivate"
+            placeholder="PFT-XXXX-XXXX"
+            type="text"
           >
         </label>
 
         <button
+          @click="handleActivate"
           class="btn btn-primary"
           :disabled="loading || store.status === 'checking'"
-          @click="handleActivate"
         >
           激活
         </button>

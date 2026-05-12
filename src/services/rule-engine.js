@@ -6,81 +6,82 @@
  * @returns {{ results: object, errors: string[], traces: object }} Calculation results
  */
 export function execute(feeRules, lookupTables, userInputs) {
-  const results = {}
-  const errors = []
-  const traces = {}
+  const results = {};
+  const errors = [];
+  const traces = {};
 
-  const enabled = feeRules.filter(r => r.启用 === '是' || r.启用 === 'TRUE')
-  const sorted = enabled.sort((a, b) => Number(a.计算顺序) - Number(b.计算顺序))
+  const enabled = feeRules.filter(r => r.启用 === "是" || r.启用 === "TRUE");
+  const sorted = enabled.sort((a, b) => Number(a.计算顺序) - Number(b.计算顺序));
 
   // 所有可用字段键（输入 + 已计算结果），公式替换时用
   const allKeys = [
     ...new Set([...Object.keys(userInputs), ...sorted.map(r => r.输出字段键).filter(Boolean)]),
-  ]
+  ];
 
   for (const rule of sorted) {
     try {
       // 条件判断 — 通过条件结构树递归求值
       if (!evalConditions(rule, userInputs, results))
-        continue
+        continue;
 
-      const key = rule.输出字段键
+      const key = rule.输出字段键;
       if (!key)
-        continue
+        continue;
 
       switch (rule.计算方式) {
-        case '查表': {
-          const { val, trace } = doLookup(rule, lookupTables, userInputs, results)
-          results[key] = val
-          traces[key] = trace
-          break
+        case "查表": {
+          const { trace, val } = doLookup(rule, lookupTables, userInputs, results);
+          results[key] = val;
+          traces[key] = trace;
+          break;
         }
-        case '百分比': {
-          const { val, trace } = doPercent(rule, userInputs, results)
-          results[key] = val
-          traces[key] = trace
-          break
+        case "百分比": {
+          const { trace, val } = doPercent(rule, userInputs, results);
+          results[key] = val;
+          traces[key] = trace;
+          break;
         }
-        case '固定值': {
-          results[key] = Number(rule.固定金额) || 0
-          traces[key] = `${rule.费用名称 || key} = ${results[key]}（固定值）`
-          break
+        case "固定值": {
+          results[key] = Number(rule.固定金额) || 0;
+          traces[key] = `${rule.费用名称 || key} = ${results[key]}（固定值）`;
+          break;
         }
-        case '加总': {
-          const { val, trace } = doSum(rule, userInputs, results)
-          results[key] = val
-          traces[key] = trace
-          break
+        case "加总": {
+          const { trace, val } = doSum(rule, userInputs, results);
+          results[key] = val;
+          traces[key] = trace;
+          break;
         }
-        case '公式': {
-          const { val, trace } = doFormula(rule, userInputs, results, allKeys)
-          results[key] = val
-          traces[key] = trace
-          break
+        case "公式": {
+          const { trace, val } = doFormula(rule, userInputs, results, allKeys);
+          results[key] = val;
+          traces[key] = trace;
+          break;
         }
       }
     }
     catch (e) {
-      errors.push(`[${rule.编号}] ${e.message}`)
+      errors.push(`[${rule.编号}] ${e.message}`);
     }
   }
 
-  return { results, errors, traces }
+  return {
+    errors,
+    results,
+    traces,
+  };
 }
 
 // ── helpers ──
 
-/**
- * 按条件数据求值。
- * 优先从 条件数据 JSON 读取完整树，否则从条件1-4列读取（AND）。
- */
+/** 按条件数据求值。 优先从 条件数据 JSON 读取完整树，否则从条件1-4列读取（AND）。 */
 function evalConditions(rule, inputs, results) {
   // 优先：条件数据 JSON 树
   if (rule.条件数据) {
     try {
-      const d = JSON.parse(rule.条件数据)
+      const d = JSON.parse(rule.条件数据);
       if (d.tree)
-        return evalTree(d.tree, d.pool || [], inputs, results)
+        return evalTree(d.tree, d.pool || [], inputs, results);
     }
     catch {
       /* fall through */
@@ -88,15 +89,15 @@ function evalConditions(rule, inputs, results) {
   }
 
   // 或：解析 条件结构
-  const 结构 = (rule.条件结构 || '').trim()
+  const 结构 = (rule.条件结构 || "").trim();
   if (结构)
-    return evalStruct(结构, rule, inputs, results)
+    return evalStruct(结构, rule, inputs, results);
 
   // 兜底：所有非空条件 AND
   for (let i = 1; i <= 4; i++) {
-    const f = rule[`条件${i}字段`]
+    const f = rule[`条件${i}字段`];
     if (!f)
-      continue
+      continue;
     if (
       !matches(
         getVal(f, inputs, results),
@@ -105,45 +106,45 @@ function evalConditions(rule, inputs, results) {
         rule[`条件${i}值2`],
       )
     ) {
-      return false
+      return false;
     }
   }
-  return true
+  return true;
 }
 
 function evalTree(node, pool, inputs, results) {
-  if (node.type === 'cond') {
-    const c = pool[node.idx]
+  if (node.type === "cond") {
+    const c = pool[node.idx];
     if (!c || !c.字段)
-      return true
-    return matches(getVal(c.字段, inputs, results), c.运算符, c.值, '')
+      return true;
+    return matches(getVal(c.字段, inputs, results), c.运算符, c.值, "");
   }
   // group: evaluate children with their individual connectors
-  let result = null
+  let result = null;
   for (const ch of node.children) {
-    const chResult = evalTree(ch, pool, inputs, results)
+    const chResult = evalTree(ch, pool, inputs, results);
     if (result === null) {
-      result = chResult
+      result = chResult;
     }
     else {
-      const op = ch.type === 'cond' ? ch.op || 'AND' : ch.linkOp || 'AND'
-      result = op === 'AND' ? result && chResult : result || chResult
+      const op = ch.type === "cond" ? ch.op || "AND" : ch.linkOp || "AND";
+      result = op === "AND" ? result && chResult : result || chResult;
     }
   }
-  return result === null ? true : result
+  return result === null ? true : result;
 }
 
 function evalStruct(结构, rule, inputs, results) {
-  const groups = 结构.split('|').map(g => g.split(',').map(s => s.trim()))
+  const groups = 结构.split("|").map(g => g.split(",").map(s => s.trim()));
   for (const group of groups) {
-    let ok = true
+    let ok = true;
     for (const idx of group) {
-      const i = Number(idx) + 1
+      const i = Number(idx) + 1;
       if (i < 1 || i > 4)
-        continue
-      const f = rule[`条件${i}字段`]
+        continue;
+      const f = rule[`条件${i}字段`];
       if (!f)
-        continue
+        continue;
       if (
         !matches(
           getVal(f, inputs, results),
@@ -152,149 +153,169 @@ function evalStruct(结构, rule, inputs, results) {
           rule[`条件${i}值2`],
         )
       ) {
-        ok = false
-        break
+        ok = false;
+        break;
       }
     }
     if (ok)
-      return true
+      return true;
   }
-  return false
+  return false;
 }
 
 function getVal(fieldKey, inputs, results) {
   if (results[fieldKey] !== undefined && results[fieldKey] !== null)
-    return results[fieldKey]
-  return inputs[fieldKey]
+    return results[fieldKey];
+  return inputs[fieldKey];
 }
 
 function matches(val, op, target, _target2) {
-  const sVal = String(val ?? '')
-  const sTgt = String(target ?? '')
-  const nVal = Number(val)
-  const nTgt = Number(target)
+  const sVal = String(val ?? "");
+  const sTgt = String(target ?? "");
+  const nVal = Number(val);
+  const nTgt = Number(target);
   switch (op) {
-    case '等于':
-      return sVal === sTgt
-    case '不等于':
-      return sVal !== sTgt
-    case '大于':
-      return nVal > nTgt
-    case '大于等于':
-      return nVal >= nTgt
-    case '小于':
-      return nVal < nTgt
-    case '小于等于':
-      return nVal <= nTgt
+    case "等于":
+      return sVal === sTgt;
+    case "不等于":
+      return sVal !== sTgt;
+    case "大于":
+      return nVal > nTgt;
+    case "大于等于":
+      return nVal >= nTgt;
+    case "小于":
+      return nVal < nTgt;
+    case "小于等于":
+      return nVal <= nTgt;
     default:
-      return false
+      return false;
   }
 }
 
 function doLookup(rule, lookupTables, inputs, results) {
-  const table = lookupTables[rule.查表名称]
+  const table = lookupTables[rule.查表名称];
   if (!table || !table.length)
-    throw new Error(`费率表「${rule.查表名称}」不存在或为空`)
+    throw new Error(`费率表「${rule.查表名称}」不存在或为空`);
 
-  const mappings = parseMappings(rule.输入映射)
-  const isRange = rule.匹配方式 === '区间'
+  const mappings = parseMappings(rule.输入映射);
+  const isRange = rule.匹配方式 === "区间";
 
   for (const row of table) {
-    const condParts = []
-    let ok = true
+    const condParts = [];
+    let ok = true;
     for (const [fieldKey, colName] of mappings) {
-      const inputVal = getVal(fieldKey, inputs, results)
+      const inputVal = getVal(fieldKey, inputs, results);
       if (isRange) {
-        const v = Number(inputVal)
-        const lo = Number(row[`${colName}下限`])
-        const hi = Number(row[`${colName}上限`])
+        const v = Number(inputVal);
+        const lo = Number(row[`${colName}下限`]);
+        const hi = Number(row[`${colName}上限`]);
         if (v < lo || v > hi) {
-          ok = false
-          break
+          ok = false;
+          break;
         }
-        condParts.push(`${fieldKey}=${inputVal}(${colName}：${lo}~${hi})`)
+        condParts.push(`${fieldKey}=${inputVal}(${colName}：${lo}~${hi})`);
       }
       else {
         if (String(inputVal) !== String(row[colName])) {
-          ok = false
-          break
+          ok = false;
+          break;
         }
-        condParts.push(`${fieldKey}=${inputVal}`)
+        condParts.push(`${fieldKey}=${inputVal}`);
       }
     }
     if (ok) {
-      const val = Number(row[rule.输出列]) || 0
-      const trace = `查表「${rule.查表名称}」→ ${condParts.join('，')} → ${rule.输出列}=${val}`
-      return { val, trace }
+      const val = Number(row[rule.输出列]) || 0;
+      const trace = `查表「${rule.查表名称}」→ ${condParts.join("，")} → ${rule.输出列}=${val}`;
+      return {
+        trace,
+        val,
+      };
     }
   }
-  throw new Error(`查表「${rule.查表名称}」未找到匹配行`)
+  throw new Error(`查表「${rule.查表名称}」未找到匹配行`);
 }
 
 function doPercent(rule, inputs, results) {
-  const base = Number(getVal(rule.百分比基数, inputs, results)) || 0
-  let rate, rateDesc
+  const base = Number(getVal(rule.百分比基数, inputs, results)) || 0;
+  let rate, rateDesc;
   if (rule.百分比来源字段) {
-    rate = Number(getVal(rule.百分比来源字段, inputs, results)) || 0
-    rateDesc = `${rule.百分比来源字段}(${rate})`
+    rate = Number(getVal(rule.百分比来源字段, inputs, results)) || 0;
+    rateDesc = `${rule.百分比来源字段}(${rate})`;
   }
   else {
-    rate = Number(rule.百分比值) / 100 || 0
-    rateDesc = `${rule.百分比值}%`
+    rate = Number(rule.百分比值) / 100 || 0;
+    rateDesc = `${rule.百分比值}%`;
   }
-  const val = base * rate
-  const trace = `${rule.百分比基数}(${base}) × ${rateDesc} = ${val.toFixed(2)}`
-  return { val, trace }
+  const val = base * rate;
+  const trace = `${rule.百分比基数}(${base}) × ${rateDesc} = ${val.toFixed(2)}`;
+  return {
+    trace,
+    val,
+  };
 }
 
 function doSum(rule, inputs, results) {
-  if (!rule.加总字段)
-    return { val: 0, trace: '' }
-  const fields = rule.加总字段.split(',').map(s => s.trim())
-  const parts = []
-  let total = 0
-  for (const fk of fields) {
-    const v = Number(getVal(fk, inputs, results)) || 0
-    parts.push(`${fk}(${v.toFixed(2)})`)
-    total += v
+  if (!rule.加总字段) {
+    return {
+      trace: "",
+      val: 0,
+    };
   }
-  const trace = `加总：${parts.join(' + ')} = ${total.toFixed(2)}`
-  return { val: total, trace }
+  const fields = rule.加总字段.split(",").map(s => s.trim());
+  const parts = [];
+  let total = 0;
+  for (const fk of fields) {
+    const v = Number(getVal(fk, inputs, results)) || 0;
+    parts.push(`${fk}(${v.toFixed(2)})`);
+    total += v;
+  }
+  const trace = `加总：${parts.join(" + ")} = ${total.toFixed(2)}`;
+  return {
+    trace,
+    val: total,
+  };
 }
 
 function doFormula(rule, inputs, results, allKeys) {
-  let expr = rule.公式
-  if (!expr)
-    return { val: 0, trace: '' }
-  const traceParts = []
+  let expr = rule.公式;
+  if (!expr) {
+    return {
+      trace: "",
+      val: 0,
+    };
+  }
+  const traceParts = [];
 
-  const sorted = [...allKeys].sort((a, b) => b.length - a.length)
+  const sorted = [...allKeys].sort((a, b) => b.length - a.length);
   for (const fk of sorted) {
-    const val = Number(getVal(fk, inputs, results)) || 0
+    const val = Number(getVal(fk, inputs, results)) || 0;
     if (expr.includes(fk)) {
-      traceParts.push(`${fk}=${val}`)
-      expr = expr.replaceAll(fk, val)
+      traceParts.push(`${fk}=${val}`);
+      expr = expr.replaceAll(fk, val);
     }
   }
 
   if (!/^[\d\s+\-*/().]+$/.test(expr)) {
-    throw new Error(`公式含非法字符：${rule.公式}`)
+    throw new Error(`公式含非法字符：${rule.公式}`);
   }
 
   // eslint-disable-next-line no-new-func
-  const val = new Function(`"use strict"; return (${expr})`)()
-  const trace = `公式「${rule.公式}」：${traceParts.join('，')} → ${Number(val).toFixed(4)}`
-  return { val, trace }
+  const val = new Function(`"use strict"; return (${expr})`)();
+  const trace = `公式「${rule.公式}」：${traceParts.join("，")} → ${Number(val).toFixed(4)}`;
+  return {
+    trace,
+    val,
+  };
 }
 
 function parseMappings(inputMap) {
   if (!inputMap)
-    return []
+    return [];
   return inputMap
-    .split(',')
+    .split(",")
     .map((p) => {
-      const parts = p.split('=').map(s => s.trim())
-      return [parts[0], parts[1]]
+      const parts = p.split("=").map(s => s.trim());
+      return [parts[0], parts[1]];
     })
-    .filter(m => m[0] && m[1])
+    .filter(m => m[0] && m[1]);
 }

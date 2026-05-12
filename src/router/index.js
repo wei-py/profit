@@ -1,21 +1,32 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from "vue-router";
 
 const routes = [
   {
-    path: '/activate',
-    name: 'activate',
-    component: () => import('@/pages/ActivationPage.vue'),
+    name: "activate",
+    path: "/activate",
+    component: () => import("@/pages/ActivationPage.vue"),
   },
   {
-    path: '/',
-    component: () => import('@/layouts/DefaultLayout.vue'),
-    redirect: '/list',
     children: [
-      { path: 'country', name: 'country', component: () => import('@/pages/CountryPage.vue') },
-      { path: 'list', name: 'list', component: () => import('@/pages/ListPage.vue') },
+      {
+        name: "country",
+        path: "country",
+        component: () => import("@/pages/CountryPage.vue"),
+      },
+      {
+        name: "list",
+        path: "list",
+        component: () => import("@/pages/ListPage.vue"),
+      },
     ],
+    path: "/",
+    redirect: "/list",
+    component: () => import("@/layouts/DefaultLayout.vue"),
   },
-]
+];
 
-const router = createRouter({ history: createWebHistory(), routes })
-export default router
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+});
+export default router;

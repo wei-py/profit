@@ -1,71 +1,74 @@
 <script setup>
-import { ref, watch } from 'vue'
-import { useSortable } from '@/composables/useSortable'
+import { ref, watch } from "vue";
+import { useSortable } from "@/composables/useSortable";
 
 const props = defineProps({
+  items: {
+    required: true,
+    type: Array,
+  },
   open: Boolean,
-  title: { type: String, default: '编辑列顺序' },
-  items: { type: Array, required: true },
-})
-const emit = defineEmits(['close', 'update'])
+  title: {
+    default: "编辑列顺序",
+    type: String,
+  },
+});
+const emit = defineEmits(["close", "update"]);
 
-const localOrder = ref([])
-const containerRef = ref(null)
+const localOrder = ref([]);
+const containerRef = ref(null);
 
-useSortable(containerRef, localOrder, { handle: '.drag-handle', animation: 200 })
+useSortable(containerRef, localOrder, {
+  animation: 200,
+  handle: ".drag-handle",
+});
 
 watch(
   () => props.open,
   (v) => {
     if (v)
-      localOrder.value = [...props.items.filter(k => k !== '_uid')]
+      localOrder.value = [...props.items.filter(k => k !== "_uid")];
   },
-)
+);
 </script>
 
 <template>
   <div v-if="open" class="modal modal-open">
-    <div class="modal-box max-w-lg max-h-[80vh]">
+    <div class="max-h-[80vh] max-w-lg modal-box">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-bold">
+        <h3 class="font-bold text-lg">
           {{ title }}
         </h3>
-        <button class="btn btn-ghost btn-sm btn-circle" @click="emit('close')">
-          ✕
-        </button>
+        <button @click="emit('close')" class="btn btn-circle btn-ghost btn-sm">✕</button>
       </div>
-      <div class="text-xs text-base-content/50 mb-2">
-        拖拽左侧三条杠调整列顺序
-      </div>
+      <div class="mb-2 text-base-content/50 text-xs">拖拽左侧三条杠调整列顺序</div>
       <div ref="containerRef" class="overflow-y-auto">
         <div
           v-for="col in localOrder"
           :key="col"
-          class="sortable-item flex items-center gap-2 p-2 bg-base-200 rounded text-sm mb-1"
+          class="bg-base-200 flex gap-2 items-center mb-1 p-2 rounded sortable-item text-sm"
         >
           <span
-            class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center px-1.5 py-0.5 select-none"
+            class="cursor-grab drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
             title="拖拽排序"
           >☰</span>
-          <span class="flex-1 truncate text-xs" :title="col">{{ col }}</span>
+          <span class="flex-1 text-xs truncate" :title="col">{{ col }}</span>
         </div>
       </div>
       <div class="modal-action mt-4">
-        <button class="btn btn-ghost btn-sm" @click="emit('close')">
-          取消
-        </button>
+        <button @click="emit('close')" class="btn btn-ghost btn-sm">取消</button>
         <button
-          class="btn btn-primary btn-sm"
           @click="
             emit('update', localOrder);
             emit('close');
           "
+          class="btn btn-primary btn-sm"
         >
           完成
         </button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="emit('close')">
+    <form @click="emit('close')" class="modal-backdrop" method="dialog">
       <button>关闭</button>
     </form>
   </div>

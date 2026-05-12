@@ -132,36 +132,51 @@ pnpm add @chenglou/pretext
 在 `src/utils/textMeasure.js` 创建文本测量工具：
 
 ```javascript
-import { layout, layoutWithLines, prepare, prepareWithSegments } from '@chenglou/pretext'
+import { layout, layoutWithLines, prepare, prepareWithSegments } from "@chenglou/pretext";
 
 const DEFAULT_FONT
-  = '14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  = "14px system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif";
 
 export function measureTextHeight(text, maxWidth, lineHeight = 20, font = DEFAULT_FONT) {
   if (!text)
-    return 0
-  const prepared = prepare(String(text), font)
-  const { height } = layout(prepared, Number(maxWidth) || 200, lineHeight)
-  return height
+    return 0;
+  const prepared = prepare(String(text), font);
+  const { height } = layout(prepared, Number(maxWidth) || 200, lineHeight);
+  return height;
 }
 
 export function measureTextLines(text, maxWidth, lineHeight = 20, font = DEFAULT_FONT) {
-  if (!text)
-    return { lines: [], height: 0, lineCount: 0 }
-  const prepared = prepareWithSegments(String(text), font)
-  return layoutWithLines(prepared, Number(maxWidth) || 200, lineHeight)
+  if (!text) {
+    return {
+      height: 0,
+      lineCount: 0,
+      lines: [],
+    };
+  }
+  const prepared = prepareWithSegments(String(text), font);
+  return layoutWithLines(prepared, Number(maxWidth) || 200, lineHeight);
 }
 
 export function getEllipsisText(text, maxWidth, font = DEFAULT_FONT, maxChars = 20) {
-  if (!text || text.length <= maxChars)
-    return { text, truncated: false }
-  const fullHeight = measureTextHeight(text, maxWidth)
-  const shortText = `${text.slice(0, maxChars)}...`
-  const shortHeight = measureTextHeight(shortText, maxWidth)
-  if (fullHeight > shortHeight) {
-    return { text: shortText, truncated: true }
+  if (!text || text.length <= maxChars) {
+    return {
+      text,
+      truncated: false,
+    };
   }
-  return { text, truncated: false }
+  const fullHeight = measureTextHeight(text, maxWidth);
+  const shortText = `${text.slice(0, maxChars)}...`;
+  const shortHeight = measureTextHeight(shortText, maxWidth);
+  if (fullHeight > shortHeight) {
+    return {
+      text: shortText,
+      truncated: true,
+    };
+  }
+  return {
+    text,
+    truncated: false,
+  };
 }
 ```
 
@@ -173,38 +188,50 @@ export function getEllipsisText(text, maxWidth, font = DEFAULT_FONT, maxChars = 
 
 ```vue
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { measureTextHeight } from '@/utils/textMeasure'
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { measureTextHeight } from "@/utils/textMeasure";
 
-const containerRef = ref(null)
-const scrollTop = ref(0)
-const containerHeight = ref(600)
-const itemHeight = 40 // 预估行高
+const containerRef = ref(null);
+const scrollTop = ref(0);
+const containerHeight = ref(600);
+const itemHeight = 40; // 预估行高
 
 const visibleRange = computed(() => {
-  const start = Math.floor(scrollTop.value / itemHeight)
-  const count = Math.ceil(containerHeight.value / itemHeight) + 5
-  return { start: Math.max(0, start - 2), end: start + count }
-})
+  const start = Math.floor(scrollTop.value / itemHeight);
+  const count = Math.ceil(containerHeight.value / itemHeight) + 5;
+  return {
+    end: start + count,
+    start: Math.max(0, start - 2),
+  };
+});
 
 const visibleRecords = computed(() => {
-  return listStore.records.slice(visibleRange.value.start, visibleRange.value.end)
-})
+  return listStore.records.slice(visibleRange.value.start, visibleRange.value.end);
+});
 
 function onScroll(e) {
-  scrollTop.value = e.target.scrollTop
+  scrollTop.value = e.target.scrollTop;
 }
 </script>
 
 <template>
   <div
+    @scroll="onScroll"
     ref="containerRef"
     class="overflow-auto"
     :style="{ height: `${containerHeight}px` }"
-    @scroll="onScroll"
   >
-    <div :style="{ height: `${listStore.records.length * itemHeight}px`, position: 'relative' }">
-      <div :style="{ transform: `translateY(${visibleRange.start * itemHeight}px)` }">
+    <div
+      :style="{
+        height: `${listStore.records.length * itemHeight}px`,
+        position: 'relative',
+      }"
+    >
+      <div
+        :style="{
+          transform: `translateY(${visibleRange.start * itemHeight}px)`,
+        }"
+      >
         <tr v-for="(row, idx) in visibleRecords" :key="visibleRange.start + idx">
           <!-- 内容 -->
         </tr>
@@ -218,11 +245,11 @@ function onScroll(e) {
 
 ```vue
 <script setup>
-import { measureTextHeight } from '@/utils/textMeasure'
+import { measureTextHeight } from "@/utils/textMeasure";
 
 function getCellHeight(text, maxWidth = 100) {
-  const height = measureTextHeight(text, maxWidth, 16)
-  return Math.max(32, height + 8) // 最小高度 32px
+  const height = measureTextHeight(text, maxWidth, 16);
+  return Math.max(32, height + 8); // 最小高度 32px
 }
 </script>
 
@@ -237,11 +264,11 @@ function getCellHeight(text, maxWidth = 100) {
 
 ```vue
 <script setup>
-import { getEllipsisText } from '@/utils/textMeasure'
+import { getEllipsisText } from "@/utils/textMeasure";
 
 function formatCellText(text, maxWidth = 120) {
-  const result = getEllipsisText(text, maxWidth)
-  return result.text
+  const result = getEllipsisText(text, maxWidth);
+  return result.text;
 }
 </script>
 

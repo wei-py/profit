@@ -1,97 +1,99 @@
 <script setup>
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useTheme } from '@/composables/useTheme'
-import { useTour } from '@/composables/useTour'
+import { computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useTheme } from "@/composables/useTheme";
+import { useTour } from "@/composables/useTour";
 
-const router = useRouter()
-const route = useRoute()
-const { isDark, toggleTheme } = useTheme()
-const { startTour } = useTour()
+const router = useRouter();
+const route = useRoute();
+const { isDark, toggleTheme } = useTheme();
+const { startTour } = useTour();
 
 const tabs = [
-  { path: '/country', label: '配置' },
-  { path: '/list', label: '商品' },
-]
+  {
+    label: "配置",
+    path: "/country",
+  },
+  {
+    label: "商品",
+    path: "/list",
+  },
+];
 
 const activeTab = computed(() => {
-  if (route.path.startsWith('/list'))
-    return '/list'
-  return '/country'
-})
+  if (route.path.startsWith("/list"))
+    return "/list";
+  return "/country";
+});
 
 function goTab(path) {
-  router.push(path)
+  router.push(path);
 }
 </script>
 
 <template>
-  <div class="flex flex-col h-screen bg-base-200">
+  <div class="bg-base-200 flex flex-col h-screen">
     <!-- 顶部栏 -->
     <header
-      class="flex items-center justify-between h-12 px-4 bg-base-100 border-b border-base-300 flex-shrink-0"
+      class="bg-base-100 border-b border-base-300 flex flex-shrink-0 h-12 items-center justify-between px-4"
     >
-      <div class="flex items-center gap-1">
-        <span class="font-bold text-lg mr-4">利润工具</span>
+      <div class="flex gap-1 items-center">
+        <span class="font-bold mr-4 text-lg">利润工具</span>
         <button
+          @click="goTab(t.path)"
           v-for="t in tabs"
           :key="t.path"
           class="btn btn-sm"
           :class="activeTab === t.path ? 'btn-primary' : 'btn-ghost'"
-          @click="goTab(t.path)"
         >
           {{ t.label }}
         </button>
       </div>
-      <div class="flex items-center gap-1">
+      <div class="flex gap-1 items-center">
         <button
-          class="btn btn-ghost btn-sm btn-circle"
-          :title="isDark ? '浅色' : '深色'"
           @click="toggleTheme()"
+          class="btn btn-circle btn-ghost btn-sm"
+          :title="isDark ? '浅色' : '深色'"
         >
           <svg
             v-if="isDark"
-            xmlns="http://www.w3.org/2000/svg"
             class="h-4 w-4"
             fill="none"
-            viewBox="0 0 24 24"
             stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
           >
             <path
+              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
               stroke-linecap="round"
               stroke-linejoin="round"
               stroke-width="2"
-              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
             />
           </svg>
           <svg
             v-else
-            xmlns="http://www.w3.org/2000/svg"
             class="h-4 w-4"
             fill="none"
-            viewBox="0 0 24 24"
             stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
           >
             <path
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
               stroke-linecap="round"
               stroke-linejoin="round"
               stroke-width="2"
-              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
             />
           </svg>
         </button>
         <div class="dropdown dropdown-end">
-          <button tabindex="0" class="btn btn-ghost btn-sm btn-circle">
-            ?
-          </button>
+          <button class="btn btn-circle btn-ghost btn-sm" tabindex="0">?</button>
           <ul
+            class="bg-base-100 border dropdown-content menu mt-1 p-2 rounded-box shadow w-52 z-50"
             tabindex="0"
-            class="dropdown-content menu bg-base-100 rounded-box z-50 w-52 p-2 shadow border mt-1"
           >
             <li>
-              <button @click="startTour('overview')">
-                应用概览
-              </button>
+              <button @click="startTour('overview')">应用概览</button>
             </li>
           </ul>
         </div>
@@ -100,7 +102,7 @@ function goTab(path) {
 
     <!-- 主内容 -->
     <main class="flex-1 overflow-hidden">
-      <div class="py-3 px-4 h-full">
+      <div class="h-full px-4 py-3">
         <router-view />
       </div>
     </main>
