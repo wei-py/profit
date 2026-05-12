@@ -51,7 +51,8 @@
 
 ### 场景 3：长文本智能省略 🎯 中优先级
 
-**位置**: 
+**位置**:
+
 - `ListPage.vue` 商品名称列（第 511 行）
 - `EditableTable.vue` textarea 内容（第 126-127 行）
 - 各种下拉选项、表格单元格
@@ -66,7 +67,8 @@
 
 **Pretext 作用**: 预计算文本宽度，智能判断是否需要省略号，以及省略多少字符最合适。
 
-**预期效果**: 
+**预期效果**:
+
 - 短文本正常显示
 - 长文本自动截断并显示省略号
 - hover 时显示完整内容（已有 title）
@@ -103,13 +105,13 @@
 
 ## 三、场景优先级排序
 
-| 优先级 | 场景 | 用户体验提升 | 实现难度 |
-|--------|------|--------------|----------|
-| 🥇 1 | 列表虚拟滚动 | 显著（1000+ 条记录流畅度） | 中等 |
-| 🥇 2 | SKU 表格动态行高 | 明显（长文本不再被截断） | 简单 |
-| 🥈 3 | 长文本智能省略 | 中等（界面更美观） | 简单 |
-| 🥉 4 | 编辑列弹窗列名截断 | 轻微 | 简单 |
-| 🥉 5 | 表单标签动态宽度 | 轻微 | 简单 |
+| 优先级 | 场景               | 用户体验提升               | 实现难度 |
+| ------ | ------------------ | -------------------------- | -------- |
+| 🥇 1   | 列表虚拟滚动       | 显著（1000+ 条记录流畅度） | 中等     |
+| 🥇 2   | SKU 表格动态行高   | 明显（长文本不再被截断）   | 简单     |
+| 🥈 3   | 长文本智能省略     | 中等（界面更美观）         | 简单     |
+| 🥉 4   | 编辑列弹窗列名截断 | 轻微                       | 简单     |
+| 🥉 5   | 表单标签动态宽度   | 轻微                       | 简单     |
 
 ---
 
@@ -126,32 +128,33 @@ pnpm add @chenglou/pretext
 在 `src/utils/textMeasure.js` 创建文本测量工具：
 
 ```javascript
-import { prepare, layout, prepareWithSegments, layoutWithLines } from '@chenglou/pretext'
+import { prepare, layout, prepareWithSegments, layoutWithLines } from "@chenglou/pretext";
 
-const DEFAULT_FONT = '14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+const DEFAULT_FONT =
+  '14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
 export function measureTextHeight(text, maxWidth, lineHeight = 20, font = DEFAULT_FONT) {
-  if (!text) return 0
-  const prepared = prepare(String(text), font)
-  const { height } = layout(prepared, Number(maxWidth) || 200, lineHeight)
-  return height
+  if (!text) return 0;
+  const prepared = prepare(String(text), font);
+  const { height } = layout(prepared, Number(maxWidth) || 200, lineHeight);
+  return height;
 }
 
 export function measureTextLines(text, maxWidth, lineHeight = 20, font = DEFAULT_FONT) {
-  if (!text) return { lines: [], height: 0, lineCount: 0 }
-  const prepared = prepareWithSegments(String(text), font)
-  return layoutWithLines(prepared, Number(maxWidth) || 200, lineHeight)
+  if (!text) return { lines: [], height: 0, lineCount: 0 };
+  const prepared = prepareWithSegments(String(text), font);
+  return layoutWithLines(prepared, Number(maxWidth) || 200, lineHeight);
 }
 
 export function getEllipsisText(text, maxWidth, font = DEFAULT_FONT, maxChars = 20) {
-  if (!text || text.length <= maxChars) return { text, truncated: false }
-  const fullHeight = measureTextHeight(text, maxWidth)
-  const shortText = text.slice(0, maxChars) + '...'
-  const shortHeight = measureTextHeight(shortText, maxWidth)
+  if (!text || text.length <= maxChars) return { text, truncated: false };
+  const fullHeight = measureTextHeight(text, maxWidth);
+  const shortText = text.slice(0, maxChars) + "...";
+  const shortHeight = measureTextHeight(shortText, maxWidth);
   if (fullHeight > shortHeight) {
-    return { text: shortText, truncated: true }
+    return { text: shortText, truncated: true };
   }
-  return { text, truncated: false }
+  return { text, truncated: false };
 }
 ```
 
@@ -163,31 +166,36 @@ export function getEllipsisText(text, maxWidth, font = DEFAULT_FONT, maxChars = 
 
 ```vue
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { measureTextHeight } from '@/utils/textMeasure'
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { measureTextHeight } from "@/utils/textMeasure";
 
-const containerRef = ref(null)
-const scrollTop = ref(0)
-const containerHeight = ref(600)
-const itemHeight = 40 // 预估行高
+const containerRef = ref(null);
+const scrollTop = ref(0);
+const containerHeight = ref(600);
+const itemHeight = 40; // 预估行高
 
 const visibleRange = computed(() => {
-  const start = Math.floor(scrollTop.value / itemHeight)
-  const count = Math.ceil(containerHeight.value / itemHeight) + 5
-  return { start: Math.max(0, start - 2), end: start + count }
-})
+  const start = Math.floor(scrollTop.value / itemHeight);
+  const count = Math.ceil(containerHeight.value / itemHeight) + 5;
+  return { start: Math.max(0, start - 2), end: start + count };
+});
 
 const visibleRecords = computed(() => {
-  return listStore.records.slice(visibleRange.value.start, visibleRange.value.end)
-})
+  return listStore.records.slice(visibleRange.value.start, visibleRange.value.end);
+});
 
 function onScroll(e) {
-  scrollTop.value = e.target.scrollTop
+  scrollTop.value = e.target.scrollTop;
 }
 </script>
 
 <template>
-  <div ref="containerRef" class="overflow-auto" :style="{ height: containerHeight + 'px' }" @scroll="onScroll">
+  <div
+    ref="containerRef"
+    class="overflow-auto"
+    :style="{ height: containerHeight + 'px' }"
+    @scroll="onScroll"
+  >
     <div :style="{ height: listStore.records.length * itemHeight + 'px', position: 'relative' }">
       <div :style="{ transform: `translateY(${visibleRange.start * itemHeight}px)` }">
         <tr v-for="(row, idx) in visibleRecords" :key="visibleRange.start + idx">
@@ -203,11 +211,11 @@ function onScroll(e) {
 
 ```vue
 <script setup>
-import { measureTextHeight } from '@/utils/textMeasure'
+import { measureTextHeight } from "@/utils/textMeasure";
 
 function getCellHeight(text, maxWidth = 100) {
-  const height = measureTextHeight(text, maxWidth, 16)
-  return Math.max(32, height + 8) // 最小高度 32px
+  const height = measureTextHeight(text, maxWidth, 16);
+  return Math.max(32, height + 8); // 最小高度 32px
 }
 </script>
 
@@ -222,11 +230,11 @@ function getCellHeight(text, maxWidth = 100) {
 
 ```vue
 <script setup>
-import { getEllipsisText } from '@/utils/textMeasure'
+import { getEllipsisText } from "@/utils/textMeasure";
 
 function formatCellText(text, maxWidth = 120) {
-  const result = getEllipsisText(text, maxWidth)
-  return result.text
+  const result = getEllipsisText(text, maxWidth);
+  return result.text;
 }
 </script>
 
@@ -241,14 +249,14 @@ function formatCellText(text, maxWidth = 120) {
 
 ## 五、文件修改清单
 
-| 文件 | 修改内容 | 优先级 |
-|------|----------|--------|
-| `package.json` | 添加 `@chenglou/pretext` 依赖 | 必须 |
-| `src/utils/textMeasure.js` | 新建文本测量工具模块 | 必须 |
-| `src/pages/ListPage.vue` | 列表虚拟滚动 | 🥇 |
-| `src/pages/ListPage.vue` | SKU 表格动态行高 | 🥇 |
-| `src/components/common/FieldInput.vue` | 长文本智能省略 | 🥈 |
-| `src/components/common/EditableTable.vue` | textarea 自适应高度 | 🥈 |
+| 文件                                      | 修改内容                      | 优先级 |
+| ----------------------------------------- | ----------------------------- | ------ |
+| `package.json`                            | 添加 `@chenglou/pretext` 依赖 | 必须   |
+| `src/utils/textMeasure.js`                | 新建文本测量工具模块          | 必须   |
+| `src/pages/ListPage.vue`                  | 列表虚拟滚动                  | 🥇     |
+| `src/pages/ListPage.vue`                  | SKU 表格动态行高              | 🥇     |
+| `src/components/common/FieldInput.vue`    | 长文本智能省略                | 🥈     |
+| `src/components/common/EditableTable.vue` | textarea 自适应高度           | 🥈     |
 
 ---
 

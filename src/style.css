@@ -129,16 +129,15 @@ body {
 /* @shopify/draggable styles */
 .draggable-source--is-dragging {
   opacity: 0.3;
+  transition: none;
 }
-.draggable-mirror {
-  opacity: 0.9;
-  z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+tr.draggable-mirror {
+  display: block !important;
 }
-
-.virtual-scroll-spacer td {
-  border: none;
-  padding: 0;
-  line-height: 0;
-  font-size: 0;
+tr.draggable-mirror td {
+  display: inline-block !important;
+  vertical-align: middle;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
 }

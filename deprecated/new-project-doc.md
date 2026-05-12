@@ -336,8 +336,8 @@ v1 数据模型共 14 个 sheet，存在以下痛点：
 
 ```javascript
 // 每个 SKU 独立计算时
-mergedInputs = { ...所有Product级字段值, ...该SKU的SKU级字段值 }
-result = execute(feeRules, lookupTables, mergedInputs)
+mergedInputs = { ...所有Product级字段值, ...该SKU的SKU级字段值 };
+result = execute(feeRules, lookupTables, mergedInputs);
 ```
 
 模板（费用规则）只管"条件是什么 → 算什么"，不管数据从哪个层级来。

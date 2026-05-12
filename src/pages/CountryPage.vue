@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import ConfigColEditorModal from '@/components/country/ConfigColEditorModal.vue'
 import CountryModal from '@/components/country/CountryModal.vue'
 import FieldModal from '@/components/country/FieldModal.vue'
@@ -12,6 +12,10 @@ import { useConfigStore } from '@/stores/config'
 const store = useConfigStore()
 const { openConfigExcel, saveConfigExcel } = useFileIO()
 const CORE_KEYS = ['编号', '国家', '平台', '货币', '货币符号', '汇率', '启用', '排序']
+
+const countriesTbodyRef = ref(null)
+const countriesRef = toRef(store, '国家平台')
+useSortable(countriesTbodyRef, countriesRef, { handle: '.drag-handle', animation: 200 })
 
 const allKeys = computed(() => {
   const keys = new Set(CORE_KEYS)
@@ -32,15 +36,17 @@ const configColumns = computed(() => {
   if (!store['国家平台'].length)
     return []
   const order = store.国家平台ColOrder
-  return order.length === allKeys.value.length
-    ? order
-    : allKeys.value
+  return order.length === allKeys.value.length ? order : allKeys.value
 })
 
 const expFieldsSource = computed(() => (cpId.value ? store.getFieldsByCountry(cpId.value) : []))
 const localFields = ref([])
 const fieldsContainerRef = ref(null)
-useSortable(fieldsContainerRef, localFields, { handle: '.drag-handle', animation: 200, onEnd: onFieldsDragEnd })
+useSortable(fieldsContainerRef, localFields, {
+  handle: '.drag-handle',
+  animation: 200,
+  onEnd: onFieldsDragEnd,
+})
 watch(
   expFieldsSource,
   (v) => {
@@ -58,7 +64,11 @@ const expOptGroupsSource = computed(() =>
 )
 const localOptGroups = ref([])
 const optGroupsContainerRef = ref(null)
-useSortable(optGroupsContainerRef, localOptGroups, { handle: '.drag-handle', animation: 200, onEnd: onOptGroupsDragEnd })
+useSortable(optGroupsContainerRef, localOptGroups, {
+  handle: '.drag-handle',
+  animation: 200,
+  onEnd: onOptGroupsDragEnd,
+})
 watch(
   expOptGroupsSource,
   (v) => {
@@ -76,7 +86,11 @@ const expTemplatesSource = computed(() =>
 )
 const localTemplates = ref([])
 const templatesContainerRef = ref(null)
-useSortable(templatesContainerRef, localTemplates, { handle: '.drag-handle', animation: 200, onEnd: onTemplatesDragEnd })
+useSortable(templatesContainerRef, localTemplates, {
+  handle: '.drag-handle',
+  animation: 200,
+  onEnd: onTemplatesDragEnd,
+})
 watch(
   expTemplatesSource,
   (v) => {
@@ -228,6 +242,7 @@ function openConfigColEditor() {
             <table class="table table-sm">
               <thead>
                 <tr>
+                  <th class="w-10" />
                   <th class="w-8" />
                   <th v-for="k in configColumns" :key="k" class="relative group">
                     {{ k }}
@@ -244,9 +259,19 @@ function openConfigColEditor() {
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref="countriesTbodyRef">
                 <template v-for="(row, ri) in store['国家平台']" :key="row.编号 || ri">
-                  <tr class="hover" :class="{ 'bg-base-200': expandedId === row.编号 }">
+                  <tr
+                    class="hover sortable-item"
+                    :class="{ 'bg-base-200': expandedId === row.编号 }"
+                  >
+                    <td>
+                      <span
+                        class="drag-handle cursor-grab text-base-content/30 hover:text-base-content flex items-center justify-center select-none px-1 py-0.5"
+                        title="拖拽排序"
+                        @mousedown="expandedId = null"
+                      >☰</span>
+                    </td>
                     <td>
                       <button class="btn btn-ghost btn-xs" @click="toggleExpand(row.编号)">
                         {{ expandedId === row.编号 ? "▼" : "▶" }}
@@ -276,7 +301,7 @@ function openConfigColEditor() {
                     </td>
                   </tr>
                   <tr v-if="expandedId === row.编号">
-                    <td :colspan="configColumns.length + 2" class="p-4 bg-base-200/50">
+                    <td :colspan="configColumns.length + 3" class="p-4 bg-base-200/50">
                       <div class="grid grid-cols-3 gap-4">
                         <div class="card card-sm bg-base-100">
                           <div class="card-body p-3">
@@ -432,6 +457,11 @@ function openConfigColEditor() {
       :cp-id="cpId"
       @close="showTplModal = false"
     />
-    <ConfigColEditorModal :open="showConfigColModal" :items="configColumns" @update="store.国家平台ColOrder = $event" @close="showConfigColModal = false" />
+    <ConfigColEditorModal
+      :open="showConfigColModal"
+      :items="configColumns"
+      @update="store.国家平台ColOrder = $event"
+      @close="showConfigColModal = false"
+    />
   </div>
 </template>

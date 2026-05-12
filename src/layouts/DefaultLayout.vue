@@ -1,27 +1,26 @@
 <script setup>
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useTheme } from '@/composables/useTheme'
-import { useTour } from '@/composables/useTour'
+import { computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useTheme } from "@/composables/useTheme";
+import { useTour } from "@/composables/useTour";
 
-const router = useRouter()
-const route = useRoute()
-const { isDark, toggleTheme } = useTheme()
-const { startTour } = useTour()
+const router = useRouter();
+const route = useRoute();
+const { isDark, toggleTheme } = useTheme();
+const { startTour } = useTour();
 
 const tabs = [
-  { path: '/country', label: '配置' },
-  { path: '/list', label: '商品' },
-]
+  { path: "/country", label: "配置" },
+  { path: "/list", label: "商品" },
+];
 
 const activeTab = computed(() => {
-  if (route.path.startsWith('/list'))
-    return '/list'
-  return '/country'
-})
+  if (route.path.startsWith("/list")) return "/list";
+  return "/country";
+});
 
 function goTab(path) {
-  router.push(path)
+  router.push(path);
 }
 </script>
 
@@ -81,17 +80,13 @@ function goTab(path) {
           </svg>
         </button>
         <div class="dropdown dropdown-end">
-          <button tabindex="0" class="btn btn-ghost btn-sm btn-circle">
-            ?
-          </button>
+          <button tabindex="0" class="btn btn-ghost btn-sm btn-circle">?</button>
           <ul
             tabindex="0"
             class="dropdown-content menu bg-base-100 rounded-box z-50 w-52 p-2 shadow border mt-1"
           >
             <li>
-              <button @click="startTour('overview')">
-                应用概览
-              </button>
+              <button @click="startTour('overview')">应用概览</button>
             </li>
           </ul>
         </div>
