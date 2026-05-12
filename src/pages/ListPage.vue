@@ -327,7 +327,7 @@ async function loadRecordBack(idx) {
 
           <template v-if="createStore.selectedTemplateId">
             <div class="flex gap-4 mt-4">
-              <div class="flex-shrink-0 space-y-2 w-60">
+              <div class="shrink-0 space-y-2 w-60">
                 <div class="font-semibold text-sm">商品级字段</div>
                 <FieldInput
                   @update:model-value="createStore.productInputs[f.字段键] = $event"
