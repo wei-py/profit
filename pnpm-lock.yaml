@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@shopify/draggable':
+        specifier: ^1.2.1
+        version: 1.2.1
       '@tauri-apps/api':
         specifier: ^2
         version: 2.10.1
@@ -41,9 +44,6 @@ importers:
       vue:
         specifier: ^3
         version: 3.5.33(typescript@6.0.3)
-      vue-draggable-next:
-        specifier: ^2.3.0
-        version: 2.3.0(sortablejs@1.15.7)(vue@3.5.33(typescript@6.0.3))
       vue-router:
         specifier: ^4
         version: 4.6.4(vue@3.5.33(typescript@6.0.3))
@@ -578,6 +578,9 @@ packages:
     resolution: {integrity: sha512-Nd/SgG27WoA9e+/TdK74KnHz852TLa94ovOYySo/yMPuTmpckK/jIF2jSwS3g7ELSKXK13/cVdmg1Z/DaCWKxA==}
     cpu: [x64]
     os: [win32]
+
+  '@shopify/draggable@1.2.1':
+    resolution: {integrity: sha512-hYKhd99nl1mkO4ybA8i3rxvZgYS2A4Imcxpq7BoUu7h4LmFt997YxHLy8Mm5J7ST+G4DTQXqBsTx9mDid6piZg==}
 
   '@stylistic/eslint-plugin@5.10.0':
     resolution: {integrity: sha512-nPK52ZHvot8Ju/0A4ucSX1dcPV2/1clx0kLcH5wDmrE4naKso7TUC/voUyU1O9OTKTrR6MYip6LP0ogEMQ9jPQ==}
@@ -2138,9 +2141,6 @@ packages:
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
-  sortablejs@1.15.7:
-    resolution: {integrity: sha512-Kk8wLQPlS+yi1ZEf48a4+fzHa4yxjC30M/Sr2AnQu+f/MPwvvX9XjZ6OWejiz8crBsLwSq8GHqaxaET7u6ux0A==}
-
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
@@ -2318,12 +2318,6 @@ packages:
     peerDependenciesMeta:
       '@vue/composition-api':
         optional: true
-
-  vue-draggable-next@2.3.0:
-    resolution: {integrity: sha512-ymbY0UIwfSdg0iDN/iyNNwUrTqZ/6KbPryzsvTNXBLuDCuOBdNijSK8yynNtmiSj6RapTPQfjLGQdJrZkzBd2w==}
-    peerDependencies:
-      sortablejs: ^1.14.0
-      vue: ^3.5.17
 
   vue-eslint-parser@10.4.0:
     resolution: {integrity: sha512-Vxi9pJdbN3ZnVGLODVtZ7y4Y2kzAAE2Cm0CZ3ZDRvydVYxZ6VrnBhLikBsRS+dpwj4Jv4UCv21PTEwF5rQ9WXg==}
@@ -2792,6 +2786,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.60.2':
     optional: true
+
+  '@shopify/draggable@1.2.1': {}
 
   '@stylistic/eslint-plugin@5.10.0(eslint@9.39.4(jiti@2.6.1))':
     dependencies:
@@ -4566,8 +4562,6 @@ snapshots:
 
   sisteransi@1.0.5: {}
 
-  sortablejs@1.15.7: {}
-
   source-map-js@1.2.1: {}
 
   spdx-exceptions@2.5.0: {}
@@ -4711,11 +4705,6 @@ snapshots:
 
   vue-demi@0.14.10(vue@3.5.33(typescript@6.0.3)):
     dependencies:
-      vue: 3.5.33(typescript@6.0.3)
-
-  vue-draggable-next@2.3.0(sortablejs@1.15.7)(vue@3.5.33(typescript@6.0.3)):
-    dependencies:
-      sortablejs: 1.15.7
       vue: 3.5.33(typescript@6.0.3)
 
   vue-eslint-parser@10.4.0(eslint@9.39.4(jiti@2.6.1)):
