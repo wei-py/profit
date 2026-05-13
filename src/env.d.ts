@@ -1,2 +1,2 @@
 /// <reference types="vite/client" />
-declare module 'hevue-img-preview/v3';
+declare module "hevue-img-preview/v3";

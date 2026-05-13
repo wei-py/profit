@@ -125,19 +125,3 @@ body {
 .card-body.flex-1 {
   flex: 1 1 0% !important;
 }
-
-/* @shopify/draggable styles */
-.draggable-source--is-dragging {
-  opacity: 0.3;
-  transition: none;
-}
-tr.draggable-mirror {
-  display: block !important;
-}
-tr.draggable-mirror td {
-  display: inline-block !important;
-  vertical-align: middle;
-  padding: 2px 6px;
-  font-size: 0.7rem;
-  white-space: nowrap;
-}

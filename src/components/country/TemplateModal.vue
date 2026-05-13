@@ -1,7 +1,6 @@
 <script setup>
 import { driver } from "driver.js";
 import { computed, reactive, ref, watch } from "vue";
-import { useSortable } from "@/composables/useSortable";
 import { useConfigStore } from "@/stores/config";
 import ConfirmModal from "./ConfirmModal.vue";
 import LookupTableModal from "./LookupTableModal.vue";
@@ -18,12 +17,7 @@ const emit = defineEmits(["close"]);
 const store = useConfigStore();
 const form = reactive({});
 const rules = ref([]);
-const rulesTableBodyRef = ref(null);
 let _ruleUid = 0;
-useSortable(rulesTableBodyRef, rules, {
-  animation: 200,
-  handle: ".drag-handle",
-});
 const editingRuleIdx = ref(-1);
 const showRuleModal = ref(false);
 const showLookupModal = ref(false);
@@ -264,7 +258,7 @@ function onConfirmOk() {
         </div>
       </div>
 
-      <!-- 费用规则 — 拖拽排序 -->
+      <!-- 费用规则 -->
       <div class="mb-4">
         <div class="flex items-center justify-between mb-2">
           <span class="font-semibold text-sm">费用规则（{{ rules.length }} 条）</span>
@@ -282,16 +276,15 @@ function onConfirmOk() {
               <th />
             </tr>
           </thead>
-          <tbody ref="rulesTableBodyRef">
+          <tbody>
             <tr
               v-for="(r, i) in rules"
               :key="r._uid || r.编号 || i"
-              class="cursor-pointer hover sortable-item"
+              class="cursor-pointer hover"
             >
               <td>
                 <span
-                  class="cursor-grab drag-handle flex hover:text-base-content items-center justify-center select-none text-base-content/30 text-xs"
-                  title="拖拽排序"
+                  class="flex hover:text-base-content items-center justify-center select-none text-base-content/30 text-xs"
                 >
                   ☰
                 </span>

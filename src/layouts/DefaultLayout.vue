@@ -18,12 +18,18 @@ const tabs = [
     label: "商品",
     path: "/list",
   },
+  {
+    label: "测试",
+    path: "/test",
+  },
 ];
 
 const activeTab = computed(() => {
-  if (route.path.startsWith("/list"))
-    return "/list";
-  return "/country";
+  return tabs.find(tab => route.path.startsWith(tab.path)).path;
+
+  // if (route.path.startsWith("/list"))
+  //   return "/list";
+  // return "/country";
 });
 
 function goTab(path) {

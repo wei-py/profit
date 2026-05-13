@@ -1,24 +1,16 @@
 <script setup>
-import { computed, ref, toRef, watch } from "vue";
-import ConfigColEditorModal from "@/components/country/ConfigColEditorModal.vue";
+import { computed, ref, watch } from "vue";
+import ColEditorModal from "@/components/common/ColEditorModal.vue";
 import CountryModal from "@/components/country/CountryModal.vue";
 import FieldModal from "@/components/country/FieldModal.vue";
 import OptionGroupModal from "@/components/country/OptionGroupModal.vue";
 import TemplateModal from "@/components/country/TemplateModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
-import { useSortable } from "@/composables/useSortable";
 import { useConfigStore } from "@/stores/config";
 
 const store = useConfigStore();
 const { openConfigExcel, saveConfigExcel } = useFileIO();
 const CORE_KEYS = ["编号", "国家", "平台", "货币", "货币符号", "汇率", "启用", "排序"];
-
-const countriesTbodyRef = ref(null);
-const countriesRef = toRef(store, "国家平台");
-useSortable(countriesTbodyRef, countriesRef, {
-  animation: 200,
-  handle: ".drag-handle",
-});
 
 const allKeys = computed(() => {
   const keys = new Set(CORE_KEYS);
@@ -44,12 +36,6 @@ const configColumns = computed(() => {
 
 const expFieldsSource = computed(() => (cpId.value ? store.getFieldsByCountry(cpId.value) : []));
 const localFields = ref([]);
-const fieldsContainerRef = ref(null);
-useSortable(fieldsContainerRef, localFields, {
-  animation: 200,
-  handle: ".drag-handle",
-  onEnd: onFieldsDragEnd,
-});
 watch(
   expFieldsSource,
   (v) => {
@@ -66,12 +52,6 @@ const expOptGroupsSource = computed(() =>
   cpId.value ? store.getOptionGroupsByCountry(cpId.value) : [],
 );
 const localOptGroups = ref([]);
-const optGroupsContainerRef = ref(null);
-useSortable(optGroupsContainerRef, localOptGroups, {
-  animation: 200,
-  handle: ".drag-handle",
-  onEnd: onOptGroupsDragEnd,
-});
 watch(
   expOptGroupsSource,
   (v) => {
@@ -88,12 +68,6 @@ const expTemplatesSource = computed(() =>
   cpId.value ? store.getTemplatesByCountry(cpId.value) : [],
 );
 const localTemplates = ref([]);
-const templatesContainerRef = ref(null);
-useSortable(templatesContainerRef, localTemplates, {
-  animation: 200,
-  handle: ".drag-handle",
-  onEnd: onTemplatesDragEnd,
-});
 watch(
   expTemplatesSource,
   (v) => {
@@ -248,17 +222,15 @@ function openConfigColEditor() {
                   <th class="w-24">操作</th>
                 </tr>
               </thead>
-              <tbody ref="countriesTbodyRef">
+              <tbody>
                 <template v-for="(row, ri) in store['国家平台']" :key="row.编号 || ri">
                   <tr
-                    class="hover sortable-item"
+                    class="hover"
                     :class="{ 'bg-base-200': expandedId === row.编号 }"
                   >
                     <td>
                       <span
-                        @mousedown="expandedId = null"
-                        class="cursor-grab drag-handle flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
-                        title="拖拽排序"
+                        class="flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
                       >☰</span>
                     </td>
                     <td>
@@ -301,16 +273,15 @@ function openConfigColEditor() {
                             <div v-if="!localFields.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else ref="fieldsContainerRef">
+                            <div v-else>
                               <div
                                 v-for="(f, i) in localFields"
                                 :key="f.字段键 || i"
-                                class="border-b border-base-200 flex items-center justify-between py-1 sortable-item text-xs"
+                                class="border-b border-base-200 flex items-center justify-between py-1 text-xs"
                               >
                                 <span class="flex gap-2 items-center">
                                   <span
-                                    class="cursor-grab drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
-                                    title="拖拽排序"
+                                    class="flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
                                   >☰</span>
                                   <span
                                     @click="openEditField(i)"
@@ -337,16 +308,15 @@ function openConfigColEditor() {
                             <div v-if="!localOptGroups.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else ref="optGroupsContainerRef">
+                            <div v-else>
                               <div
                                 v-for="(g, i) in localOptGroups"
                                 :key="g.编号 || i"
-                                class="border-b border-base-200 flex items-center justify-between py-1 sortable-item text-xs"
+                                class="border-b border-base-200 flex items-center justify-between py-1 text-xs"
                               >
                                 <span class="flex gap-2 items-center">
                                   <span
-                                    class="cursor-grab drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
-                                    title="拖拽排序"
+                                    class="flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
                                   >☰</span>
                                   <span
                                     @click="openEditOpt(i)"
@@ -374,16 +344,15 @@ function openConfigColEditor() {
                             <div v-if="!localTemplates.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else ref="templatesContainerRef">
+                            <div v-else>
                               <div
                                 v-for="(t, i) in localTemplates"
                                 :key="t.编号 || i"
-                                class="border-b border-base-200 flex items-center justify-between py-1 sortable-item text-xs"
+                                class="border-b border-base-200 flex items-center justify-between py-1 text-xs"
                               >
                                 <span class="flex gap-2 items-center">
                                   <span
-                                    class="cursor-grab drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
-                                    title="拖拽排序"
+                                    class="flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
                                   >☰</span>
                                   <span
                                     @click="openEditTpl(i)"
@@ -440,11 +409,12 @@ function openConfigColEditor() {
       :open="showTplModal"
       :templateIdx="editingTplIdx"
     />
-    <ConfigColEditorModal
+    <ColEditorModal
       @close="showConfigColModal = false"
       @update="store.国家平台ColOrder = $event"
       :items="configColumns"
       :open="showConfigColModal"
+      filterKey=""
     />
   </div>
 </template>

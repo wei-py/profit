@@ -6,7 +6,6 @@ import FieldInput from "@/components/common/FieldInput.vue";
 import ReverseCalcModal from "@/components/list/ReverseCalcModal.vue";
 import TraceModal from "@/components/list/TraceModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
-import { useSortable } from "@/composables/useSortable";
 import { useConfigStore } from "@/stores/config";
 import { useCreateStore } from "@/stores/create";
 import { useListStore } from "@/stores/list";
@@ -67,8 +66,6 @@ const traceFieldKey = ref("");
 const showColModal = ref(false);
 const skuColModal = ref(false);
 const skuColOrder = ref([]);
-const skuTableBodyRef = ref(null);
-const recordsTableBodyRef = ref(null);
 
 const skuAllFields = computed(() => {
   const fields = [];
@@ -95,29 +92,24 @@ watch(
   { immediate: true },
 );
 
-useSortable(skuTableBodyRef, createStore.skus, {
-  animation: 200,
-  handle: ".drag-handle",
-});
 const currentPage = ref(1);
 const pageSize = ref(20);
 
 const pageOffset = computed(() => (currentPage.value - 1) * pageSize.value);
-useSortable(recordsTableBodyRef, listStore.records, {
-  animation: 200,
-  handle: ".drag-handle",
-  onSplice: (oldVisualIdx, newVisualIdx) => {
+
+const pagedRecordsWritable = computed({
+  get: () => {
+    const start = pageOffset.value;
+    return listStore.records.slice(start, start + pageSize.value);
+  },
+  set: (newPaged) => {
     const offset = pageOffset.value;
-    const [moved] = listStore.records.splice(offset + oldVisualIdx, 1);
-    listStore.records.splice(offset + newVisualIdx, 0, moved);
+    const count = Math.min(pageSize.value, Math.max(0, listStore.records.length - offset));
+    listStore.records.splice(offset, count, ...newPaged);
   },
 });
 
 const totalPages = computed(() => Math.ceil(listStore.records.length / pageSize.value) || 1);
-const pagedRecords = computed(() => {
-  const start = pageOffset.value;
-  return listStore.records.slice(start, start + pageSize.value);
-});
 
 watch(pageSize, () => {
   if (currentPage.value > totalPages.value)
@@ -426,17 +418,15 @@ async function loadRecordBack(idx) {
                       </th>
                     </tr>
                   </thead>
-                  <tbody ref="skuTableBodyRef">
+                  <tbody>
                     <tr
                       v-for="(sku, si) in createStore.skus"
                       :key="sku.key"
-                      class="sortable-item"
                       :style="{ height: `${skuRowHeights[si]}px` }"
                     >
                       <td class="bg-base-100 left-0 sticky z-10">
                         <span
-                          class="cursor-grab drag-handle flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
-                          title="拖拽排序"
+                          class="flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
                         >☰</span>
                       </td>
                       <td>
@@ -558,12 +548,11 @@ async function loadRecordBack(idx) {
                     <th class="bg-base-100 right-0 sticky w-24 z-10">操作</th>
                   </tr>
                 </thead>
-                <tbody ref="recordsTableBodyRef">
-                  <tr v-for="(row, pIdx) in pagedRecords" :key="row._uid" class="sortable-item">
+                <tbody>
+                  <tr v-for="(row, pIdx) in pagedRecordsWritable" :key="row._uid">
                     <td class="bg-base-100 left-0 sticky z-10">
                       <span
-                        class="cursor-grab drag-handle flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
-                        title="拖拽排序"
+                        class="flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
                       >☰</span>
                     </td>
                     <td v-for="col in listColumns" :key="col" class="whitespace-nowrap">

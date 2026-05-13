@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from "vue";
-import { useSortable } from "@/composables/useSortable";
+import { vDraggable } from "vue-draggable-plus";
 
 const props = defineProps({
   items: {
@@ -12,24 +12,37 @@ const props = defineProps({
     default: "编辑列顺序",
     type: String,
   },
+  filterKey: {
+    default: "_uid",
+    type: String,
+  },
 });
 const emit = defineEmits(["close", "update"]);
 
 const localOrder = ref([]);
-const containerRef = ref(null);
 
-useSortable(containerRef, localOrder, {
-  animation: 200,
+const options = {
+  animation: 150,
+  chosenClass: "col-chosen",
+  dragClass: "col-drag",
+  fallbackOnBody: true,
+  forceFallback: true,
+  ghostClass: "col-ghost",
   handle: ".drag-handle",
-});
+};
 
 watch(
   () => props.open,
   (v) => {
     if (v)
-      localOrder.value = [...props.items.filter(k => k !== "_uid")];
+      localOrder.value = [...props.items.filter(k => k !== props.filterKey)];
   },
 );
+
+function saveOrder() {
+  emit("update", [...localOrder.value]);
+  emit("close");
+}
 </script>
 
 <template>
@@ -42,15 +55,14 @@ watch(
         <button @click="emit('close')" class="btn btn-circle btn-ghost btn-sm">✕</button>
       </div>
       <div class="mb-2 text-base-content/50 text-xs">拖拽左侧三条杠调整列顺序</div>
-      <div ref="containerRef" class="overflow-y-auto">
+      <div v-draggable="[localOrder, options]" class="overflow-y-auto drag-list">
         <div
           v-for="col in localOrder"
           :key="col"
-          class="bg-base-200 flex gap-2 items-center mb-1 p-2 rounded sortable-item text-sm"
+          class="bg-base-200 flex gap-2 items-center mb-1 p-2 rounded text-sm drag-item"
         >
           <span
-            class="cursor-grab drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
-            title="拖拽排序"
+            class="drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30 cursor-grab"
           >☰</span>
           <span class="flex-1 text-xs truncate" :title="col">{{ col }}</span>
         </div>
@@ -58,10 +70,7 @@ watch(
       <div class="modal-action mt-4">
         <button @click="emit('close')" class="btn btn-ghost btn-sm">取消</button>
         <button
-          @click="
-            emit('update', localOrder);
-            emit('close');
-          "
+          @click="saveOrder"
           class="btn btn-primary btn-sm"
         >
           完成
@@ -73,3 +82,16 @@ watch(
     </form>
   </div>
 </template>
+
+<style>
+.col-ghost {
+  opacity: 0.4;
+}
+.col-chosen {
+  outline: 2px solid oklch(var(--p));
+}
+.col-drag {
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+</style>

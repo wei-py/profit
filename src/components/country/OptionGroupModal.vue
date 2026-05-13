@@ -1,7 +1,6 @@
 <script setup>
 import { driver } from "driver.js";
 import { reactive, ref, watch } from "vue";
-import { useSortable } from "@/composables/useSortable";
 import { useConfigStore } from "@/stores/config";
 import "driver.js/dist/driver.css";
 
@@ -15,13 +14,7 @@ const emit = defineEmits(["close"]);
 const store = useConfigStore();
 const form = reactive({});
 const items = ref([]);
-const itemsTableBodyRef = ref(null);
 let _uid = 0;
-
-useSortable(itemsTableBodyRef, items, {
-  animation: 200,
-  handle: ".drag-handle",
-});
 
 const optionEditSteps = [
   {
@@ -166,12 +159,11 @@ function deleteGroup() {
               <th />
             </tr>
           </thead>
-          <tbody ref="itemsTableBodyRef">
-            <tr v-for="(item, i) in items" :key="i" class="sortable-item">
+          <tbody>
+            <tr v-for="(item, i) in items" :key="i">
               <td>
                 <span
-                  class="cursor-grab drag-handle flex hover:text-base-content items-center justify-center px-0.5 select-none text-base-content/30 text-xs"
-                  title="拖拽排序"
+                  class="flex hover:text-base-content items-center justify-center px-0.5 select-none text-base-content/30 text-xs"
                 >☰</span>
               </td>
               <td>

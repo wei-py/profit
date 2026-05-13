@@ -18,6 +18,11 @@ const routes = [
         path: "list",
         component: () => import("@/pages/ListPage.vue"),
       },
+      {
+        name: "test",
+        path: "test",
+        component: () => import("@/pages/TestPage.vue"),
+      },
     ],
     path: "/",
     redirect: "/list",
