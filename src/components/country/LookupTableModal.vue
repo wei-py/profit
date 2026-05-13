@@ -1,6 +1,7 @@
 <script setup>
 import { driver } from "driver.js";
 import { ref, watch } from "vue";
+import { vDraggable } from "vue-draggable-plus";
 import { useConfigStore } from "@/stores/config";
 import "driver.js/dist/driver.css";
 
@@ -13,6 +14,16 @@ const emit = defineEmits(["close"]);
 const store = useConfigStore();
 const newName = ref("");
 const rowsLocal = ref([]);
+
+const dragOpts = {
+  animation: 150,
+  chosenClass: "drag-chosen",
+  dragClass: "drag-drag",
+  fallbackOnBody: true,
+  forceFallback: true,
+  ghostClass: "drag-ghost",
+  handle: ".drag-handle",
+};
 
 const lookupEditSteps = [
   {
@@ -127,6 +138,7 @@ function save() {
         <table class="table table-xs">
           <thead>
             <tr>
+              <th class="w-8" />
               <th v-for="k in Object.keys(rowsLocal[0] || {})" :key="k" class="group relative">
                 {{ k }}
                 <button
@@ -139,8 +151,13 @@ function save() {
               <th class="w-12" />
             </tr>
           </thead>
-          <tbody>
+          <tbody v-draggable="[rowsLocal, dragOpts]">
             <tr v-for="(row, i) in rowsLocal" :key="i">
+              <td>
+                <span
+                  class="drag-handle flex hover:text-base-content items-center justify-center select-none text-base-content/30 text-xs"
+                >☰</span>
+              </td>
               <td v-for="k in Object.keys(rowsLocal[0] || {})" :key="k">
                 <input v-model="row[k]" class="input input-bordered input-xs w-full">
               </td>

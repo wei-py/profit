@@ -1,6 +1,7 @@
 <script setup>
 import { driver } from "driver.js";
 import { computed, reactive, ref, watch } from "vue";
+import { vDraggable } from "vue-draggable-plus";
 import { useConfigStore } from "@/stores/config";
 import ConfirmModal from "./ConfirmModal.vue";
 import LookupTableModal from "./LookupTableModal.vue";
@@ -18,6 +19,19 @@ const store = useConfigStore();
 const form = reactive({});
 const rules = ref([]);
 let _ruleUid = 0;
+
+const dragOpts = {
+  animation: 150,
+  chosenClass: "drag-chosen",
+  dragClass: "drag-drag",
+  fallbackOnBody: true,
+  forceFallback: true,
+  ghostClass: "drag-ghost",
+  handle: ".drag-handle",
+  onEnd: () => {
+    rules.value.forEach((r, i) => { r.计算顺序 = i + 1; });
+  },
+};
 const editingRuleIdx = ref(-1);
 const showRuleModal = ref(false);
 const showLookupModal = ref(false);
@@ -276,7 +290,7 @@ function onConfirmOk() {
               <th />
             </tr>
           </thead>
-          <tbody>
+          <tbody v-draggable="[rules, dragOpts]">
             <tr
               v-for="(r, i) in rules"
               :key="r._uid || r.编号 || i"
@@ -284,7 +298,7 @@ function onConfirmOk() {
             >
               <td>
                 <span
-                  class="flex hover:text-base-content items-center justify-center select-none text-base-content/30 text-xs"
+                  class="drag-handle flex hover:text-base-content items-center justify-center select-none text-base-content/30 text-xs"
                 >
                   ☰
                 </span>

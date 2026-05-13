@@ -23,11 +23,11 @@ const localOrder = ref([]);
 
 const options = {
   animation: 150,
-  chosenClass: "col-chosen",
-  dragClass: "col-drag",
+  chosenClass: "drag-chosen",
+  dragClass: "drag-drag",
   fallbackOnBody: true,
   forceFallback: true,
-  ghostClass: "col-ghost",
+  ghostClass: "drag-ghost",
   handle: ".drag-handle",
 };
 
@@ -83,15 +83,4 @@ function saveOrder() {
   </div>
 </template>
 
-<style>
-.col-ghost {
-  opacity: 0.4;
-}
-.col-chosen {
-  outline: 2px solid oklch(var(--p));
-}
-.col-drag {
-  opacity: 0.9;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-</style>
+

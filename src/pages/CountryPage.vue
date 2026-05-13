@@ -5,12 +5,23 @@ import CountryModal from "@/components/country/CountryModal.vue";
 import FieldModal from "@/components/country/FieldModal.vue";
 import OptionGroupModal from "@/components/country/OptionGroupModal.vue";
 import TemplateModal from "@/components/country/TemplateModal.vue";
+import { vDraggable } from "vue-draggable-plus";
 import { useFileIO } from "@/composables/useFileIO";
 import { useConfigStore } from "@/stores/config";
 
 const store = useConfigStore();
 const { openConfigExcel, saveConfigExcel } = useFileIO();
 const CORE_KEYS = ["编号", "国家", "平台", "货币", "货币符号", "汇率", "启用", "排序"];
+
+const dragOpts = {
+  animation: 150,
+  chosenClass: "drag-chosen",
+  dragClass: "drag-drag",
+  fallbackOnBody: true,
+  forceFallback: true,
+  ghostClass: "drag-ghost",
+  handle: ".drag-handle",
+};
 
 const allKeys = computed(() => {
   const keys = new Set(CORE_KEYS);
@@ -273,7 +284,7 @@ function openConfigColEditor() {
                             <div v-if="!localFields.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else>
+                            <div v-else v-draggable="[localFields, { ...dragOpts, onEnd: onFieldsDragEnd }]">
                               <div
                                 v-for="(f, i) in localFields"
                                 :key="f.字段键 || i"
@@ -281,7 +292,7 @@ function openConfigColEditor() {
                               >
                                 <span class="flex gap-2 items-center">
                                   <span
-                                    class="flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
+                                    class="drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
                                   >☰</span>
                                   <span
                                     @click="openEditField(i)"
@@ -308,7 +319,7 @@ function openConfigColEditor() {
                             <div v-if="!localOptGroups.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else>
+                            <div v-else v-draggable="[localOptGroups, { ...dragOpts, onEnd: onOptGroupsDragEnd }]">
                               <div
                                 v-for="(g, i) in localOptGroups"
                                 :key="g.编号 || i"
@@ -316,7 +327,7 @@ function openConfigColEditor() {
                               >
                                 <span class="flex gap-2 items-center">
                                   <span
-                                    class="flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
+                                    class="drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
                                   >☰</span>
                                   <span
                                     @click="openEditOpt(i)"
@@ -344,7 +355,7 @@ function openConfigColEditor() {
                             <div v-if="!localTemplates.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else>
+                            <div v-else v-draggable="[localTemplates, { ...dragOpts, onEnd: onTemplatesDragEnd }]">
                               <div
                                 v-for="(t, i) in localTemplates"
                                 :key="t.编号 || i"
@@ -352,7 +363,7 @@ function openConfigColEditor() {
                               >
                                 <span class="flex gap-2 items-center">
                                   <span
-                                    class="flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
+                                    class="drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
                                   >☰</span>
                                   <span
                                     @click="openEditTpl(i)"

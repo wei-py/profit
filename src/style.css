@@ -125,3 +125,20 @@ body {
 .card-body.flex-1 {
   flex: 1 1 0% !important;
 }
+
+.drag-ghost {
+  opacity: 0.4;
+}
+.drag-chosen {
+  outline: 2px solid oklch(var(--p));
+}
+.drag-drag {
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.drag-handle {
+  cursor: grab;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}

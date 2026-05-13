@@ -1,6 +1,7 @@
 <script setup>
 import { driver } from "driver.js";
 import { reactive, ref, watch } from "vue";
+import { vDraggable } from "vue-draggable-plus";
 import { useConfigStore } from "@/stores/config";
 import "driver.js/dist/driver.css";
 
@@ -15,6 +16,19 @@ const store = useConfigStore();
 const form = reactive({});
 const items = ref([]);
 let _uid = 0;
+
+const dragOpts = {
+  animation: 150,
+  chosenClass: "drag-chosen",
+  dragClass: "drag-drag",
+  fallbackOnBody: true,
+  forceFallback: true,
+  ghostClass: "drag-ghost",
+  handle: ".drag-handle",
+  onEnd: () => {
+    items.value.forEach((item, i) => { item.排序 = i + 1; });
+  },
+};
 
 const optionEditSteps = [
   {
@@ -159,11 +173,11 @@ function deleteGroup() {
               <th />
             </tr>
           </thead>
-          <tbody>
+          <tbody v-draggable="[items, dragOpts]">
             <tr v-for="(item, i) in items" :key="i">
               <td>
                 <span
-                  class="flex hover:text-base-content items-center justify-center px-0.5 select-none text-base-content/30 text-xs"
+                  class="drag-handle flex hover:text-base-content items-center justify-center px-0.5 select-none text-base-content/30 text-xs"
                 >☰</span>
               </td>
               <td>
