@@ -11,7 +11,7 @@ import { useConfigStore } from "@/stores/config";
 
 const store = useConfigStore();
 const { openConfigExcel, saveConfigExcel } = useFileIO();
-const CORE_KEYS = ["编号", "国家", "平台", "货币", "货币符号", "汇率", "启用", "排序"];
+const CORE_KEYS = ["编号", "国家", "平台", "货币", "货币符号", "汇率", "启用"];
 
 const dragOpts = {
   animation: 150,
@@ -43,6 +43,15 @@ const expandedId = ref(null);
 const cpId = computed(() => expandedId.value);
 
 const configColumns = computed(() => {
+  if (!store["国家平台"].length)
+    return [];
+  const order = store.国家平台ColOrder;
+  const all = order.length === allKeys.value.length ? order : allKeys.value;
+  const hiddenSet = new Set(store.国家平台HiddenCols);
+  return all.filter(k => !hiddenSet.has(k));
+});
+
+const allConfigColumns = computed(() => {
   if (!store["国家平台"].length)
     return [];
   const order = store.国家平台ColOrder;
@@ -448,8 +457,10 @@ function openConfigColEditor() {
     <ColEditorModal
       @close="showConfigColModal = false"
       @update="store.国家平台ColOrder = $event"
+      @update-hidden="store.国家平台HiddenCols = $event"
       filterKey=""
-      :items="configColumns"
+      :hiddenKeys="store.国家平台HiddenCols"
+      :items="allConfigColumns"
       :open="showConfigColModal"
     />
   </div>

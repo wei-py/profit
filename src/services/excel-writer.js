@@ -29,6 +29,13 @@ export async function buildWorkbookBuffer(config) {
     }
   }
 
+  if (config.国家平台HiddenCols && config.国家平台HiddenCols.length) {
+    const meta = wb.addWorksheet("__meta__");
+    meta.addRow(["国家平台HiddenCols"]);
+    meta.addRow([JSON.stringify(config.国家平台HiddenCols)]);
+    meta.state = "hidden";
+  }
+
   return new Uint8Array(await wb.xlsx.writeBuffer());
 }
 

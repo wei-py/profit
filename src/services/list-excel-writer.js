@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import JSZip from "jszip";
 
 /** 写入 Excel，图片真正嵌入单元格（WPS DISPIMG 兼容）。 先用 ExcelJS 生成 xlsx，再用 JSZip 注入 cellimages.xml。 */
-export async function buildListWorkbookBuffer(records, columnOrder) {
+export async function buildListWorkbookBuffer(records, columnOrder, hiddenColumns = []) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("商品记录");
 
@@ -81,8 +81,15 @@ export async function buildListWorkbookBuffer(records, columnOrder) {
   const xlsxBuf = new Uint8Array(await wb.xlsx.writeBuffer());
 
   // 2. 如果没有图片，直接返回
-  if (!cellImages.length)
+  if (!cellImages.length) {
+    if (hiddenColumns.length) {
+      // 注入 __meta__ 隐藏 sheet 到 xlsx zip
+      const zip2 = await JSZip.loadAsync(xlsxBuf);
+      injectHiddenMeta(zip2, hiddenColumns);
+      return await zip2.generateAsync({ type: "uint8array" });
+    }
     return xlsxBuf;
+  }
 
   // 3. JSZip 注入 cellimages.xml
   const zip = await JSZip.loadAsync(xlsxBuf);
@@ -155,6 +162,11 @@ export async function buildListWorkbookBuffer(records, columnOrder) {
   }
 
   const out = await zip.generateAsync({ type: "uint8array" });
+  if (hiddenColumns.length) {
+    const zip2 = await JSZip.loadAsync(out);
+    injectHiddenMeta(zip2, hiddenColumns);
+    return await zip2.generateAsync({ type: "uint8array" });
+  }
   return out;
 }
 
@@ -182,4 +194,53 @@ function displayWidth(str) {
     w += /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(ch) ? 2 : 1;
   }
   return w;
+}
+
+async function injectHiddenMeta(zip, hiddenColumns) {
+  const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheetPr/>
+<dimension ref="A1:A2"/>
+<sheetViews><sheetView tabSelected="0" workbookViewId="0"><pane ySplit="0" xSplit="0" topLeftCell="A1" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
+<cols><col min="1" max="1" width="30" customWidth="1"/></cols>
+<sheetData>
+<row r="1"><c r="A1" t="str"><v>hiddenColumns</v></c></row>
+<row r="2"><c r="A2" t="str"><v>${escapeXml(JSON.stringify(hiddenColumns))}</v></c></row>
+</sheetData>
+</worksheet>`;
+
+  zip.file("xl/worksheets/sheet2.xml", sheetXml);
+
+  const wbRelsXml = await zip.file("xl/_rels/workbook.xml.rels").async("text");
+  if (!wbRelsXml.includes("sheet2.xml")) {
+    const updatedRels = wbRelsXml.replace(
+      "</Relationships>",
+      "<Relationship Id=\"rIdMeta\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet2.xml\"/></Relationships>",
+    );
+    zip.file("xl/_rels/workbook.xml.rels", updatedRels);
+  }
+
+  const wbXml = await zip.file("xl/workbook.xml").async("text");
+  if (!wbXml.includes("name=\"__meta__\"")) {
+    const updatedWb = wbXml.replace(
+      "</sheets>",
+      "<sheet name=\"__meta__\" sheetId=\"99\" state=\"hidden\" r:id=\"rIdMeta\"/></sheets>",
+    );
+    zip.file("xl/workbook.xml", updatedWb);
+  }
+
+  const ctXml = await zip.file("[Content_Types].xml").async("text");
+  if (!ctXml.includes("sheet2.xml")) {
+    const updatedCt = ctXml.replace(
+      "</Types>",
+      "<Override PartName=\"/xl/worksheets/sheet2.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/></Types>",
+    );
+    zip.file("[Content_Types].xml", updatedCt);
+  }
+}
+
+function escapeXml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }

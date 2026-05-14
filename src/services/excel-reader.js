@@ -21,11 +21,13 @@ function readConfigWorkbook(wb) {
   }
 
   const 国家平台ColOrder = getSheetHeaders(wb, "国家平台");
+  const 国家平台HiddenCols = readHiddenCols(wb);
 
   const config = {
     lookupTables: {},
     国家平台: s2j(wb, "国家平台"),
     国家平台ColOrder,
+    国家平台HiddenCols,
     模板参数: s2j(wb, "模板参数", true),
     计算字段: s2j(wb, "计算字段"),
     计算模板: s2j(wb, "计算模板"),
@@ -87,4 +89,21 @@ function getSheetHeaders(wb, name) {
     headers.push(cell ? String(cell.v) : "");
   }
   return headers.filter(h => h);
+}
+
+function readHiddenCols(wb) {
+  try {
+    const ws = wb.Sheets["__meta__"];
+    if (!ws || !ws["!ref"])
+      return [];
+    const json = XLSX.utils.sheet_to_json(ws, { defval: "", header: 1 });
+    for (const row of json) {
+      if (Array.isArray(row) && row[0] === "国家平台HiddenCols" && row[1]) {
+        const parsed = JSON.parse(row[1]);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    }
+  }
+  catch {}
+  return [];
 }

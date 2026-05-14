@@ -15,6 +15,7 @@ export async function readListWorkbook(buffer) {
   if (!ws) {
     return {
       columnOrder: [],
+      hiddenColumns: [],
       records: [],
     };
   }
@@ -69,8 +70,11 @@ export async function readListWorkbook(buffer) {
     if (Object.values(rec).some(v => v))
       rows.push(rec);
   }
+  const hiddenColumns = readListHiddenCols(wb);
+
   return {
     columnOrder,
+    hiddenColumns,
     records: rows,
   };
 }
@@ -163,4 +167,20 @@ function colToNum(col) {
   let n = 0;
   for (const ch of col) n = n * 26 + (ch.charCodeAt(0) - 64);
   return n - 1;
+}
+
+function readListHiddenCols(wb) {
+  try {
+    const metaWs = wb.getWorksheet("__meta__");
+    if (!metaWs)
+      return [];
+    const row1 = metaWs.getRow(1);
+    const row2 = metaWs.getRow(2);
+    if (row1.getCell(1).value === "hiddenColumns" && row2.getCell(1).value) {
+      const parsed = JSON.parse(String(row2.getCell(1).value));
+      return Array.isArray(parsed) ? parsed : [];
+    }
+  }
+  catch {}
+  return [];
 }

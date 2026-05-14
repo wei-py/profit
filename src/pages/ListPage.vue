@@ -66,6 +66,7 @@ const traceFieldKey = ref("");
 const showColModal = ref(false);
 const skuColModal = ref(false);
 const skuColOrder = ref([]);
+const skuHiddenKeys = ref([]);
 
 const skuAllFields = computed(() => {
   const fields = [];
@@ -77,9 +78,11 @@ const skuAllFields = computed(() => {
 
 const skuColDisplay = computed(() => {
   const all = skuAllFields.value;
-  return skuColOrder.value.length && skuColOrder.value.length === all.length
+  const order = skuColOrder.value.length && skuColOrder.value.length === all.length
     ? skuColOrder.value
     : all;
+  const hiddenSet = new Set(skuHiddenKeys.value);
+  return order.filter(k => !hiddenSet.has(k));
 });
 
 watch(
@@ -129,7 +132,8 @@ watch(
 const listColumns = computed(() => {
   if (!listStore.records.length)
     return [];
-  return listStore.columnOrder.filter(k => k !== "_uid");
+  const hiddenSet = new Set(listStore.hiddenColumns);
+  return listStore.columnOrder.filter(k => k !== "_uid" && !hiddenSet.has(k));
 });
 
 function openCalcModal(si) {
@@ -396,7 +400,7 @@ async function loadRecordBack(idx) {
                     <tr>
                       <th class="bg-base-100 left-0 sticky w-10 z-10" />
                       <th>SKU码</th>
-                      <th class="w-8" />
+                      <th class="w-8 text-xs">反推</th>
                       <th
                         v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
                         :key="a.name"
@@ -625,6 +629,8 @@ async function loadRecordBack(idx) {
     <ColEditorModal
       @close="showColModal = false"
       @update="listStore.columnOrder = $event"
+      @update-hidden="listStore.hiddenColumns = $event"
+      :hiddenKeys="listStore.hiddenColumns"
       :items="listStore.columnOrder"
       :open="showColModal"
       title="编辑列顺序"
@@ -632,6 +638,8 @@ async function loadRecordBack(idx) {
     <ColEditorModal
       @close="skuColModal = false"
       @update="skuColOrder = $event"
+      @update-hidden="skuHiddenKeys = $event"
+      :hiddenKeys="skuHiddenKeys"
       :items="skuColOrder"
       :open="skuColModal"
       title="SKU 列顺序"

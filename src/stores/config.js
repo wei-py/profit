@@ -19,6 +19,7 @@ export const useConfigStore = defineStore("config", () => {
   const 模板参数 = ref([]);
   const lookupTables = ref({});
   const 国家平台ColOrder = ref([]);
+  const 国家平台HiddenCols = ref([]);
 
   const loaded = computed(() => 国家平台.value.length > 0);
 
@@ -39,6 +40,7 @@ export const useConfigStore = defineStore("config", () => {
       模板参数.value = config["模板参数"] || [];
       lookupTables.value = config.lookupTables || {};
       国家平台ColOrder.value = config.国家平台ColOrder || [];
+      国家平台HiddenCols.value = config.国家平台HiddenCols || [];
       sync国家平台ColOrder();
       workbook.value = buffer;
     }
@@ -56,6 +58,7 @@ export const useConfigStore = defineStore("config", () => {
       lookupTables: lookupTables.value,
       国家平台: 国家平台.value,
       国家平台ColOrder: 国家平台ColOrder.value,
+      国家平台HiddenCols: 国家平台HiddenCols.value,
       模板参数: 模板参数.value,
       计算字段: 计算字段.value,
       计算模板: 计算模板.value,
@@ -68,6 +71,7 @@ export const useConfigStore = defineStore("config", () => {
   function sync国家平台ColOrder() {
     if (!国家平台.value.length) {
       国家平台ColOrder.value = [];
+    国家平台HiddenCols.value = [];
       return;
     }
     const existing = new Set(国家平台ColOrder.value);
@@ -84,6 +88,7 @@ export const useConfigStore = defineStore("config", () => {
         merged.push(k);
     }
     国家平台ColOrder.value = merged;
+    国家平台HiddenCols.value = 国家平台HiddenCols.value.filter(k => allKeys.has(k));
   }
 
   // ── 便捷查询 ──
@@ -169,6 +174,7 @@ export const useConfigStore = defineStore("config", () => {
     workbook,
     国家平台,
     国家平台ColOrder,
+    国家平台HiddenCols,
     模板参数,
     计算字段,
     计算模板,

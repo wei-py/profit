@@ -12,6 +12,7 @@ export const useListStore = defineStore("list", () => {
   const filePath = ref("");
   const records = ref([]);
   const columnOrder = ref([]);
+  const hiddenColumns = ref([]);
   const loading = ref(false);
   const error = ref("");
 
@@ -21,12 +22,13 @@ export const useListStore = defineStore("list", () => {
     if (p)
       filePath.value = p;
     try {
-      const { columnOrder: order, records: rows } = await readListWorkbook(buffer);
+      const { columnOrder: order, hiddenColumns: hidden, records: rows } = await readListWorkbook(buffer);
       records.value = rows.map(r => ({
         ...r,
         _uid: genUid(),
       }));
       columnOrder.value = order;
+      hiddenColumns.value = hidden || [];
     }
     catch (e) {
       error.value = e.message;
@@ -37,7 +39,7 @@ export const useListStore = defineStore("list", () => {
   }
 
   async function getExportBuffer() {
-    return await buildListWorkbookBuffer(records.value, columnOrder.value);
+    return await buildListWorkbookBuffer(records.value, columnOrder.value, hiddenColumns.value);
   }
 
   function addRecords(skuRows) {
@@ -94,12 +96,14 @@ export const useListStore = defineStore("list", () => {
         merged.push(k);
     }
     columnOrder.value = merged;
+    hiddenColumns.value = hiddenColumns.value.filter(k => allKeys.has(k));
   }
 
   function clear() {
     filePath.value = "";
     records.value = [];
     columnOrder.value = [];
+    hiddenColumns.value = [];
   }
 
   return {
@@ -109,6 +113,7 @@ export const useListStore = defineStore("list", () => {
     error,
     filePath,
     getExportBuffer,
+    hiddenColumns,
     loadFromBuffer,
     loading,
     moveRecordToBottom,
