@@ -1,11 +1,11 @@
 <script setup>
 import { computed, ref, watch } from "vue";
+import { vDraggable } from "vue-draggable-plus";
 import ColEditorModal from "@/components/common/ColEditorModal.vue";
 import CountryModal from "@/components/country/CountryModal.vue";
 import FieldModal from "@/components/country/FieldModal.vue";
 import OptionGroupModal from "@/components/country/OptionGroupModal.vue";
 import TemplateModal from "@/components/country/TemplateModal.vue";
-import { vDraggable } from "vue-draggable-plus";
 import { useFileIO } from "@/composables/useFileIO";
 import { useConfigStore } from "@/stores/config";
 
@@ -423,9 +423,9 @@ function openConfigColEditor() {
     <ColEditorModal
       @close="showConfigColModal = false"
       @update="store.国家平台ColOrder = $event"
+      filterKey=""
       :items="configColumns"
       :open="showConfigColModal"
-      filterKey=""
     />
   </div>
 </template>

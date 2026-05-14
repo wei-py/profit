@@ -3,6 +3,10 @@ import { ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
 
 const props = defineProps({
+  filterKey: {
+    default: "_uid",
+    type: String,
+  },
   items: {
     required: true,
     type: Array,
@@ -10,10 +14,6 @@ const props = defineProps({
   open: Boolean,
   title: {
     default: "编辑列顺序",
-    type: String,
-  },
-  filterKey: {
-    default: "_uid",
     type: String,
   },
 });
@@ -82,5 +82,3 @@ function saveOrder() {
     </form>
   </div>
 </template>
-
-

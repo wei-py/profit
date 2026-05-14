@@ -50,9 +50,9 @@ export const useConfigStore = defineStore("config", () => {
     }
   }
 
-  function getExportBuffer() {
+  async function getExportBuffer() {
     sync国家平台ColOrder();
-    return buildWorkbookBuffer({
+    return await buildWorkbookBuffer({
       lookupTables: lookupTables.value,
       国家平台: 国家平台.value,
       国家平台ColOrder: 国家平台ColOrder.value,

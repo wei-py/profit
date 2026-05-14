@@ -1,14 +1,12 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 const STD_ORDER = ["国家平台", "计算字段", "选项组", "选项值", "计算模板", "费用规则", "模板参数"];
+const MIN_W = 8;
+const MAX_W = 30;
+const PAD = 2;
 
-/**
- * 将配置对象序列化为 Excel ArrayBuffer。
- * @param {object} config
- * @returns {Uint8Array} Excel ArrayBuffer
- */
-export function buildWorkbookBuffer(config) {
-  const wb = XLSX.utils.book_new();
+export async function buildWorkbookBuffer(config) {
+  const wb = new ExcelJS.Workbook();
   const colOrder = config.国家平台ColOrder;
 
   for (const name of STD_ORDER) {
@@ -23,12 +21,7 @@ export function buildWorkbookBuffer(config) {
       }
     }
   }
-  // 模板参数可为空
-  if (config.模板参数 && !STD_ORDER.includes("模板参数")) {
-    appendSheet(wb, "模板参数", config.模板参数);
-  }
 
-  // 动态费率表
   if (config.lookupTables) {
     for (const [name, data] of Object.entries(config.lookupTables)) {
       if (data && data.length)
@@ -36,10 +29,7 @@ export function buildWorkbookBuffer(config) {
     }
   }
 
-  return XLSX.write(wb, {
-    bookType: "xlsx",
-    type: "array",
-  });
+  return new Uint8Array(await wb.xlsx.writeBuffer());
 }
 
 function reorderKeys(data, order) {
@@ -57,25 +47,42 @@ function reorderKeys(data, order) {
   });
 }
 
-/**
- * @deprecated Use `list-excel-writer.js` instead — this version lacks WPS DISPIMG image
- * embedding and columnOrder support.
- */
-export function buildListWorkbookBuffer(records) {
-  const wb = XLSX.utils.book_new();
-  if (records && records.length) {
-    appendSheet(wb, "商品记录", records);
+function appendSheet(wb, name, data) {
+  const ws = wb.addWorksheet(name);
+  const centerAlign = { horizontal: "center", vertical: "middle" };
+
+  const keys = Object.keys(data[0] || {});
+  ws.columns = keys.map(k => ({ header: k, key: k }));
+
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true };
+  headerRow.eachCell((cell) => {
+    cell.alignment = centerAlign;
+  });
+
+  for (const row of data) {
+    const r = ws.addRow(keys.map(k => row[k] ?? ""));
+    r.eachCell((cell) => {
+      cell.alignment = centerAlign;
+    });
   }
-  else {
-    appendSheet(wb, "商品记录", []);
-  }
-  return XLSX.write(wb, {
-    bookType: "xlsx",
-    type: "array",
+
+  ws.columns.forEach((col, i) => {
+    let maxW = displayWidth(keys[i] || "");
+    for (const row of data) {
+      const val = row[keys[i]];
+      if (val != null)
+        maxW = Math.max(maxW, displayWidth(String(val)));
+    }
+    col.width = Math.max(MIN_W, Math.min(MAX_W, maxW + PAD));
   });
 }
 
-function appendSheet(wb, name, data) {
-  const ws = XLSX.utils.json_to_sheet(data);
-  XLSX.utils.book_append_sheet(wb, ws, name);
+function displayWidth(str) {
+  if (!str) return 0;
+  let w = 0;
+  for (const ch of str) {
+    w += /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(ch) ? 2 : 1;
+  }
+  return w;
 }

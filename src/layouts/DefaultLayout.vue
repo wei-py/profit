@@ -41,7 +41,7 @@ function goTab(path) {
   <div class="bg-base-200 flex flex-col h-screen">
     <!-- 顶部栏 -->
     <header
-      class="bg-base-100 border-b border-base-300 flex flex-shrink-0 h-12 items-center justify-between px-4"
+      class="bg-base-100 border-b border-base-300 flex shrink-0 h-12 items-center justify-between px-4"
     >
       <div class="flex gap-1 items-center">
         <span class="font-bold mr-4 text-lg">利润工具</span>

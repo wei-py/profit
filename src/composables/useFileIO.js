@@ -176,7 +176,7 @@ export function useFileIO() {
         success: false,
       };
     }
-    const buffer = configStore.getExportBuffer();
+    const buffer = await configStore.getExportBuffer();
     if (isTauri()) {
       let path = configStore.filePath;
       if (!path) {

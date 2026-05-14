@@ -28,14 +28,21 @@ export async function buildListWorkbookBuffer(records, columnOrder) {
   const imgColIdx = cols.indexOf("图片") + 1;
   const imgColLetter = colNumToLetter(imgColIdx - 1);
 
+  const centerAlign = { horizontal: "center", vertical: "middle" };
+
   const header = ws.addRow(cols);
   header.font = { bold: true };
+  header.eachCell((cell) => {
+    cell.alignment = centerAlign;
+  });
 
-  // 收集图片 base64，记下列位置
   const cellImages = [];
   for (let ri = 0; ri < records.length; ri++) {
     const record = records[ri];
     const row = ws.addRow(cols.map(c => record[c] ?? ""));
+    row.eachCell((cell) => {
+      cell.alignment = centerAlign;
+    });
     row.commit();
 
     const imgSrc = record["图片"];
@@ -45,22 +52,28 @@ export async function buildListWorkbookBuffer(records, columnOrder) {
         cellRef: `${imgColLetter}${ri + 2}`,
         col: imgColIdx,
         ext: imgSrc.includes("image/png") ? "png" : "jpeg",
-        row: ri + 2, // 1-based Excel row
+        row: ri + 2,
       });
-      // 清除图片列单元格值（后面改为 DISPIMG 公式）
       row.getCell(imgColIdx).value = "";
     }
   }
 
+  const MIN_W = 8;
+  const MAX_W = 30;
+  const PAD = 2;
   ws.columns.forEach((col, i) => {
     if (i === imgColIdx - 1) {
       col.width = 16;
-    } // 图片列加宽
-    else {
-      col.width = Math.max(8, Math.min(22, String(cols[i] || "").length * 2 + 4));
+      return;
     }
+    let maxW = displayWidth(cols[i] || "");
+    for (const record of records) {
+      const val = record[cols[i]];
+      if (val != null)
+        maxW = Math.max(maxW, displayWidth(String(val)));
+    }
+    col.width = Math.max(MIN_W, Math.min(MAX_W, maxW + PAD));
   });
-  // 有图片的行加高
   for (const ci of cellImages) {
     ws.getRow(ci.row).height = 90;
   }
@@ -160,4 +173,13 @@ function generateHex32() {
   let s = "";
   for (let i = 0; i < 32; i++) s += chars[Math.floor(Math.random() * 16)];
   return s;
+}
+
+function displayWidth(str) {
+  if (!str) return 0;
+  let w = 0;
+  for (const ch of str) {
+    w += /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(ch) ? 2 : 1;
+  }
+  return w;
 }
