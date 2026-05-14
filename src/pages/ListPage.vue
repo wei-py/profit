@@ -67,6 +67,15 @@ const showColModal = ref(false);
 const skuColModal = ref(false);
 const skuColOrder = ref([]);
 const skuHiddenKeys = ref([]);
+const skuViewMode = ref(localStorage.getItem("skuViewMode") || "table");
+const recordViewMode = ref(localStorage.getItem("recordViewMode") || "table");
+const skuCardExpanded = ref(localStorage.getItem("skuCardExpanded") === "true");
+const recordCardExpanded = ref(localStorage.getItem("recordCardExpanded") === "true");
+
+watch(skuViewMode, v => localStorage.setItem("skuViewMode", v));
+watch(recordViewMode, v => localStorage.setItem("recordViewMode", v));
+watch(skuCardExpanded, v => localStorage.setItem("skuCardExpanded", String(v)));
+watch(recordCardExpanded, v => localStorage.setItem("recordCardExpanded", String(v)));
 
 const skuAllFields = computed(() => {
   const fields = [];
@@ -114,9 +123,32 @@ const pagedRecordsWritable = computed({
 
 const totalPages = computed(() => Math.ceil(listStore.records.length / pageSize.value) || 1);
 
+const skuPage = ref(1);
+const skuPageSize = ref(20);
+const skuPageOffset = computed(() => (skuPage.value - 1) * skuPageSize.value);
+const skuPaged = computed(() => {
+  const start = skuPageOffset.value;
+  return createStore.skus.slice(start, start + skuPageSize.value)
+    .map((sku, i) => ({ sku, origIdx: start + i }));
+});
+const skuTotalPages = computed(() => Math.ceil(createStore.skus.length / skuPageSize.value) || 1);
+
 watch(pageSize, () => {
   if (currentPage.value > totalPages.value)
     currentPage.value = totalPages.value;
+});
+
+watch(
+  () => createStore.skus.length,
+  () => {
+    if (skuPage.value > skuTotalPages.value)
+      skuPage.value = skuTotalPages.value || 1;
+  },
+);
+
+watch(skuPageSize, () => {
+  if (skuPage.value > skuTotalPages.value)
+    skuPage.value = skuTotalPages.value;
 });
 
 watch(
@@ -256,6 +288,29 @@ async function loadRecordBack(idx) {
   }
   showCreatePanel.value = true;
 }
+
+const jumpPage = ref("");
+const jumpSkuPage = ref("");
+
+function handleJumpPage() {
+  const n = Number(jumpPage.value);
+  if (n >= 1 && n <= totalPages.value) {
+    currentPage.value = n;
+    jumpPage.value = "";
+  }
+}
+
+function handleJumpSkuPage() {
+  const n = Number(jumpSkuPage.value);
+  if (n >= 1 && n <= skuTotalPages.value) {
+    skuPage.value = n;
+    jumpSkuPage.value = "";
+  }
+}
+
+function normalizeVariantValues(val) {
+  return val.replace(/[,，、]/g, "|");
+}
 </script>
 
 <template>
@@ -355,12 +410,12 @@ async function loadRecordBack(idx) {
                   >
                   <input
                     @input="
-                      createStore.updateVariantAttribute(i, {
-                        values: $event.target.value,
-                      })
+                      const v = normalizeVariantValues($event.target.value);
+                      $event.target.value = v;
+                      createStore.updateVariantAttribute(i, { values: v });
                     "
                     class="flex-1 input input-bordered input-sm"
-                    placeholder="红,蓝"
+                    placeholder="红|蓝"
                     :value="attr.values"
                   >
                   <button
@@ -391,130 +446,215 @@ async function loadRecordBack(idx) {
               <div class="flex-1 min-w-0 overflow-x-auto">
                 <div class="flex items-center justify-between mb-1">
                   <span class="font-semibold text-sm">SKU 列表</span>
-                  <button @click="skuColModal = true" class="btn btn-ghost btn-xs">
-                    ⚙️ 编辑列
-                  </button>
-                </div>
-                <table v-if="createStore.skus.length" class="table table-xs">
-                  <thead>
-                    <tr>
-                      <th class="bg-base-100 left-0 sticky w-10 z-10" />
-                      <th>SKU码</th>
-                      <th class="w-8 text-xs">反推</th>
-                      <th
-                        v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
-                        :key="a.name"
-                      >
-                        {{ a.name.trim() }}
-                      </th>
-                      <th v-for="fk in skuColDisplay" :key="fk">
-                        <div class="flex gap-0 items-center">
-                          <span class="text-xs">{{ fk }}</span>
-                          <button
-                            v-if="isSkuInputCol(fk)"
-                            @click="batchSetSkuInput(fk)"
-                            class="btn btn-ghost btn-xs hover:opacity-100 opacity-30 px-0"
-                            title="统一"
-                          >
-                            ⇅
-                          </button>
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(sku, si) in createStore.skus"
-                      :key="sku.key"
-                      :style="{ height: `${skuRowHeights[si]}px` }"
+                  <div class="flex gap-1 items-center text-xs">
+                    <span>表格</span>
+                    <input
+                      type="checkbox"
+                      class="toggle toggle-sm"
+                      :checked="skuViewMode === 'card'"
+                      @change="skuViewMode = $event.target.checked ? 'card' : 'table'"
                     >
-                      <td class="bg-base-100 left-0 sticky z-10">
-                        <span
-                          class="flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
-                        >☰</span>
-                      </td>
-                      <td>
-                        <input
-                          v-model="sku.skuCode"
-                          class="input input-bordered input-xs w-20"
-                          placeholder="SKU"
+                    <span>卡片</span>
+                    <button
+                      v-if="skuViewMode === 'card'"
+                      @click="skuCardExpanded = !skuCardExpanded"
+                      class="btn btn-ghost btn-xs"
+                      :title="skuCardExpanded ? '收起' : '展开'"
+                    >
+                      {{ skuCardExpanded ? '收起' : '展开' }}
+                    </button>
+                    <input v-model.number="skuPageSize" class="input input-bordered input-xs w-12" min="1">
+                    <span class="opacity-50">条/页</span>
+                    <button @click="skuPage--" class="btn btn-ghost btn-xs" :disabled="skuPage <= 1">◀</button>
+                    <span>{{ skuPage }}/{{ skuTotalPages }}</span>
+                    <button @click="skuPage++" class="btn btn-ghost btn-xs" :disabled="skuPage >= skuTotalPages">▶</button>
+                    <input
+                      v-model="jumpSkuPage"
+                      @keyup.enter="handleJumpSkuPage"
+                      class="input input-bordered input-xs w-10"
+                      placeholder="页"
+                    >
+                    <button @click="handleJumpSkuPage" class="btn btn-ghost btn-xs">跳转</button>
+                    <button @click="skuColModal = true" class="btn btn-ghost btn-xs">
+                      ⚙️ 编辑列
+                    </button>
+                  </div>
+                </div>
+                <template v-if="skuViewMode === 'table' && createStore.skus.length">
+                  <table class="table table-xs">
+                    <thead>
+                      <tr>
+                        <th class="bg-base-100 left-0 sticky w-10 z-10" />
+                        <th>SKU码</th>
+                        <th class="w-8 text-xs">反推</th>
+                        <th
+                          v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
+                          :key="a.name"
                         >
-                      </td>
-                      <td>
-                        <button
-                          @click="openCalcModal(si)"
-                          class="btn btn-ghost btn-xs"
-                          title="反推计算"
-                        >
-                          🧮
-                        </button>
-                      </td>
-                      <td
-                        v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
-                        :key="a.name"
-                        class="text-xs"
-                      >
-                        {{ sku.attrs[a.name.trim()] }}
-                      </td>
-                      <td v-for="fk in skuColDisplay" :key="fk">
-                        <template v-if="isSkuInputCol(fk)">
-                          <input
-                            v-model="sku.inputs[fk]"
-                            class="input input-bordered input-xs w-20"
-                            step="any"
-                            type="number"
-                          >
-                        </template>
-                        <template v-else-if="fk === '图片'">
-                          <div v-if="sku.images" class="group h-10 relative w-10">
-                            <img
-                              @click="openImagePreview(sku.images)"
-                              class="border cursor-pointer h-10 object-cover rounded w-10"
-                              :src="sku.images"
-                            >
+                          {{ a.name.trim() }}
+                        </th>
+                        <th v-for="fk in skuColDisplay" :key="fk">
+                          <div class="flex gap-0 items-center">
+                            <span class="text-xs">{{ fk }}</span>
                             <button
-                              @click="clearImage(sku)"
-                              class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4"
+                              v-if="isSkuInputCol(fk)"
+                              @click="batchSetSkuInput(fk)"
+                              class="btn btn-ghost btn-xs hover:opacity-100 opacity-30 px-0"
+                              title="统一"
                             >
-                              ✕
+                              ⇅
                             </button>
                           </div>
-                          <label
-                            v-else
-                            class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-10 p-0 text-base-content/30 text-lg w-10"
-                            title="上传图片"
-                          >＋<input
-                            @change="handleImageUpload(sku, $event)"
-                            accept="image/*"
-                            class="hidden"
-                            type="file"
-                          ></label>
-                        </template>
-                        <template v-else>
-                          <span v-if="sku.error" class="text-error text-xs">{{ sku.error }}</span>
-                          <template v-else-if="sku.results[fk] !== undefined">
-                            {{
-                              isPercentCol(fk)
-                                ? `${(sku.results[fk] * 100).toFixed(2)}%`
-                                : typeof sku.results[fk] === "number"
-                                  ? sku.results[fk].toFixed(2)
-                                  : sku.results[fk]
-                            }}
-                            <button
-                              v-if="sku.traces?.[fk]"
-                              @click="openTrace(sku, fk)"
-                              class="btn btn-ghost btn-xs ml-1 text-base-content/40"
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="(item, pIdx) in skuPaged"
+                        :key="item.sku.key"
+                        :style="{ height: `${skuRowHeights[item.origIdx]}px` }"
+                      >
+                        <td class="bg-base-100 left-0 sticky z-10">
+                          <span
+                            class="flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
+                          >☰</span>
+                        </td>
+                        <td>
+                          <input
+                            v-model="item.sku.skuCode"
+                            class="input input-bordered input-xs w-20"
+                            placeholder="SKU"
+                          >
+                        </td>
+                        <td>
+                          <button
+                            @click="openCalcModal(item.origIdx)"
+                            class="btn btn-ghost btn-xs"
+                            title="反推计算"
+                          >
+                            🧮
+                          </button>
+                        </td>
+                        <td
+                          v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
+                          :key="a.name"
+                          class="text-xs"
+                        >
+                          {{ item.sku.attrs[a.name.trim()] }}
+                        </td>
+                        <td v-for="fk in skuColDisplay" :key="fk">
+                          <template v-if="isSkuInputCol(fk)">
+                            <input
+                              v-model="item.sku.inputs[fk]"
+                              class="input input-bordered input-xs w-20"
+                              step="any"
+                              type="number"
                             >
-                              ?
-                            </button>
                           </template>
-                          <span v-else class="text-base-content/30">—</span>
-                        </template>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div v-else class="mt-2 text-base-content/40 text-sm">
+                          <template v-else-if="fk === '图片'">
+                            <div v-if="item.sku.images" class="group h-10 relative w-10">
+                              <img
+                                @click="openImagePreview(item.sku.images)"
+                                class="border cursor-pointer h-10 object-cover rounded w-10"
+                                :src="item.sku.images"
+                              >
+                              <button
+                                @click="clearImage(item.sku)"
+                                class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <label
+                              v-else
+                              class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-10 p-0 text-base-content/30 text-lg w-10"
+                              title="上传图片"
+                            >＋<input
+                              @change="handleImageUpload(item.sku, $event)"
+                              accept="image/*"
+                              class="hidden"
+                              type="file"
+                            ></label>
+                          </template>
+                          <template v-else>
+                            <span v-if="item.sku.error" class="text-error text-xs">{{ item.sku.error }}</span>
+                            <template v-else-if="item.sku.results[fk] !== undefined">
+                              {{
+                                isPercentCol(fk)
+                                  ? `${(item.sku.results[fk] * 100).toFixed(2)}%`
+                                  : typeof item.sku.results[fk] === "number"
+                                    ? item.sku.results[fk].toFixed(2)
+                                    : item.sku.results[fk]
+                              }}
+                              <button
+                                v-if="item.sku.traces?.[fk]"
+                                @click="openTrace(item.sku, fk)"
+                                class="btn btn-ghost btn-xs ml-1 text-base-content/40"
+                              >
+                                ?
+                              </button>
+                            </template>
+                            <span v-else class="text-base-content/30">—</span>
+                          </template>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </template>
+
+                <template v-else-if="skuViewMode === 'card' && createStore.skus.length">
+                  <div class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    <div
+                      v-for="(item, pIdx) in skuPaged"
+                      :key="item.sku.key"
+                      class="bg-base-200 border border-base-300 flex flex-col gap-1 p-2 rounded text-xs"
+                    >
+                      <div class="flex gap-1 items-center">
+                        <span class="font-semibold text-xs truncate">{{ item.sku.skuCode || '-' }}</span>
+                        <button
+                          @click="openCalcModal(item.origIdx)"
+                          class="btn btn-ghost btn-xs ml-auto"
+                          title="反推计算"
+                        >🧮</button>
+                      </div>
+                      <div v-if="createStore.variantAttributes.filter(a => a.name.trim()).length" class="flex flex-wrap gap-1">
+                        <span class="badge badge-xs badge-outline" v-for="a in createStore.variantAttributes.filter(a => a.name.trim())" :key="a.name">
+                          {{ a.name.trim() }}: {{ item.sku.attrs[a.name.trim()] }}
+                        </span>
+                      </div>
+                      <template v-if="skuCardExpanded">
+                        <div v-for="fk in skuColDisplay" :key="fk" class="border-t border-base-300 pt-0.5">
+                          <template v-if="isSkuInputCol(fk)">
+                            <div class="flex gap-1 items-center justify-between">
+                              <span class="opacity-60">{{ fk }}</span>
+                              <input v-model="item.sku.inputs[fk]" class="input input-bordered input-xs w-16" step="any" type="number">
+                            </div>
+                          </template>
+                          <template v-else-if="fk === '图片'">
+                            <div v-if="item.sku.images" class="group h-10 relative w-10">
+                              <img @click="openImagePreview(item.sku.images)" class="border cursor-pointer h-10 object-cover rounded w-10" :src="item.sku.images">
+                              <button @click="clearImage(item.sku)" class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4">✕</button>
+                            </div>
+                            <label v-else class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-8 p-0 text-base-content/30 text-lg w-8" title="上传图片">＋<input @change="handleImageUpload(item.sku, $event)" accept="image/*" class="hidden" type="file"></label>
+                          </template>
+                          <template v-else>
+                            <div class="flex justify-between">
+                              <span class="opacity-60">{{ fk }}</span>
+                              <span v-if="item.sku.error" class="text-error">{{ item.sku.error }}</span>
+                              <span v-else-if="item.sku.results[fk] !== undefined">
+                                {{ isPercentCol(fk) ? `${(item.sku.results[fk]*100).toFixed(2)}%` : typeof item.sku.results[fk]==='number' ? item.sku.results[fk].toFixed(2) : item.sku.results[fk] }}
+                                <button v-if="item.sku.traces?.[fk]" @click="openTrace(item.sku, fk)" class="btn btn-ghost btn-xs ml-1 text-base-content/40">?</button>
+                              </span>
+                              <span v-else class="text-base-content/30">—</span>
+                            </div>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <div v-if="!createStore.skus.length" class="mt-2 text-base-content/40 text-sm">
                   选择模板后自动生成 SKU，或点击「生成SKU」手动刷新
                 </div>
               </div>
@@ -527,21 +667,30 @@ async function loadRecordBack(idx) {
       <div class="bg-base-100 border border-base-300 card card-sm">
         <div class="card-body">
           <div class="flex items-center justify-between">
-            <h2 class="card-title text-lg">商品记录（{{ listStore.records.length }} 行）</h2>
+              <h2 class="card-title text-lg">商品记录（{{ listStore.records.length }} 行）</h2>
             <div class="flex gap-2 items-center">
+              <span class="text-xs">表格</span>
               <input
-                v-model.number="pageSize"
-                class="input input-bordered input-xs w-16"
-                max="100"
-                min="1"
+                type="checkbox"
+                class="toggle toggle-sm"
+                :checked="recordViewMode === 'card'"
+                @change="recordViewMode = $event.target.checked ? 'card' : 'table'"
               >
-              <span class="text-xs">条/页</span>
+              <span class="text-xs">卡片</span>
+              <button
+                v-if="recordViewMode === 'card'"
+                @click="recordCardExpanded = !recordCardExpanded"
+                class="btn btn-ghost btn-xs"
+                :title="recordCardExpanded ? '收起' : '展开'"
+              >
+                {{ recordCardExpanded ? '收起' : '展开' }}
+              </button>
               <button @click="showColModal = true" class="btn btn-ghost btn-xs">⚙️ 编辑列</button>
             </div>
           </div>
           <div v-if="!listStore.records.length" class="text-base-content/40 text-sm">暂无</div>
           <template v-else>
-            <div class="overflow-x-auto">
+            <div v-if="recordViewMode === 'table'" class="overflow-x-auto">
               <table class="table table-sm">
                 <thead>
                   <tr>
@@ -593,7 +742,56 @@ async function loadRecordBack(idx) {
                 </tbody>
               </table>
             </div>
-            <div class="flex gap-2 items-center justify-center mt-2">
+
+            <div v-else class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              <div
+                v-for="(row, pIdx) in pagedRecordsWritable"
+                :key="row._uid"
+                class="bg-base-200 border border-base-300 flex flex-col gap-1 p-2 rounded text-xs"
+              >
+                <template v-if="isImage(row['图片'])">
+                  <img
+                    @click="openImagePreview(row['图片'])"
+                    class="border cursor-pointer h-16 object-cover rounded w-full"
+                    :src="row['图片']"
+                  >
+                </template>
+                <div class="flex gap-1 items-center">
+                  <span class="font-semibold truncate">{{ row['商品ID'] || row['商品名称'] || '-' }}</span>
+                </div>
+                <div v-if="row['商品名称']" class="text-base-content/60 truncate">{{ row['商品名称'] }}</div>
+                <div v-if="row['SKU码']" class="badge badge-xs badge-outline">{{ row['SKU码'] }}</div>
+                <template v-if="recordCardExpanded">
+                  <div v-for="col in listColumns" :key="col" class="border-t border-base-300 flex justify-between pt-0.5">
+                    <span class="opacity-60 truncate mr-1">{{ col }}</span>
+                    <span class="text-right truncate">
+                      <template v-if="isImage(row[col])">📷</template>
+                      <template v-else-if="isDispimg(row[col])">📷</template>
+                      <template v-else>{{ row[col] || '—' }}</template>
+                    </span>
+                  </div>
+                </template>
+                <div class="flex gap-1 mt-1">
+                  <button
+                    @click="loadRecordBack(pageOffset + pIdx)"
+                    class="btn btn-ghost btn-xs flex-1"
+                    title="加载到新建面板"
+                  >
+                    📋
+                  </button>
+                  <button
+                    @click="listStore.removeRecord(pageOffset + pIdx)"
+                    class="btn btn-ghost btn-xs text-error"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2 items-center justify-center mt-2">
+              <input v-model.number="pageSize" class="input input-bordered input-xs w-14" min="1" max="100">
+              <span class="text-xs">条/页</span>
               <button
                 @click="currentPage--"
                 class="btn btn-ghost btn-xs"
@@ -609,6 +807,14 @@ async function loadRecordBack(idx) {
               >
                 下一页
               </button>
+              <span class="text-xs">跳转到</span>
+              <input
+                v-model="jumpPage"
+                @keyup.enter="handleJumpPage"
+                class="input input-bordered input-xs w-12"
+                placeholder="页"
+              >
+              <button @click="handleJumpPage" class="btn btn-ghost btn-xs">跳转</button>
             </div>
           </template>
         </div>

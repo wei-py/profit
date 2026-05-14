@@ -135,7 +135,7 @@ export const useCreateStore = defineStore("create", () => {
       .map(a => ({
         name: a.name.trim(),
         values: a.values
-          .split(",")
+          .split("|")
           .map(s => s.trim())
           .filter(Boolean),
       }));
