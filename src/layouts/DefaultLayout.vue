@@ -26,10 +26,6 @@ const tabs = [
 
 const activeTab = computed(() => {
   return tabs.find(tab => route.path.startsWith(tab.path)).path;
-
-  // if (route.path.startsWith("/list"))
-  //   return "/list";
-  // return "/country";
 });
 
 function goTab(path) {

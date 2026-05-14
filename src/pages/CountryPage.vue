@@ -22,6 +22,10 @@ const dragOpts = {
   ghostClass: "drag-ghost",
   handle: ".drag-handle",
 };
+const dragOptsCountry = {
+  ...dragOpts,
+  draggable: ".country-main-row",
+};
 
 const allKeys = computed(() => {
   const keys = new Set(CORE_KEYS);
@@ -154,6 +158,27 @@ const showTplModal = ref(false);
 const editingTplIdx = ref(-1);
 const showConfigColModal = ref(false);
 
+let isDraggingCp = false;
+const local国家平台 = ref([]);
+const tbodyKey = ref(0);
+watch(
+  () => [...store['国家平台']],
+  (v) => {
+    if (!isDraggingCp)
+      local国家平台.value.splice(0, local国家平台.value.length, ...v);
+  },
+  { immediate: true },
+);
+function onCountryDragStart() {
+  isDraggingCp = true;
+  expandedId.value = null;
+}
+function onCountryDragEnd() {
+  store['国家平台'].splice(0, store['国家平台'].length, ...local国家平台.value);
+  isDraggingCp = false;
+  tbodyKey.value++;
+}
+
 function openEditCountry(row) {
   editingCountryId.value = row.编号;
   showCountryModal.value = true;
@@ -233,15 +258,15 @@ function openConfigColEditor() {
                   <th class="w-24">操作</th>
                 </tr>
               </thead>
-              <tbody>
-                <template v-for="(row, ri) in store['国家平台']" :key="row.编号 || ri">
+              <tbody :key="tbodyKey" v-draggable="[local国家平台, { ...dragOptsCountry, onStart: onCountryDragStart, onEnd: onCountryDragEnd }]">
+                <template v-for="(row, ri) in local国家平台" :key="row.编号 || ri">
                   <tr
-                    class="hover"
+                    class="country-main-row hover"
                     :class="{ 'bg-base-200': expandedId === row.编号 }"
                   >
                     <td>
                       <span
-                        class="flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
+                        class="drag-handle flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
                       >☰</span>
                     </td>
                     <td>
