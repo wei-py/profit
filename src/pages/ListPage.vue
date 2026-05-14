@@ -259,7 +259,7 @@ async function loadRecordBack(idx) {
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-hidden">
+  <div class="flex flex-col h-full">
     <div class="flex items-center justify-between mb-4">
       <h1 class="font-bold text-2xl">商品列表</h1>
       <div class="flex gap-2">
@@ -271,7 +271,7 @@ async function loadRecordBack(idx) {
       </div>
     </div>
 
-    <div class="flex-1 min-h-0 overflow-y-auto space-y-4">
+    <div class="flex-1 space-y-4">
       <!-- 新建面板 -->
       <div v-if="showCreatePanel" class="bg-base-100 border border-base-300 card card-sm">
         <div class="card-body">

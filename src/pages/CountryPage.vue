@@ -222,7 +222,7 @@ function openConfigColEditor() {
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-hidden">
+  <div class="flex flex-col h-full">
     <div class="flex items-center justify-between mb-4">
       <h1 class="font-bold text-2xl">配置</h1>
       <div class="flex gap-2">
@@ -245,7 +245,7 @@ function openConfigColEditor() {
       </div>
     </div>
 
-    <div class="flex-1 min-h-0 overflow-auto space-y-4">
+    <div class="flex-1 space-y-4">
       <div class="bg-base-100 border border-base-300 card card-sm">
         <div class="card-body p-3">
           <div class="overflow-x-auto">

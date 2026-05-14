@@ -103,7 +103,7 @@ function goTab(path) {
     </header>
 
     <!-- 主内容 -->
-    <main class="flex-1 overflow-hidden">
+    <main class="flex-1 overflow-auto">
       <div class="h-full px-4 py-3">
         <router-view />
       </div>
