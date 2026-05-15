@@ -399,24 +399,15 @@ function normalizeVariantValues(val) {
                 <div class="font-semibold pt-2 text-sm">变体属性</div>
                 <div v-for="(attr, i) in createStore.variantAttributes" :key="i" class="flex gap-1">
                   <input
-                    @input="
-                      createStore.updateVariantAttribute(i, {
-                        name: $event.target.value,
-                      })
-                    "
+                    v-model="attr.name"
                     class="input input-bordered input-sm w-16"
                     placeholder="颜色"
-                    :value="attr.name"
                   >
                   <input
-                    @input="
-                      const v = normalizeVariantValues($event.target.value);
-                      $event.target.value = v;
-                      createStore.updateVariantAttribute(i, { values: v });
-                    "
+                    v-model="attr.values"
+                    @input="attr.values = normalizeVariantValues(attr.values)"
                     class="flex-1 input input-bordered input-sm"
                     placeholder="红|蓝"
-                    :value="attr.values"
                   >
                   <button
                     @click="createStore.removeVariantAttribute(i)"
@@ -668,15 +659,15 @@ function normalizeVariantValues(val) {
         <div class="card-body">
           <div class="flex items-center justify-between">
               <h2 class="card-title text-lg">商品记录（{{ listStore.records.length }} 行）</h2>
-            <div class="flex gap-2 items-center">
-              <span class="text-xs">表格</span>
+            <div class="flex gap-1 items-center text-xs">
+              <span>表格</span>
               <input
                 type="checkbox"
                 class="toggle toggle-sm"
                 :checked="recordViewMode === 'card'"
                 @change="recordViewMode = $event.target.checked ? 'card' : 'table'"
               >
-              <span class="text-xs">卡片</span>
+              <span>卡片</span>
               <button
                 v-if="recordViewMode === 'card'"
                 @click="recordCardExpanded = !recordCardExpanded"
@@ -685,6 +676,13 @@ function normalizeVariantValues(val) {
               >
                 {{ recordCardExpanded ? '收起' : '展开' }}
               </button>
+              <input v-model.number="pageSize" class="input input-bordered input-xs w-12" min="1">
+              <span class="opacity-50">条/页</span>
+              <button @click="currentPage--" class="btn btn-ghost btn-xs" :disabled="currentPage <= 1">◀</button>
+              <span>{{ currentPage }}/{{ totalPages }}</span>
+              <button @click="currentPage++" class="btn btn-ghost btn-xs" :disabled="currentPage >= totalPages">▶</button>
+              <input v-model="jumpPage" @keyup.enter="handleJumpPage" class="input input-bordered input-xs w-10" placeholder="页">
+              <button @click="handleJumpPage" class="btn btn-ghost btn-xs">跳转</button>
               <button @click="showColModal = true" class="btn btn-ghost btn-xs">⚙️ 编辑列</button>
             </div>
           </div>
@@ -789,33 +787,6 @@ function normalizeVariantValues(val) {
               </div>
             </div>
 
-            <div class="flex flex-wrap gap-2 items-center justify-center mt-2">
-              <input v-model.number="pageSize" class="input input-bordered input-xs w-14" min="1" max="100">
-              <span class="text-xs">条/页</span>
-              <button
-                @click="currentPage--"
-                class="btn btn-ghost btn-xs"
-                :disabled="currentPage <= 1"
-              >
-                上一页
-              </button>
-              <span class="text-xs">{{ currentPage }} / {{ totalPages }}</span>
-              <button
-                @click="currentPage++"
-                class="btn btn-ghost btn-xs"
-                :disabled="currentPage >= totalPages"
-              >
-                下一页
-              </button>
-              <span class="text-xs">跳转到</span>
-              <input
-                v-model="jumpPage"
-                @keyup.enter="handleJumpPage"
-                class="input input-bordered input-xs w-12"
-                placeholder="页"
-              >
-              <button @click="handleJumpPage" class="btn btn-ghost btn-xs">跳转</button>
-            </div>
           </template>
         </div>
       </div>
