@@ -18,10 +18,10 @@ const tabs = [
     label: "商品",
     path: "/list",
   },
-  {
-    label: "测试",
-    path: "/test",
-  },
+  // {
+  //   label: "测试",
+  //   path: "/test",
+  // },
 ];
 
 const activeTab = computed(() => {
@@ -29,6 +29,9 @@ const activeTab = computed(() => {
 });
 
 function goTab(path) {
+  if (!path.length) {
+    return;
+  }
   router.push(path);
 }
 </script>
