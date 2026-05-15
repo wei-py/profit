@@ -8,14 +8,11 @@ const store = useAdminStore();
 
 const text = ref(props.remark || "");
 const saving = ref(false);
-const templateLoading = ref(false);
 
-async function fillTemplate() {
-  templateLoading.value = true;
+async function copyTemplate() {
   const resp = await store.doGetTemplate();
-  templateLoading.value = false;
   if (resp.success && resp.value) {
-    text.value = resp.value;
+    navigator.clipboard.writeText(resp.value);
   }
 }
 
@@ -38,8 +35,8 @@ async function handleSave() {
           placeholder="输入备注内容"
         />
         <div class="modal-action">
-          <button @click="fillTemplate" class="btn btn-sm btn-ghost" :disabled="templateLoading">
-            从模板填充
+          <button @click="copyTemplate" class="btn btn-sm btn-ghost">
+            复制模板
           </button>
           <button @click="emit('close')" class="btn btn-sm">取消</button>
           <button @click="handleSave" class="btn btn-sm btn-primary" :disabled="saving">

@@ -20,5 +20,7 @@ src-tauri/target/
 # pnpm
 .pnpm-store/
 
-# worker
-worker/.wrangler/
+# api
+api/.wrangler/
+
+.dev.vars

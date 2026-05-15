@@ -38,7 +38,12 @@ function statusBadge(status) {
           <div>已用: {{ store.detail.used_cnt }} / 剩余: {{ store.detail.remaining }}</div>
           <div>创建: {{ formatTime(store.detail.created_at) }}</div>
           <div>过期: {{ store.detail.expires_at ? formatTime(store.detail.expires_at) : "永久" }}</div>
-          <div>备注: {{ store.detail.remark || "-" }}</div>
+          <div class="flex items-start">
+            <span>
+              备注:
+            </span>
+            <span class="whitespace-pre-wrap ml-4 inline-block">{{ store.detail.remark || "-" }}</span>
+          </div>
         </div>
 
         <!-- 设备列表 -->
@@ -54,7 +59,7 @@ function statusBadge(status) {
             </thead>
             <tbody>
               <tr v-for="d in store.detailDevices" :key="d.fingerprint">
-                <td class="font-mono text-xs w-1/2">{{ d.fingerprint }}</td>
+                <td class="font-mono text-xs w-1/2 break-all">{{ d.fingerprint }}</td>
                 <td class="text-xs">{{ formatTime(d.bound_at) }}</td>
                 <td class="text-xs">{{ formatTime(d.last_seen_at) }}</td>
               </tr>
