@@ -1,83 +1,95 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { vDraggable } from "vue-draggable-plus";
+import { onMounted, ref } from "vue";
+import { getFingerprint, validateCode } from "@/services/activation";
+import { useActivationStore } from "@/stores/activation";
 
-const list = ref([
-  { id: 1, name: "任务 A" },
-  { id: 2, name: "任务 B" },
-  { id: 3, name: "任务 C" },
-]);
+const store = useActivationStore();
+const code = ref("");
+const fingerprint = ref("");
+const loading = ref(false);
+const response = ref<any>(null);
 
-function onStart() {
-  console.log("start");
+onMounted(async () => {
+  fingerprint.value = await getFingerprint();
+});
+
+async function handleActivate() {
+  const trimmed = code.value.trim();
+  if (!trimmed) return;
+  loading.value = true;
+  const res = await store.activate(trimmed);
+  response.value = res;
+  loading.value = false;
 }
 
-function onUpdate() {
-  console.log("update", list.value);
+async function handleValidate() {
+  const trimmed = code.value.trim();
+  if (!trimmed) return;
+  loading.value = true;
+  const res = await validateCode(trimmed);
+  response.value = res;
+  loading.value = false;
 }
 
-function onEnd() {
-  console.log("end", list.value);
+async function handleClear() {
+  await store.deactivate();
+  response.value = null;
+}
+
+function statusBadge(s: string) {
+  if (s === "activated") return "badge-success";
+  if (s === "checking") return "badge-info";
+  return "badge-warning";
 }
 </script>
 
 <template>
-  <div class="page">
-    <div
-      v-draggable="[
-        list,
-        {
-          animation: 150,
-          handle: '.drag-handle',
-          ghostClass: 'ghost',
-          forceFallback: true,
-          onStart,
-          onUpdate,
-          onEnd,
-        },
-      ]"
-      class="list"
-    >
-      <div v-for="item in list" :key="item.id" class="item">
-        <span class="drag-handle">☰</span>
-        <span>{{ item.name }}</span>
+  <div class="flex flex-col gap-4">
+    <div class="bg-base-100 card">
+      <div class="card-body gap-4">
+        <h2 class="card-title">激活码测试</h2>
+
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-base-content/60">设备指纹:</span>
+          <code class="bg-base-200 px-2 py-1 rounded text-xs break-all">{{ fingerprint }}</code>
+        </div>
+
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-base-content/60">当前状态:</span>
+          <span class="badge badge-sm" :class="statusBadge(store.status)">{{ store.status }}</span>
+        </div>
+
+        <label class="form-control">
+          <div class="label"><span class="label-text">激活码</span></div>
+          <input
+            v-model="code"
+            class="input input-bordered input-sm"
+            :disabled="loading"
+            placeholder="PFT-XXXX-XXXX"
+            type="text"
+          >
+        </label>
+
+        <div class="flex gap-2">
+          <button @click="handleActivate" class="btn btn-sm btn-primary" :disabled="loading">
+            <span v-if="loading" class="loading loading-spinner loading-xs" />
+            激活
+          </button>
+          <button @click="handleValidate" class="btn btn-sm" :disabled="loading">
+            校验
+          </button>
+          <button @click="handleClear" class="btn btn-sm btn-ghost">
+            清除
+          </button>
+        </div>
       </div>
     </div>
 
-    <pre>{{ list }}</pre>
+    <div v-if="response" class="bg-base-100 card">
+      <div class="card-body gap-2">
+        <h3 class="font-bold text-sm">响应</h3>
+        <pre class="bg-base-200 overflow-auto p-3 rounded text-xs">{{ JSON.stringify(response, null, 2) }}</pre>
+      </div>
+    </div>
   </div>
 </template>
-
-<style scoped>
-.page {
-  padding: 24px;
-}
-
-.list {
-  width: 320px;
-}
-
-.item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #fff;
-  user-select: none;
-}
-
-.drag-handle {
-  cursor: grab;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.ghost {
-  opacity: 0.5;
-}
-</style>

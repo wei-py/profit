@@ -1,5 +1,5 @@
 name = "profit-api"
-main = "src/index.js"
+main = "worker.js"
 compatibility_date = "2024-12-01"
 
 [[d1_databases]]
@@ -7,9 +7,9 @@ binding = "DB"
 database_name = "profit-db"
 database_id = "0ed1083f-f48c-4c25-ab1b-c2bcb27aa0e5"
 
+[[routes]]
+pattern = "profit-admin.xu-wei.space/api/*"
+zone_name = "xu-wei.space"
+
 [observability]
 enabled = true
-
-[vars]
-# 至少 32 字符的随机密钥，用于签发设备令牌
-# 部署时用 `wrangler secret put ACTIVATION_SECRET` 替代

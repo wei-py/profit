@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const API_BASE: &str = "https://profit-api.xu-wei.space";
+#[cfg(debug_assertions)]
+const API_BASE: &str = "http://localhost:8787";
+#[cfg(not(debug_assertions))]
+const API_BASE: &str = "https://profit-admin.xu-wei.space";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActivateRequest {

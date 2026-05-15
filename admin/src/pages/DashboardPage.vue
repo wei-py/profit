@@ -4,12 +4,17 @@ import { useRouter } from "vue-router";
 import CodeTable from "@/components/CodeTable.vue";
 import CreateModal from "@/components/CreateModal.vue";
 import DetailModal from "@/components/DetailModal.vue";
+import RemarkModal from "@/components/RemarkModal.vue";
+import TemplateModal from "@/components/TemplateModal.vue";
 import { useAdminStore } from "@/stores/admin";
 
 const router = useRouter();
 const store = useAdminStore();
 const showCreate = ref(false);
 const showDetail = ref(false);
+const showRemark = ref(false);
+const showTemplate = ref(false);
+const remarkTarget = ref({ code: "", remark: "" });
 
 const filters = [
   { label: "全部", value: "all" },
@@ -39,6 +44,11 @@ function openDetail(code) {
   store.doCheck(code);
   showDetail.value = true;
 }
+
+function openRemark({ code, remark }) {
+  remarkTarget.value = { code, remark };
+  showRemark.value = true;
+}
 </script>
 
 <template>
@@ -60,6 +70,9 @@ function openDetail(code) {
         <button @click="openCreate" class="btn btn-sm btn-primary">
           批量创建
         </button>
+        <button @click="showTemplate = true" class="btn btn-sm btn-ghost">
+          备注模板
+        </button>
         <button @click="store.fetchCodes()" class="btn btn-sm btn-ghost">
           刷新
         </button>
@@ -67,6 +80,11 @@ function openDetail(code) {
           退出
         </button>
       </div>
+    </div>
+
+    <!-- API 信息 -->
+    <div class="text-xs text-base-content/40">
+      {{ store.apiBase }}
     </div>
 
     <!-- 错误 -->
@@ -84,6 +102,7 @@ function openDetail(code) {
       v-if="store.codes.length > 0"
       @delete="store.doDelete"
       @detail="openDetail"
+      @remark="openRemark"
       :codes="store.codes"
       :loading="store.loading"
     />
@@ -97,5 +116,16 @@ function openDetail(code) {
 
     <!-- 详情弹窗 -->
     <DetailModal v-if="showDetail" @close="showDetail = false" />
+
+    <!-- 备注弹窗 -->
+    <RemarkModal
+      v-if="showRemark"
+      :code="remarkTarget.code"
+      :remark="remarkTarget.remark"
+      @close="showRemark = false"
+    />
+
+    <!-- 模板弹窗 -->
+    <TemplateModal v-if="showTemplate" @close="showTemplate = false" />
   </div>
 </template>

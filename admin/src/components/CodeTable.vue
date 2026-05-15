@@ -7,7 +7,7 @@ const props = defineProps({
   loading: { default: false, type: Boolean },
 });
 
-const emit = defineEmits(["detail", "delete"]);
+const emit = defineEmits(["detail", "delete", "remark"]);
 
 const confirmCode = ref("");
 
@@ -33,6 +33,11 @@ function confirmDelete() {
   emit("delete", confirmCode.value);
   confirmCode.value = "";
 }
+
+function remarkPreview(text) {
+  if (!text) return "";
+  return text.length > 8 ? text.slice(0, 8) + "..." : text;
+}
 </script>
 
 <template>
@@ -42,6 +47,7 @@ function confirmDelete() {
         <tr>
           <th>激活码</th>
           <th>状态</th>
+          <th>备注</th>
           <th>最大设备</th>
           <th>已用</th>
           <th>剩余</th>
@@ -58,8 +64,11 @@ function confirmDelete() {
               {{ c.status }}
             </span>
           </td>
+          <td @click="emit('remark', { code: c.code, remark: c.remark })" class="cursor-pointer text-base-content/60 text-xs hover:underline">
+            {{ remarkPreview(c.remark) }}
+          </td>
           <td>{{ c.max_devices }}</td>
-          <td>{{ c.used }}</td>
+          <td>{{ c.used_cnt }}</td>
           <td>{{ c.remaining }}</td>
           <td class="text-xs">{{ formatTime(c.created_at) }}</td>
           <td class="text-xs">{{ formatTime(c.expires_at) }}</td>

@@ -8,16 +8,17 @@ const store = useAdminStore();
 const count = ref(1);
 const maxDevices = ref(1);
 const expiresIn = ref("");
+const remark = ref("");
 const creating = ref(false);
 const result = ref(null);
 const error = ref("");
 
-const expiresInOptions = [
-  { label: "永久", value: "" },
-  { label: "30 天", value: "30d" },
-  { label: "90 天", value: "90d" },
-  { label: "1 年", value: "1y" },
-];
+async function fillTemplate() {
+  const resp = await store.doGetTemplate();
+  if (resp.success && resp.value) {
+    remark.value = resp.value;
+  }
+}
 
 async function handleCreate() {
   creating.value = true;
@@ -27,6 +28,7 @@ async function handleCreate() {
     count: count.value,
     expires_in: expiresIn.value || undefined,
     max_devices: maxDevices.value,
+    remark: remark.value || undefined,
   });
 
   creating.value = false;
@@ -90,11 +92,25 @@ function copyAll() {
 
         <div class="flex items-center justify-between">
           <span>有效期</span>
-          <select v-model="expiresIn" class="select select-bordered select-sm w-24">
-            <option v-for="opt in expiresInOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+          <input
+            v-model="expiresIn"
+            class="input input-bordered input-sm w-28"
+            placeholder="如 30d 90d 1y"
+            type="text"
+          >
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span>备注</span>
+          <div class="flex gap-1">
+            <input
+              v-model="remark"
+              class="input input-bordered input-sm w-36"
+              placeholder="备注内容"
+              type="text"
+            >
+            <button @click="fillTemplate" class="btn btn-xs btn-ghost">模板</button>
+          </div>
         </div>
 
         <div class="modal-action">

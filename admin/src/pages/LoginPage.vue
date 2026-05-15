@@ -6,19 +6,23 @@ import { useAdminStore } from "@/stores/admin";
 const router = useRouter();
 const store = useAdminStore();
 const secret = ref(store.secret);
+const apiBase = ref(store.apiBase);
 const loading = ref(false);
 const error = ref("");
 
 async function handleLogin() {
-  const trimmed = secret.value.trim();
-  if (!trimmed) {
+  const trimmedSecret = secret.value.trim();
+  const trimmedBase = apiBase.value.trim();
+
+  if (!trimmedSecret) {
     error.value = "请输入管理密钥";
     return;
   }
 
   loading.value = true;
   error.value = "";
-  store.setSecret(trimmed);
+  store.setApiBase(trimmedBase);
+  store.setSecret(trimmedSecret);
 
   const resp = await store.fetchCodes();
   loading.value = false;
@@ -39,12 +43,25 @@ async function handleLogin() {
       <div class="card-body gap-5">
         <div class="text-center">
           <h1 class="font-bold text-2xl">激活码管理</h1>
-          <p class="mt-1 text-base-content/60 text-sm">请输入管理密钥以登录</p>
+          <p class="mt-1 text-base-content/60 text-sm">请输入 API 地址和管理密钥</p>
         </div>
 
         <div v-if="error" class="alert alert-error">
           <span>{{ error }}</span>
         </div>
+
+        <label class="form-control">
+          <div class="label">
+            <span class="label-text">API 地址</span>
+          </div>
+          <input
+            v-model="apiBase"
+            class="input input-bordered"
+            :disabled="loading"
+            placeholder="留空使用当前域名"
+            type="url"
+          >
+        </label>
 
         <label class="form-control">
           <div class="label">

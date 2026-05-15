@@ -122,7 +122,13 @@ export const useActivationStore = defineStore("activation", () => {
         lastVerifiedAt.value = Date.now();
         await saveCache();
         status.value = "activated";
-        return { success: true };
+        return {
+          code: inputCode,
+          expires_at: resp.expires_at,
+          max_devices: resp.max_devices,
+          success: true,
+          token: resp.token,
+        };
       }
       else {
         error.value = resp.error || "激活失败";

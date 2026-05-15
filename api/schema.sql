@@ -3,9 +3,11 @@ CREATE TABLE IF NOT EXISTS activations (
   code        TEXT    NOT NULL UNIQUE,
   status      TEXT    NOT NULL DEFAULT 'active',  -- active | revoked | expired
   max_devices INTEGER NOT NULL DEFAULT 1,
+  remark      TEXT    NOT NULL DEFAULT '',
   created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
   expires_at  TEXT                                 -- NULL = 永不过期
 );
+ALTER TABLE activations ADD COLUMN remark TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS devices (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14,4 +16,9 @@ CREATE TABLE IF NOT EXISTS devices (
   bound_at      TEXT    NOT NULL DEFAULT (datetime('now')),
   last_seen_at  TEXT    NOT NULL DEFAULT (datetime('now')),
   UNIQUE(activation_id, fingerprint)
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT ''
 );

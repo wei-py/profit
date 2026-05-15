@@ -231,13 +231,13 @@ async function handleAdminCreate(request, env) {
   if (!checkAdmin(request, env))
     return json({ error: "未授权" }, 401);
 
-  const { count = 1, expires_in, max_devices = 1 } = await request.json().catch(() => ({}));
+  const { count = 1, expires_in, max_devices = 1, remark } = await request.json().catch(() => ({}));
   const created = [];
 
   for (let i = 0; i < Math.min(count, 100); i++) {
     const code = genCode();
-    let cols = "code, max_devices";
-    let vals = `'${code}', ${max_devices}`;
+    let cols = "code, max_devices, remark";
+    let vals = `'${code}', ${max_devices}, '${(remark || "").replace(/'/g, "''")}'`;
     let expiresVal = null;
     if (expires_in) {
       const m = expires_in.match(/^(\d+)([dmy])$/);
@@ -308,19 +308,25 @@ async function handleAdminList(request, env) {
   const filter = new URL(request.url).searchParams.get("filter") || "all";
 
   let where = "";
-  if (filter === "actived")
-    where = "WHERE a.status = 'active' HAVING COUNT(d.id) > 0";
-  else if (filter === "inactive")
-    where = "WHERE a.status = 'active' HAVING COUNT(d.id) = 0";
+  let having = "";
+  if (filter === "actived") {
+    where = "WHERE a.status = 'active'";
+    having = "HAVING COUNT(d.id) > 0";
+  }
+  else if (filter === "inactive") {
+    where = "WHERE a.status = 'active'";
+    having = "HAVING COUNT(d.id) = 0";
+  }
 
   const { results } = await env.DB.prepare(
-    `SELECT a.code, a.status, a.max_devices, a.created_at, a.expires_at,
-            COUNT(d.id) AS used,
+    `SELECT a.code, a.status, a.max_devices, a.remark, a.created_at, a.expires_at,
+            COUNT(d.id) AS used_cnt,
             a.max_devices - COUNT(d.id) AS remaining
      FROM activations a
      LEFT JOIN devices d ON d.activation_id = a.id
      ${where}
      GROUP BY a.id
+     ${having}
      ORDER BY a.created_at DESC`,
   ).all();
 
@@ -336,8 +342,8 @@ async function handleAdminCheck(request, env) {
   const { code } = await request.json();
 
   const act = await env.DB.prepare(
-    `SELECT a.code, a.status, a.max_devices, a.created_at, a.expires_at,
-            COUNT(d.id) AS used,
+    `SELECT a.code, a.status, a.max_devices, a.remark, a.created_at, a.expires_at,
+            COUNT(d.id) AS used_cnt,
             a.max_devices - COUNT(d.id) AS remaining
      FROM activations a
      LEFT JOIN devices d ON d.activation_id = a.id
@@ -367,6 +373,36 @@ async function handleAdminCheck(request, env) {
     devices,
     success: true,
   });
+}
+
+async function handleAdminRemark(request, env) {
+  if (!checkAdmin(request, env))
+    return json({ error: "未授权" }, 401);
+  const { code, remark } = await request.json();
+
+  await env.DB.prepare("UPDATE activations SET remark = ? WHERE code = ?")
+    .bind(remark || "", code)
+    .run();
+
+  return json({ success: true });
+}
+
+async function handleAdminTemplate(request, env) {
+  if (!checkAdmin(request, env))
+    return json({ error: "未授权" }, 401);
+  const { action, value } = await request.json();
+
+  if (action === "get") {
+    const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'remark_template'").first();
+    return json({ success: true, value: row?.value || "" });
+  }
+  if (action === "save") {
+    await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('remark_template', ?)")
+      .bind(value || "")
+      .run();
+    return json({ success: true });
+  }
+  return json({ error: "无效操作" }, 400);
 }
 
 // ===== 入口 =====
@@ -451,6 +487,27 @@ export default {
           status: res.status,
         });
       }
+      if (url.pathname === "/api/admin/remark" && request.method === "POST") {
+        const res = await handleAdminRemark(request, env);
+        return new Response(res.body, {
+          headers: {
+            ...Object.fromEntries(res.headers),
+            ...cors,
+          },
+          status: res.status,
+        });
+      }
+      if (url.pathname === "/api/admin/template" && request.method === "POST") {
+        const res = await handleAdminTemplate(request, env);
+        return new Response(res.body, {
+          headers: {
+            ...Object.fromEntries(res.headers),
+            ...cors,
+          },
+          status: res.status,
+        });
+      }
+
       return json({ error: "Not Found" }, 404);
     }
     catch (e) {

@@ -1,8 +1,11 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { checkCode, createCodes, deleteCode, listCodes } from "@/api/admin";
+import { checkCode, createCodes, deleteCode, getTemplate, listCodes, saveTemplate, updateRemark } from "@/api/admin";
 
 export const useAdminStore = defineStore("admin", () => {
+  const apiBase = ref(
+    localStorage.getItem("admin-api-base") || import.meta.env.VITE_API_BASE || "",
+  );
   const secret = ref(localStorage.getItem("admin-secret") || "");
   const codes = ref([]);
   const detail = ref(null);
@@ -10,6 +13,11 @@ export const useAdminStore = defineStore("admin", () => {
   const filter = ref("all");
   const loading = ref(false);
   const error = ref("");
+
+  function setApiBase(val) {
+    apiBase.value = val;
+    localStorage.setItem("admin-api-base", val);
+  }
 
   function setSecret(val) {
     secret.value = val;
@@ -85,6 +93,8 @@ export const useAdminStore = defineStore("admin", () => {
   }
 
   async function doCheck(code) {
+    detail.value = null;
+    detailDevices.value = [];
     loading.value = true;
     error.value = "";
     try {
@@ -106,7 +116,46 @@ export const useAdminStore = defineStore("admin", () => {
     }
   }
 
+  async function doUpdateRemark(code, remark) {
+    try {
+      const resp = await updateRemark(code, remark);
+      if (resp.success) {
+        await fetchCodes();
+        return resp;
+      }
+      error.value = resp.error || "更新备注失败";
+      return resp;
+    }
+    catch (e) {
+      error.value = e.message || "网络错误";
+      return { error: e.message, success: false };
+    }
+  }
+
+  async function doGetTemplate() {
+    try {
+      const resp = await getTemplate();
+      return resp;
+    }
+    catch (e) {
+      error.value = e.message || "网络错误";
+      return { error: e.message, success: false };
+    }
+  }
+
+  async function doSaveTemplate(value) {
+    try {
+      const resp = await saveTemplate(value);
+      return resp;
+    }
+    catch (e) {
+      error.value = e.message || "网络错误";
+      return { error: e.message, success: false };
+    }
+  }
+
   return {
+    apiBase,
     clearSecret,
     codes,
     detail,
@@ -114,11 +163,15 @@ export const useAdminStore = defineStore("admin", () => {
     doCheck,
     doCreate,
     doDelete,
+    doGetTemplate,
+    doSaveTemplate,
+    doUpdateRemark,
     error,
     fetchCodes,
     filter,
     loading,
     secret,
+    setApiBase,
     setSecret,
   };
 });
