@@ -1,0 +1,26 @@
+{
+  "name": "profit-admin",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "wrangler pages deploy dist --project-name=profit-admin"
+  },
+  "dependencies": {
+    "dayjs": "^1",
+    "pinia": "^2",
+    "vue": "^3",
+    "vue-router": "^4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4",
+    "@vitejs/plugin-vue": "^5",
+    "daisyui": "^5",
+    "tailwindcss": "^4",
+    "vite": "^6",
+    "wrangler": "^4"
+  }
+}
