@@ -488,10 +488,14 @@ async function handleFilesUpload(request, env) {
   });
 
   if (existing && overwrite) {
-    await env.FILES.delete(existing.r2_key);
+    // 覆盖时复用已有 r2_key，保证公开链接不变
+    const r2Key = existing.r2_key;
+    await env.FILES.put(r2Key, file.stream(), {
+      httpMetadata: { contentType: mimeType },
+    });
     await env.DB.prepare(
-      "UPDATE files SET r2_key = ?, size = ?, mime_type = ?, updated_at = datetime('now') WHERE id = ?",
-    ).bind(r2Key, file.size, mimeType, existing.id).run();
+      "UPDATE files SET size = ?, mime_type = ?, updated_at = datetime('now') WHERE id = ?",
+    ).bind(file.size, mimeType, existing.id).run();
     return json({
       success: true,
       file: { id: existing.id, name: file.name, size: file.size, mime_type: mimeType, r2_key: r2Key },
