@@ -1,8 +1,9 @@
 <script setup>
 import { ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const route = useRoute();
+const router = useRouter();
 const isDark = ref(document.documentElement.getAttribute("data-theme") === "me-dark");
 
 function toggleTheme() {
@@ -10,6 +11,10 @@ function toggleTheme() {
   const next = isDark.value ? "me-dark" : "lofi";
   document.documentElement.setAttribute("data-theme", next);
   localStorage.setItem("profit-theme", next);
+}
+
+function tabClass(name) {
+  return route.name === name ? "btn-primary" : "btn-ghost";
 }
 </script>
 
@@ -19,7 +24,22 @@ function toggleTheme() {
       v-if="route.name !== 'login'"
       class="bg-base-100 border-b border-base-300 flex shrink-0 h-12 items-center justify-between px-4"
     >
-      <span class="font-bold text-lg">激活码管理</span>
+      <div class="flex gap-1 items-center">
+        <button
+          @click="router.push('/')"
+          class="btn btn-sm"
+          :class="tabClass('dashboard')"
+        >
+          激活码
+        </button>
+        <button
+          @click="router.push('/files')"
+          class="btn btn-sm"
+          :class="tabClass('files')"
+        >
+          文件
+        </button>
+      </div>
       <div class="flex gap-1 items-center">
         <button
           @click="toggleTheme()"

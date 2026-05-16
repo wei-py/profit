@@ -12,6 +12,12 @@ const routes = [
     path: "/",
     component: () => import("@/pages/DashboardPage.vue"),
   },
+  {
+    meta: { requiresAuth: true },
+    name: "files",
+    path: "/files",
+    component: () => import("@/pages/FilesPage.vue"),
+  },
 ];
 
 const router = createRouter({

@@ -22,3 +22,17 @@ CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS files (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  parent_id  TEXT,
+  type       TEXT NOT NULL CHECK(type IN ('folder','file')),
+  size       INTEGER DEFAULT 0,
+  mime_type  TEXT,
+  r2_key     TEXT,
+  is_public  INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_files_parent ON files(parent_id);

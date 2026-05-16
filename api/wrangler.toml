@@ -7,6 +7,10 @@ binding = "DB"
 database_name = "profit-db"
 database_id = "0ed1083f-f48c-4c25-ab1b-c2bcb27aa0e5"
 
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "profit-files"
+
 [[routes]]
 pattern = "profit-admin.xu-wei.space/api/*"
 zone_name = "xu-wei.space"

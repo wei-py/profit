@@ -50,3 +50,74 @@ export function getTemplate() {
 export function saveTemplate(value) {
   return request("/api/admin/template", { action: "save", value });
 }
+
+// ===== 文件管理 =====
+
+export async function listFiles(parentId) {
+  const resp = await fetch(`${getApiBase()}/api/admin/files/list`, {
+    body: JSON.stringify({ parent_id: parentId || null }),
+    headers: getHeaders(),
+    method: "POST",
+  });
+  return resp.json();
+}
+
+export function createFolder(name, parentId) {
+  return request("/api/admin/files/folder", { name, parent_id: parentId || null });
+}
+
+export async function uploadFile(file, parentId, overwrite = false) {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (parentId) {
+    formData.append("parent_id", parentId);
+  }
+  if (overwrite) {
+    formData.append("overwrite", "true");
+  }
+
+  const resp = await fetch(`${getApiBase()}/api/admin/files/upload`, {
+    body: formData,
+    headers: { Authorization: getHeaders().Authorization },
+    method: "POST",
+  });
+  return resp.json();
+}
+
+export function renameFile(id, name) {
+  return request("/api/admin/files/rename", { id, name });
+}
+
+export function toggleFilePublic(id) {
+  return request("/api/admin/files/toggle-public", { id });
+}
+
+export function deleteFile(id) {
+  return request("/api/admin/files/delete", { id });
+}
+
+export function getFileDownloadUrl(r2Key) {
+  return `${getApiBase()}/api/files/${r2Key}`;
+}
+
+export async function downloadFile(id, filename) {
+  const resp = await fetch(`${getApiBase()}/api/admin/files/download`, {
+    body: JSON.stringify({ id }),
+    headers: getHeaders(),
+    method: "POST",
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: "下载失败" }));
+    return { error: err.error, success: false };
+  }
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return { success: true };
+}
