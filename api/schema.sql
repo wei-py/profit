@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS activations (
   created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
   expires_at  TEXT                                 -- NULL = 永不过期
 );
-ALTER TABLE activations ADD COLUMN remark TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS devices (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
