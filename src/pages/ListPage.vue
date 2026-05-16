@@ -129,7 +129,7 @@ const skuPageOffset = computed(() => (skuPage.value - 1) * skuPageSize.value);
 const skuPaged = computed(() => {
   const start = skuPageOffset.value;
   return createStore.skus.slice(start, start + skuPageSize.value)
-    .map((sku, i) => ({ sku, origIdx: start + i }));
+    .map((sku, i) => ({ origIdx: start + i, sku }));
 });
 const skuTotalPages = computed(() => Math.ceil(createStore.skus.length / skuPageSize.value) || 1);
 
@@ -217,6 +217,9 @@ function isDispimg(val) {
 }
 function isSkuInputCol(fk) {
   return createStore.skuInputFields.some(f => f.字段键 === fk);
+}
+function getSkuField(fk) {
+  return createStore.skuInputFields.find(f => f.字段键 === fk) || {};
 }
 function isPercentCol(fk) {
   return createStore.skuOutputFields.some(f => f.字段键 === fk && f.单位 === "%");
@@ -440,10 +443,10 @@ function normalizeVariantValues(val) {
                   <div class="flex gap-1 items-center text-xs">
                     <span>表格</span>
                     <input
-                      type="checkbox"
-                      class="toggle toggle-sm"
-                      :checked="skuViewMode === 'card'"
                       @change="skuViewMode = $event.target.checked ? 'card' : 'table'"
+                      :checked="skuViewMode === 'card'"
+                      class="toggle toggle-sm"
+                      type="checkbox"
                     >
                     <span>卡片</span>
                     <button
@@ -523,12 +526,13 @@ function normalizeVariantValues(val) {
                         </td>
                         <td v-for="fk in skuColDisplay" :key="fk">
                           <template v-if="isSkuInputCol(fk)">
-                            <input
-                              v-model="item.sku.inputs[fk]"
-                              class="input input-bordered input-xs w-20"
-                              step="any"
-                              type="number"
-                            >
+                            <FieldInput
+                              @update:model-value="item.sku.inputs[fk] = $event"
+                              :field="getSkuField(fk)"
+                              :modelValue="item.sku.inputs[fk]"
+                              noLabel
+                              :optionItems="configStore['选项值']"
+                            />
                           </template>
                           <template v-else-if="fk === '图片'">
                             <div v-if="item.sku.images" class="group h-10 relative w-10">
@@ -594,10 +598,12 @@ function normalizeVariantValues(val) {
                           @click="openCalcModal(item.origIdx)"
                           class="btn btn-ghost btn-xs ml-auto"
                           title="反推计算"
-                        >🧮</button>
+                        >
+                          🧮
+                        </button>
                       </div>
                       <div v-if="createStore.variantAttributes.filter(a => a.name.trim()).length" class="flex flex-wrap gap-1">
-                        <span class="badge badge-xs badge-outline" v-for="a in createStore.variantAttributes.filter(a => a.name.trim())" :key="a.name">
+                        <span v-for="a in createStore.variantAttributes.filter(a => a.name.trim())" :key="a.name" class="badge badge-xs badge-outline">
                           {{ a.name.trim() }}: {{ item.sku.attrs[a.name.trim()] }}
                         </span>
                       </div>
@@ -605,8 +611,14 @@ function normalizeVariantValues(val) {
                         <div v-for="fk in skuColDisplay" :key="fk" class="border-t border-base-300 pt-0.5">
                           <template v-if="isSkuInputCol(fk)">
                             <div class="flex gap-1 items-center justify-between">
-                              <span class="opacity-60">{{ fk }}</span>
-                              <input v-model="item.sku.inputs[fk]" class="input input-bordered input-xs w-16" step="any" type="number">
+                              <span class="shrink-0 w-[40%] opacity-60 truncate">{{ fk }}</span>
+                              <FieldInput
+                                @update:model-value="item.sku.inputs[fk] = $event"
+                                :field="getSkuField(fk)"
+                                :modelValue="item.sku.inputs[fk]"
+                                noLabel
+                                :optionItems="configStore['选项值']"
+                              />
                             </div>
                           </template>
                           <template v-else-if="fk === '图片'">
@@ -614,14 +626,19 @@ function normalizeVariantValues(val) {
                               <img @click="openImagePreview(item.sku.images)" class="border cursor-pointer h-10 object-cover rounded w-10" :src="item.sku.images">
                               <button @click="clearImage(item.sku)" class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4">✕</button>
                             </div>
-                            <label v-else class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-8 p-0 text-base-content/30 text-lg w-8" title="上传图片">＋<input @change="handleImageUpload(item.sku, $event)" accept="image/*" class="hidden" type="file"></label>
+                            <label v-else class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-8 p-0 text-base-content/30 text-lg w-8" title="上传图片">＋<input
+                              @change="handleImageUpload(item.sku, $event)"
+                              accept="image/*"
+                              class="hidden"
+                              type="file"
+                            ></label>
                           </template>
                           <template v-else>
                             <div class="flex justify-between">
                               <span class="opacity-60">{{ fk }}</span>
                               <span v-if="item.sku.error" class="text-error">{{ item.sku.error }}</span>
                               <span v-else-if="item.sku.results[fk] !== undefined">
-                                {{ isPercentCol(fk) ? `${(item.sku.results[fk]*100).toFixed(2)}%` : typeof item.sku.results[fk]==='number' ? item.sku.results[fk].toFixed(2) : item.sku.results[fk] }}
+                                {{ isPercentCol(fk) ? `${(item.sku.results[fk] * 100).toFixed(2)}%` : typeof item.sku.results[fk] === 'number' ? item.sku.results[fk].toFixed(2) : item.sku.results[fk] }}
                                 <button v-if="item.sku.traces?.[fk]" @click="openTrace(item.sku, fk)" class="btn btn-ghost btn-xs ml-1 text-base-content/40">?</button>
                               </span>
                               <span v-else class="text-base-content/30">—</span>
@@ -642,7 +659,12 @@ function normalizeVariantValues(val) {
                   <button @click="skuPage--" class="btn btn-ghost btn-xs" :disabled="skuPage <= 1">◀</button>
                   <span>{{ skuPage }}/{{ skuTotalPages }}</span>
                   <button @click="skuPage++" class="btn btn-ghost btn-xs" :disabled="skuPage >= skuTotalPages">▶</button>
-                  <input v-model="jumpSkuPage" @keyup.enter="handleJumpSkuPage" class="input input-bordered input-xs w-10" placeholder="页">
+                  <input
+                    v-model="jumpSkuPage"
+                    @keyup.enter="handleJumpSkuPage"
+                    class="input input-bordered input-xs w-10"
+                    placeholder="页"
+                  >
                   <button @click="handleJumpSkuPage" class="btn btn-ghost btn-xs">跳转</button>
                 </div>
               </div>
@@ -655,14 +677,14 @@ function normalizeVariantValues(val) {
       <div class="bg-base-100 border border-base-300 card card-sm">
         <div class="card-body">
           <div class="flex items-center justify-between">
-              <h2 class="card-title text-lg">商品记录（{{ listStore.records.length }} 行）</h2>
+            <h2 class="card-title text-lg">商品记录（{{ listStore.records.length }} 行）</h2>
             <div class="flex gap-1 items-center text-xs">
               <span>表格</span>
               <input
-                type="checkbox"
-                class="toggle toggle-sm"
-                :checked="recordViewMode === 'card'"
                 @change="recordViewMode = $event.target.checked ? 'card' : 'table'"
+                :checked="recordViewMode === 'card'"
+                class="toggle toggle-sm"
+                type="checkbox"
               >
               <span>卡片</span>
               <button
@@ -783,10 +805,14 @@ function normalizeVariantValues(val) {
               <button @click="currentPage--" class="btn btn-ghost btn-xs" :disabled="currentPage <= 1">◀</button>
               <span>{{ currentPage }}/{{ totalPages }}</span>
               <button @click="currentPage++" class="btn btn-ghost btn-xs" :disabled="currentPage >= totalPages">▶</button>
-              <input v-model="jumpPage" @keyup.enter="handleJumpPage" class="input input-bordered input-xs w-10" placeholder="页">
+              <input
+                v-model="jumpPage"
+                @keyup.enter="handleJumpPage"
+                class="input input-bordered input-xs w-10"
+                placeholder="页"
+              >
               <button @click="handleJumpPage" class="btn btn-ghost btn-xs">跳转</button>
             </div>
-
           </template>
         </div>
       </div>

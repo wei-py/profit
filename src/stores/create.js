@@ -193,9 +193,19 @@ export const useCreateStore = defineStore("create", () => {
   function makeDefaultSkuInputs() {
     const inputs = {};
     for (const f of skuInputFields.value) {
-      if (f.默认值)
+      if (f.默认值) {
         inputs[f.字段键] = f.默认值;
-      else inputs[f.字段键] = "";
+      }
+      else if (f.类型 === "下拉" && f.选项组编号) {
+        const items = configStore.getOptionItemsByGroup(f.选项组编号);
+        if (items.length)
+          inputs[f.字段键] = items[0].选项值;
+        else
+          inputs[f.字段键] = "";
+      }
+      else {
+        inputs[f.字段键] = "";
+      }
     }
     return inputs;
   }

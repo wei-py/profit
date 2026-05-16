@@ -7,6 +7,10 @@ const props = defineProps({
     type: Object,
   },
   modelValue: { default: "" },
+  noLabel: {
+    default: false,
+    type: Boolean,
+  },
   optionGroups: {
     type: Array,
     default: () => [],
@@ -59,7 +63,7 @@ function _onCheck(e) {
 </script>
 
 <template>
-  <div class="form-control">
+  <div v-if="!noLabel" class="form-control">
     <label class="label py-1">
       <span class="label-text">{{ fname }}</span>
       <span v-if="funit" class="label-text-alt opacity-60">{{ funit }}</span>
@@ -68,7 +72,7 @@ function _onCheck(e) {
     <select
       v-if="ftype === 'select' || ftype === '下拉'"
       @change="onInput"
-      class="select select-bordered"
+      class="select select-bordered select-xs w-full"
       :required="frequired"
       :value="modelValue"
     >
@@ -93,7 +97,7 @@ function _onCheck(e) {
     <input
       v-else-if="ftype === 'number' || ftype === '数字'"
       @input="onInput"
-      class="input input-bordered"
+      class="input input-bordered input-xs w-full"
       :placeholder="fdesc"
       :required="frequired"
       step="any"
@@ -104,11 +108,51 @@ function _onCheck(e) {
     <input
       v-else
       @input="onInput"
-      class="input input-bordered"
+      class="input input-bordered input-xs w-full"
       :placeholder="fdesc"
       :required="frequired"
       type="text"
       :value="modelValue"
     >
   </div>
+
+  <template v-else>
+    <select
+      v-if="ftype === 'select' || ftype === '下拉'"
+      @change="onInput"
+      class="select select-bordered select-xs"
+      :value="modelValue"
+    >
+      <option value="">--</option>
+      <option v-for="opt in options" :key="opt.value" :value="opt.value">
+        {{ opt.label }}
+      </option>
+    </select>
+
+    <div v-else-if="ftype === 'boolean' || ftype === '布尔'" class="flex items-center">
+      <input
+        @change="emit('update:modelValue', $event.target.checked ? '是' : '否')"
+        :checked="modelValue === '是' || modelValue === true || modelValue === 'true'"
+        class="toggle toggle-xs"
+        type="checkbox"
+      >
+    </div>
+
+    <input
+      v-else-if="ftype === 'number' || ftype === '数字'"
+      @input="onInput"
+      class="input input-bordered input-xs"
+      step="any"
+      type="number"
+      :value="modelValue"
+    >
+
+    <input
+      v-else
+      @input="onInput"
+      class="input input-bordered input-xs"
+      type="text"
+      :value="modelValue"
+    >
+  </template>
 </template>
