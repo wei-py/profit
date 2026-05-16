@@ -454,18 +454,6 @@ function normalizeVariantValues(val) {
                     >
                       {{ skuCardExpanded ? '收起' : '展开' }}
                     </button>
-                    <input v-model.number="skuPageSize" class="input input-bordered input-xs w-12" min="1">
-                    <span class="opacity-50">条/页</span>
-                    <button @click="skuPage--" class="btn btn-ghost btn-xs" :disabled="skuPage <= 1">◀</button>
-                    <span>{{ skuPage }}/{{ skuTotalPages }}</span>
-                    <button @click="skuPage++" class="btn btn-ghost btn-xs" :disabled="skuPage >= skuTotalPages">▶</button>
-                    <input
-                      v-model="jumpSkuPage"
-                      @keyup.enter="handleJumpSkuPage"
-                      class="input input-bordered input-xs w-10"
-                      placeholder="页"
-                    >
-                    <button @click="handleJumpSkuPage" class="btn btn-ghost btn-xs">跳转</button>
                     <button @click="skuColModal = true" class="btn btn-ghost btn-xs">
                       ⚙️ 编辑列
                     </button>
@@ -648,6 +636,15 @@ function normalizeVariantValues(val) {
                 <div v-if="!createStore.skus.length" class="mt-2 text-base-content/40 text-sm">
                   选择模板后自动生成 SKU，或点击「生成SKU」手动刷新
                 </div>
+                <div v-if="createStore.skus.length" class="flex items-center justify-end gap-1 mt-2 text-xs">
+                  <input v-model.number="skuPageSize" class="input input-bordered input-xs w-12" min="1">
+                  <span class="opacity-50">条/页</span>
+                  <button @click="skuPage--" class="btn btn-ghost btn-xs" :disabled="skuPage <= 1">◀</button>
+                  <span>{{ skuPage }}/{{ skuTotalPages }}</span>
+                  <button @click="skuPage++" class="btn btn-ghost btn-xs" :disabled="skuPage >= skuTotalPages">▶</button>
+                  <input v-model="jumpSkuPage" @keyup.enter="handleJumpSkuPage" class="input input-bordered input-xs w-10" placeholder="页">
+                  <button @click="handleJumpSkuPage" class="btn btn-ghost btn-xs">跳转</button>
+                </div>
               </div>
             </div>
           </template>
@@ -676,13 +673,6 @@ function normalizeVariantValues(val) {
               >
                 {{ recordCardExpanded ? '收起' : '展开' }}
               </button>
-              <input v-model.number="pageSize" class="input input-bordered input-xs w-12" min="1">
-              <span class="opacity-50">条/页</span>
-              <button @click="currentPage--" class="btn btn-ghost btn-xs" :disabled="currentPage <= 1">◀</button>
-              <span>{{ currentPage }}/{{ totalPages }}</span>
-              <button @click="currentPage++" class="btn btn-ghost btn-xs" :disabled="currentPage >= totalPages">▶</button>
-              <input v-model="jumpPage" @keyup.enter="handleJumpPage" class="input input-bordered input-xs w-10" placeholder="页">
-              <button @click="handleJumpPage" class="btn btn-ghost btn-xs">跳转</button>
               <button @click="showColModal = true" class="btn btn-ghost btn-xs">⚙️ 编辑列</button>
             </div>
           </div>
@@ -785,6 +775,16 @@ function normalizeVariantValues(val) {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div v-if="listStore.records.length" class="flex items-center justify-end gap-1 mt-2 text-xs">
+              <input v-model.number="pageSize" class="input input-bordered input-xs w-12" min="1">
+              <span class="opacity-50">条/页</span>
+              <button @click="currentPage--" class="btn btn-ghost btn-xs" :disabled="currentPage <= 1">◀</button>
+              <span>{{ currentPage }}/{{ totalPages }}</span>
+              <button @click="currentPage++" class="btn btn-ghost btn-xs" :disabled="currentPage >= totalPages">▶</button>
+              <input v-model="jumpPage" @keyup.enter="handleJumpPage" class="input input-bordered input-xs w-10" placeholder="页">
+              <button @click="handleJumpPage" class="btn btn-ghost btn-xs">跳转</button>
             </div>
 
           </template>

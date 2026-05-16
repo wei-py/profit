@@ -54,29 +54,29 @@ function openRemark({ code, remark }) {
 <template>
   <div class="h-full px-4 py-3 flex flex-col gap-3">
     <!-- 顶栏 -->
-    <div class="flex items-center justify-between">
-      <div class="flex gap-1 items-center">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div class="flex gap-1 items-center flex-wrap">
         <button
           @click="setFilter(f.value)"
           v-for="f in filters"
           :key="f.value"
-          class="btn btn-sm"
+          class="btn btn-xs sm:btn-sm"
           :class="store.filter === f.value ? 'btn-primary' : 'btn-ghost'"
         >
           {{ f.label }}
         </button>
       </div>
-      <div class="flex gap-1 items-center">
-        <button @click="openCreate" class="btn btn-sm btn-primary">
+      <div class="flex gap-1 items-center flex-wrap">
+        <button @click="openCreate" class="btn btn-xs sm:btn-sm btn-primary">
           批量创建
         </button>
-        <button @click="showTemplate = true" class="btn btn-sm btn-ghost">
+        <button @click="showTemplate = true" class="btn btn-xs sm:btn-sm btn-ghost">
           备注模板
         </button>
-        <button @click="store.fetchCodes()" class="btn btn-sm btn-ghost">
+        <button @click="store.fetchCodes()" class="btn btn-xs sm:btn-sm btn-ghost">
           刷新
         </button>
-        <button @click="handleLogout" class="btn btn-sm btn-ghost">
+        <button @click="handleLogout" class="btn btn-xs sm:btn-sm btn-ghost">
           退出
         </button>
       </div>

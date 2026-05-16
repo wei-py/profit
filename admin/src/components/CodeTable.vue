@@ -41,7 +41,8 @@ function remarkPreview(text) {
 </script>
 
 <template>
-  <div class="overflow-auto">
+  <!-- 桌面表格 -->
+  <div class="hidden sm:block overflow-auto">
     <table class="table table-sm">
       <thead>
         <tr>
@@ -85,20 +86,48 @@ function remarkPreview(text) {
         </tr>
       </tbody>
     </table>
+  </div>
 
-    <!-- 删除确认 -->
-    <dialog v-if="confirmCode" class="modal">
-      <div class="modal-box">
-        <h3 class="font-bold text-lg">确认删除</h3>
-        <p class="py-2">确定要删除/撤销激活码 <span class="font-mono">{{ confirmCode }}</span> 吗？</p>
-        <div class="modal-action">
-          <button @click="confirmCode = ''" class="btn btn-sm">取消</button>
-          <button @click="confirmDelete" class="btn btn-sm btn-error">确认</button>
+  <!-- 移动端卡片 -->
+  <div class="sm:hidden flex flex-col gap-2">
+    <div v-for="c in codes" :key="c.code" class="bg-base-100 border border-base-300 card card-sm">
+      <div class="card-body p-3">
+        <div class="flex items-center justify-between">
+          <span class="font-mono font-semibold text-sm">{{ c.code }}</span>
+          <span class="badge badge-sm" :class="statusBadge(c.status)">{{ c.status }}</span>
+        </div>
+        <div v-if="c.remark" @click="emit('remark', { code: c.code, remark: c.remark })" class="text-xs text-base-content/50 truncate cursor-pointer hover:underline">
+          {{ c.remark }}
+        </div>
+        <div class="flex gap-3 text-xs">
+          <span>设备 {{ c.used_cnt }}/{{ c.max_devices }}</span>
+          <span>剩余 {{ c.remaining }}</span>
+        </div>
+        <div class="flex gap-3 text-xs text-base-content/50">
+          <span>创建 {{ formatTime(c.created_at) }}</span>
+        </div>
+        <div class="text-xs text-base-content/50">
+          <span>过期 {{ formatTime(c.expires_at) }}</span>
+        </div>
+        <div class="flex gap-1 mt-1">
+          <button @click="emit('detail', c.code)" class="btn btn-xs btn-outline flex-1">详情</button>
+          <button @click="handleDelete(c.code)" class="btn btn-xs btn-outline text-error flex-1">删除</button>
         </div>
       </div>
-      <form class="modal-backdrop" method="dialog">
-        <button @click="confirmCode = ''" />
-      </form>
-    </dialog>
+    </div>
   </div>
-</template>
+
+  <!-- 删除确认 -->
+  <dialog v-if="confirmCode" class="modal">
+    <div class="modal-box max-w-full sm:max-w-md">
+      <h3 class="font-bold text-lg">确认删除</h3>
+      <p class="py-2">确定要删除/撤销激活码 <span class="font-mono break-all">{{ confirmCode }}</span> 吗？</p>
+      <div class="modal-action">
+        <button @click="confirmCode = ''" class="btn btn-sm">取消</button>
+        <button @click="confirmDelete" class="btn btn-sm btn-error">确认</button>
+      </div>
+    </div>
+    <form class="modal-backdrop" method="dialog">
+      <button @click="confirmCode = ''" />
+    </form>
+  </dialog></template>

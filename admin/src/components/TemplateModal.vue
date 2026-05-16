@@ -31,7 +31,7 @@ function copyAll() {
 
 <template>
   <dialog class="modal" open>
-    <div class="modal-box">
+    <div class="modal-box max-w-full sm:max-w-md">
       <h3 class="font-bold text-lg">备注模板</h3>
       <div v-if="loading" class="flex justify-center py-6">
         <span class="loading loading-spinner" />

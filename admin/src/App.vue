@@ -22,19 +22,19 @@ function tabClass(name) {
   <div class="bg-base-200 flex flex-col h-screen">
     <header
       v-if="route.name !== 'login'"
-      class="bg-base-100 border-b border-base-300 flex shrink-0 h-12 items-center justify-between px-4"
+      class="bg-base-100 border-b border-base-300 flex shrink-0 items-center justify-between px-2 sm:px-4 h-10 sm:h-12"
     >
-      <div class="flex gap-1 items-center">
+      <div class="flex gap-0.5 sm:gap-1 items-center">
         <button
           @click="router.push('/')"
-          class="btn btn-sm"
+          class="btn btn-xs sm:btn-sm"
           :class="tabClass('dashboard')"
         >
           激活码
         </button>
         <button
           @click="router.push('/files')"
-          class="btn btn-sm"
+          class="btn btn-xs sm:btn-sm"
           :class="tabClass('files')"
         >
           文件
@@ -43,7 +43,7 @@ function tabClass(name) {
       <div class="flex gap-1 items-center">
         <button
           @click="toggleTheme()"
-          class="btn btn-circle btn-ghost btn-sm"
+          class="btn btn-circle btn-ghost btn-xs sm:btn-sm"
           :title="isDark ? '浅色' : '深色'"
         >
           <svg

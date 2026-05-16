@@ -26,7 +26,7 @@ async function handleSave() {
 
 <template>
   <dialog class="modal" open>
-    <div class="modal-box">
+    <div class="modal-box max-w-full sm:max-w-md">
       <h3 class="font-bold text-lg">编辑备注 - {{ props.code }}</h3>
       <div class="mt-4 flex flex-col gap-3">
         <textarea

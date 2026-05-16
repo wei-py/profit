@@ -315,10 +315,10 @@ async function confirmDelete() {
     class="h-full px-4 py-3 flex flex-col gap-3"
   >
     <!-- 面包屑 -->
-    <div class="flex items-center gap-1 text-sm">
+    <div class="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto">
       <button
         @click="navigateToBreadcrumb(-1)"
-        class="btn btn-xs btn-ghost"
+        class="btn btn-xs btn-ghost whitespace-nowrap"
       >
         📂 根目录
       </button>
@@ -327,26 +327,26 @@ async function confirmDelete() {
         <button
           v-if="i < breadcrumb.length - 1"
           @click="navigateToBreadcrumb(i)"
-          class="btn btn-xs btn-ghost"
+          class="btn btn-xs btn-ghost whitespace-nowrap"
         >
           {{ crumb.name }}
         </button>
-        <span v-else class="font-bold">{{ crumb.name }}</span>
+        <span v-else class="font-bold text-xs sm:text-sm whitespace-nowrap">{{ crumb.name }}</span>
       </template>
     </div>
 
     <!-- 操作栏 -->
-    <div class="flex items-center justify-between">
-      <div class="flex gap-1 items-center">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div class="flex gap-1 items-center flex-wrap">
         <button
           @click="startNewFolder"
-          class="btn btn-sm btn-primary"
+          class="btn btn-xs sm:btn-sm btn-primary"
         >
           📁 新建文件夹
         </button>
         <button
           @click="triggerUpload"
-          class="btn btn-sm btn-ghost"
+          class="btn btn-xs sm:btn-sm btn-ghost"
         >
           ⬆ 上传文件
         </button>
@@ -360,7 +360,7 @@ async function confirmDelete() {
       </div>
       <button
         @click="fetchItems"
-        class="btn btn-sm btn-ghost"
+        class="btn btn-xs sm:btn-sm btn-ghost"
       >
         刷新
       </button>
@@ -414,8 +414,8 @@ async function confirmDelete() {
       释放文件以上传
     </div>
 
-    <!-- 文件表格 -->
-    <div v-if="!loading && items.length > 0" class="overflow-auto flex-1">
+    <!-- 文件表格 (桌面) -->
+    <div v-if="!loading && items.length > 0" class="hidden sm:block overflow-auto flex-1">
       <table class="table table-sm">
         <thead>
           <tr>
@@ -515,6 +515,64 @@ async function confirmDelete() {
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- 文件卡片 (移动端) -->
+    <div v-if="!loading && items.length > 0" class="sm:hidden flex flex-col gap-2 overflow-auto flex-1">
+      <div v-for="item in items" :key="item.id" class="bg-base-100 border border-base-300 card card-sm">
+        <div class="card-body p-3">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-sm truncate mr-2">{{ item.name }}</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-base-content/50">
+            <span>{{ typeLabel(item) }}</span>
+            <span v-if="item.type !== 'folder'">· {{ formatSize(item.size) }}</span>
+          </div>
+          <div class="text-xs text-base-content/50">
+            修改: {{ timeLabel(item.updated_at) }}
+          </div>
+          <div class="flex gap-1 mt-1">
+            <template v-if="item.type === 'folder'">
+              <button @click="enterFolder(item)" class="btn btn-xs btn-outline flex-1">打开</button>
+            </template>
+            <template v-else>
+              <button @click="handleDownload(item)" class="btn btn-xs btn-outline flex-1">下载</button>
+            </template>
+            <button
+              v-if="editingId !== item.id"
+              @click="startRename(item)"
+              class="btn btn-xs btn-ghost"
+            >改名</button>
+            <div v-else class="flex items-center gap-1">
+              <input
+                v-model="editName"
+                @blur="confirmRename"
+                @keydown="handleRenameKey"
+                :id="`rename-input-${item.id}`"
+                class="input input-xs input-bordered w-24"
+              >
+            </div>
+            <button @click="handleDelete(item)" class="btn btn-xs btn-ghost text-error">删除</button>
+          </div>
+          <div v-if="item.type !== 'folder'" class="flex items-center gap-1 mt-1 text-xs">
+            <input
+              @change="handleTogglePublic(item)"
+              :checked="item.is_public === 1"
+              class="toggle toggle-xs"
+              type="checkbox"
+            >
+            <span class="text-base-content/50">公开</span>
+            <button
+              v-if="item.is_public === 1"
+              @click="copyLink(item)"
+              class="btn btn-xs btn-ghost btn-circle"
+              title="复制链接"
+            >
+              🔗
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 空状态 -->

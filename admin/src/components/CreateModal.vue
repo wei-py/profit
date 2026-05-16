@@ -51,7 +51,7 @@ function copyAll() {
 
 <template>
   <dialog class="modal" open>
-    <div class="modal-box">
+    <div class="modal-box max-w-full sm:max-w-md">
       <h3 class="font-bold text-lg">批量创建激活码</h3>
 
       <div v-if="result" class="mt-4">

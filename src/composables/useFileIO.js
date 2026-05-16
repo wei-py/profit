@@ -133,6 +133,7 @@ export function useFileIO() {
         return {
           config: (await store.get("lastConfigPath")) || "",
           list: (await store.get("lastListPath")) || "",
+          remoteUrl: (await store.get("lastRemoteUrl")) || "",
         };
       }
       catch {
@@ -142,6 +143,7 @@ export function useFileIO() {
     return {
       config: localStorage.getItem("lastConfigPath") || "",
       list: localStorage.getItem("lastListPath") || "",
+      remoteUrl: localStorage.getItem("lastRemoteUrl") || "",
     };
   }
   async function saveLastPath(key, path) {
@@ -201,6 +203,29 @@ export function useFileIO() {
     return { success: true };
   }
 
+  async function openRemoteConfigExcel(url) {
+    configStore.loading = true;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buffer = await resp.arrayBuffer();
+      await configStore.loadFromBuffer(buffer, null, { remote: true, remoteUrl: url });
+      await saveLastPath("lastRemoteUrl", url);
+      return { success: true };
+    }
+    catch (e) {
+      configStore.loading = false;
+      configStore.error = `远程配置加载失败: ${e.message}`;
+      return { success: false, error: e.message };
+    }
+  }
+
+  async function restoreRemoteUrl() {
+    const { remoteUrl } = await getLastPaths();
+    if (remoteUrl)
+      configStore.remoteUrl = remoteUrl;
+  }
+
   async function openListExcel() {
     const result = isTauri() ? await tauriOpen("打开列表 Excel", "xlsx") : await browserOpen();
     if (!result)
@@ -256,7 +281,9 @@ export function useFileIO() {
   return {
     openConfigExcel,
     openListExcel,
+    openRemoteConfigExcel,
     restoreLastPath,
+    restoreRemoteUrl,
     saveConfigExcel,
     saveListExcel,
   };

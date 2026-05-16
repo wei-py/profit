@@ -1,16 +1,17 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
 import ColEditorModal from "@/components/common/ColEditorModal.vue";
 import CountryModal from "@/components/country/CountryModal.vue";
 import FieldModal from "@/components/country/FieldModal.vue";
 import OptionGroupModal from "@/components/country/OptionGroupModal.vue";
+import RemoteUrlModal from "@/components/country/RemoteUrlModal.vue";
 import TemplateModal from "@/components/country/TemplateModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
 import { useConfigStore } from "@/stores/config";
 
 const store = useConfigStore();
-const { openConfigExcel, saveConfigExcel } = useFileIO();
+const { openConfigExcel, saveConfigExcel, restoreRemoteUrl } = useFileIO();
 const CORE_KEYS = ["编号", "国家", "平台", "货币", "货币符号", "汇率", "启用"];
 
 const dragOpts = {
@@ -39,6 +40,7 @@ const allKeys = computed(() => {
 });
 const newColName = ref("");
 const showAddCol = ref(false);
+const showRemoteModal = ref(false);
 const expandedId = ref(null);
 const cpId = computed(() => expandedId.value);
 
@@ -219,15 +221,42 @@ function openEditTpl(idx) {
 function openConfigColEditor() {
   showConfigColModal.value = true;
 }
+
+onMounted(() => {
+  restoreRemoteUrl();
+});
 </script>
 
 <template>
   <div class="flex flex-col h-full">
     <div class="flex items-center justify-between mb-4">
-      <h1 class="font-bold text-2xl">配置</h1>
+      <div class="flex items-center gap-2">
+        <h1 class="font-bold text-2xl">配置</h1>
+        <span v-if="store.isRemote" class="badge badge-warning badge-sm">远程</span>
+      </div>
       <div class="flex gap-2">
-        <button @click="openConfigExcel" class="btn btn-outline btn-sm">打开配置</button>
-        <button @click="saveConfigExcel" class="btn btn-outline btn-sm">保存配置</button>
+        <div class="flex">
+          <button @click="openConfigExcel" class="btn btn-outline btn-sm rounded-r-none">
+            打开配置
+          </button>
+          <div class="dropdown dropdown-end">
+            <button tabindex="0" class="btn btn-outline btn-sm rounded-l-none border-l-base-300 border-l-0">
+              ▼
+            </button>
+            <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-40 p-1 shadow-sm">
+              <li><button class="text-xs" @click="openConfigExcel">📁 本地文件</button></li>
+              <li><button class="text-xs" @click="showRemoteModal = true">🔗 远程链接</button></li>
+            </ul>
+          </div>
+        </div>
+        <button
+          @click="saveConfigExcel"
+          class="btn btn-outline btn-sm"
+          :disabled="store.isRemote"
+          :title="store.isRemote ? '远程配置不可直接保存，请先加载本地文件' : ''"
+        >
+          保存配置
+        </button>
         <button @click="openConfigColEditor" class="btn btn-ghost btn-sm">⚙️ 编辑列</button>
         <button v-if="!showAddCol" @click="showAddCol = true" class="btn btn-ghost btn-sm">
           ＋ 添加列
@@ -462,6 +491,10 @@ function openConfigColEditor() {
       :hiddenKeys="store.国家平台HiddenCols"
       :items="allConfigColumns"
       :open="showConfigColModal"
+    />
+    <RemoteUrlModal
+      @close="showRemoteModal = false"
+      :open="showRemoteModal"
     />
   </div>
 </template>

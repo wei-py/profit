@@ -21,14 +21,20 @@ export const useConfigStore = defineStore("config", () => {
   const 国家平台ColOrder = ref([]);
   const 国家平台HiddenCols = ref([]);
 
+  const isRemote = ref(false);
+  const remoteUrl = ref("");
+
   const loaded = computed(() => 国家平台.value.length > 0);
 
-  /** @param {ArrayBuffer} buffer @param {string} [p] */
-  async function loadFromBuffer(buffer, p) {
+  /** @param {ArrayBuffer} buffer @param {string} [p] @param {{ remote?: boolean, remoteUrl?: string }} [opts] */
+  async function loadFromBuffer(buffer, p, opts = {}) {
     loading.value = true;
     error.value = "";
     if (p)
       filePath.value = p;
+    isRemote.value = opts.remote || false;
+    if (opts.remoteUrl)
+      remoteUrl.value = opts.remoteUrl;
     try {
       const config = readWorkbookBuffer(buffer);
       国家平台.value = config["国家平台"] || [];
@@ -142,6 +148,7 @@ export const useConfigStore = defineStore("config", () => {
   function clear() {
     filePath.value = "";
     workbook.value = null;
+    isRemote.value = false;
     国家平台.value = [];
     计算字段.value = [];
     选项组.value = [];
@@ -166,10 +173,12 @@ export const useConfigStore = defineStore("config", () => {
     getOptionItemsByGroup,
     getTemplateParams,
     getTemplatesByCountry,
+    isRemote,
     loaded,
     loadFromBuffer,
     loading,
     lookupTables,
+    remoteUrl,
     sync国家平台ColOrder,
     workbook,
     国家平台,

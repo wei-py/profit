@@ -22,7 +22,7 @@ function statusBadge(status) {
 
 <template>
   <dialog class="modal" open>
-    <div class="modal-box max-w-2xl">
+    <div class="modal-box max-w-full sm:max-w-2xl">
       <h3 class="font-bold text-lg">激活码详情</h3>
 
       <div v-if="!store.detail" class="flex justify-center py-4">
