@@ -1,11 +1,13 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeProductId } from "@/domain/product-records";
 import { readListWorkbook } from "@/services/list-excel-reader";
 import { buildListWorkbookBuffer } from "@/services/list-excel-writer";
 
-let _uidCounter = 0;
+let uidCounter = 0;
 function genUid() {
-  return ++_uidCounter;
+  uidCounter += 1;
+  return uidCounter;
 }
 
 export const useListStore = defineStore("list", () => {
@@ -23,15 +25,14 @@ export const useListStore = defineStore("list", () => {
       filePath.value = p;
     try {
       const { columnOrder: order, hiddenColumns: hidden, records: rows } = await readListWorkbook(buffer);
-      records.value = rows.map(r => ({
-        ...r,
-        _uid: genUid(),
-      }));
-      columnOrder.value = order;
+      records.value = withUids(rows);
+      columnOrder.value = order || [];
       hiddenColumns.value = hidden || [];
+      syncColumnOrder();
     }
     catch (e) {
       error.value = e.message;
+      throw e;
     }
     finally {
       loading.value = false;
@@ -39,21 +40,44 @@ export const useListStore = defineStore("list", () => {
   }
 
   async function getExportBuffer() {
+    syncColumnOrder();
     return await buildListWorkbookBuffer(records.value, columnOrder.value, hiddenColumns.value);
   }
 
+  function withUids(rows) {
+    return (rows || []).map(row => ({ ...row, _uid: genUid() }));
+  }
+
   function addRecords(skuRows) {
-    for (const row of skuRows) {
-      records.value.push({
-        ...row,
-        _uid: genUid(),
-      });
+    records.value.push(...withUids(skuRows));
+    syncColumnOrder();
+  }
+
+  function replaceRecordsByProductId(productId, skuRows) {
+    const target = normalizeProductId(productId);
+    if (!target) {
+      addRecords(skuRows);
+      return;
     }
+
+    const firstIndex = records.value.findIndex(row => normalizeProductId(row.商品ID) === target);
+    if (firstIndex < 0) {
+      addRecords(skuRows);
+      return;
+    }
+
+    const nextRows = withUids(skuRows);
+    records.value = [
+      ...records.value.slice(0, firstIndex),
+      ...nextRows,
+      ...records.value.slice(firstIndex).filter(row => normalizeProductId(row.商品ID) !== target),
+    ];
     syncColumnOrder();
   }
 
   function removeRecord(index) {
     records.value.splice(index, 1);
+    syncColumnOrder();
   }
 
   function moveRecordToTop(index) {
@@ -71,32 +95,33 @@ export const useListStore = defineStore("list", () => {
   }
 
   function updateRecord(index, data) {
-    records.value[index] = {
-      ...records.value[index],
-      ...data,
-    };
+    records.value[index] = { ...records.value[index], ...data };
+    syncColumnOrder();
   }
 
   function syncColumnOrder() {
     if (!records.value.length) {
       columnOrder.value = [];
+      hiddenColumns.value = [];
       return;
     }
-    const existing = new Set(columnOrder.value);
+
     const allKeys = new Set();
     for (const row of records.value) {
-      for (const k of Object.keys(row)) {
-        if (k !== "_uid")
-          allKeys.add(k);
+      for (const key of Object.keys(row || {})) {
+        if (key !== "_uid")
+          allKeys.add(key);
       }
     }
-    const merged = [...columnOrder.value.filter(k => allKeys.has(k))];
-    for (const k of allKeys) {
-      if (!existing.has(k))
-        merged.push(k);
+
+    const existing = new Set(columnOrder.value);
+    const merged = columnOrder.value.filter(key => allKeys.has(key));
+    for (const key of allKeys) {
+      if (!existing.has(key))
+        merged.push(key);
     }
     columnOrder.value = merged;
-    hiddenColumns.value = hiddenColumns.value.filter(k => allKeys.has(k));
+    hiddenColumns.value = hiddenColumns.value.filter(key => allKeys.has(key));
   }
 
   function clear() {
@@ -104,6 +129,7 @@ export const useListStore = defineStore("list", () => {
     records.value = [];
     columnOrder.value = [];
     hiddenColumns.value = [];
+    error.value = "";
   }
 
   return {
@@ -120,6 +146,7 @@ export const useListStore = defineStore("list", () => {
     moveRecordToTop,
     records,
     removeRecord,
+    replaceRecordsByProductId,
     syncColumnOrder,
     updateRecord,
   };

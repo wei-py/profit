@@ -1,62 +1,44 @@
 import { defineStore } from "pinia";
 import { computed, reactive, ref } from "vue";
+import { buildProductRows, parseVariantValues } from "@/domain/product-records";
 import { execute } from "@/services/rule-engine";
+import { nowText, normalizeId } from "@/utils/value";
 import { useConfigStore } from "./config";
 
 export const useCreateStore = defineStore("create", () => {
   const configStore = useConfigStore();
 
-  // ── 商品基本信息 ──
   const productId = ref("");
   const productName = ref("");
   const selectedCountryId = ref("");
   const selectedTemplateId = ref("");
-
-  // ── 商品级字段值 ──
   const productInputs = reactive({});
 
-  // ── 变体 ──
-  const variantAttributes = ref([]); // [{name:'颜色', values:'红,蓝'}, ...]
-  const skuPrefix = ref(""); // SKU 前缀
-
-  // ── SKU ──
-  const skus = reactive([]); // [{key, attrs, inputs, results, error, images, skuCode}]
+  const variantAttributes = ref([]);
+  const skuPrefix = ref("");
+  const skus = reactive([]);
 
   const calculating = ref(false);
   const lastCalculatedAt = ref("");
 
-  // ── 计算属性 ──
   const selectedTemplate = computed(() =>
-    configStore["计算模板"].find(t => t.编号 === selectedTemplateId.value),
+    configStore.计算模板.find(t => normalizeId(t.编号) === normalizeId(selectedTemplateId.value)),
   );
 
   const currentRules = computed(() => configStore.getFeeRulesByTemplate(selectedTemplateId.value));
 
-  const productFields = computed(() =>
-    selectedCountryId.value
-      ? configStore
-          .getFieldsByCountry(selectedCountryId.value)
-          .filter(f => f.层级 === "商品级" && f.输入输出 === "输入")
-      : [],
-  );
+  const productFields = computed(() => getFields("商品级", "输入"));
+  const skuInputFields = computed(() => getFields("SKU级", "输入"));
+  const skuOutputFields = computed(() => getFields("SKU级", "输出"));
 
-  const skuInputFields = computed(() =>
-    selectedCountryId.value
-      ? configStore
-          .getFieldsByCountry(selectedCountryId.value)
-          .filter(f => f.层级 === "SKU级" && f.输入输出 === "输入")
-      : [],
-  );
+  function getFields(level, ioType) {
+    if (!selectedCountryId.value)
+      return [];
+    return configStore
+      .getEnabledFieldsByCountry(selectedCountryId.value)
+      .filter(field => field.层级 === level && field.输入输出 === ioType);
+  }
 
-  const skuOutputFields = computed(() =>
-    selectedCountryId.value
-      ? configStore
-          .getFieldsByCountry(selectedCountryId.value)
-          .filter(f => f.层级 === "SKU级" && f.输入输出 === "输出")
-      : [],
-  );
-
-  // ── 选择国家+模板 ──
   function selectCountry(countryId) {
     selectedCountryId.value = countryId;
     selectedTemplateId.value = "";
@@ -71,7 +53,8 @@ export const useCreateStore = defineStore("create", () => {
   function resetForm() {
     productId.value = "";
     productName.value = "";
-    for (const k of Object.keys(productInputs)) delete productInputs[k];
+    skuPrefix.value = "";
+    clearObject(productInputs);
     variantAttributes.value = [];
     skus.splice(0, skus.length);
     calculating.value = false;
@@ -79,48 +62,49 @@ export const useCreateStore = defineStore("create", () => {
   }
 
   function resetForTemplate() {
-    for (const k of Object.keys(productInputs)) delete productInputs[k];
+    clearObject(productInputs);
     variantAttributes.value = [];
     skus.splice(0, skus.length);
     calculating.value = false;
     lastCalculatedAt.value = "";
-
-    // 加载默认值（从选项组取第一个，或模板参数）
-    for (const f of productFields.value) {
-      if (f.默认值) {
-        productInputs[f.字段键] = f.默认值;
-      }
-      else if (f.类型 === "下拉" && f.选项组编号) {
-        const items = configStore.getOptionItemsByGroup(f.选项组编号);
-        if (items.length)
-          productInputs[f.字段键] = items[0].选项值;
-      }
-      else if (f.类型 === "数字") {
-        productInputs[f.字段键] = "";
-      }
-      else {
-        productInputs[f.字段键] = "";
-      }
-    }
+    applyDefaultProductInputs();
   }
 
-  // ── 变体操作 ──
+  function applyDefaultProductInputs() {
+    const paramDefaults = new Map(
+      configStore.getTemplateParams(selectedTemplateId.value).map(param => [param.字段键, param.默认值]),
+    );
+    for (const field of productFields.value)
+      productInputs[field.字段键] = defaultValueForField(field, paramDefaults.get(field.字段键));
+  }
+
+  function defaultValueForField(field, templateDefault = undefined) {
+    if (templateDefault !== undefined && templateDefault !== "")
+      return templateDefault;
+    if (field.默认值)
+      return field.默认值;
+    if (field.类型 === "下拉" && field.选项组编号)
+      return configStore.getOptionCascadeDefault(field.选项组编号);
+    return "";
+  }
+
+  function makeDefaultSkuInputs() {
+    const paramDefaults = new Map(
+      configStore.getTemplateParams(selectedTemplateId.value).map(param => [param.字段键, param.默认值]),
+    );
+    const inputs = {};
+    for (const field of skuInputFields.value)
+      inputs[field.字段键] = defaultValueForField(field, paramDefaults.get(field.字段键));
+    return inputs;
+  }
+
   function addVariantAttribute() {
-    variantAttributes.value = [
-      ...variantAttributes.value,
-      {
-        name: "",
-        values: "",
-      },
-    ];
+    variantAttributes.value = [...variantAttributes.value, { name: "", values: "" }];
   }
 
   function updateVariantAttribute(index, attr) {
     const arr = [...variantAttributes.value];
-    arr[index] = {
-      ...arr[index],
-      ...attr,
-    };
+    arr[index] = { ...arr[index], ...attr };
     variantAttributes.value = arr;
   }
 
@@ -128,92 +112,64 @@ export const useCreateStore = defineStore("create", () => {
     variantAttributes.value = variantAttributes.value.filter((_, i) => i !== index);
   }
 
-  // ── 笛卡尔积生成 SKU ──
   function generateSkus() {
     const attrs = variantAttributes.value
-      .filter(a => a.name.trim() && a.values.trim())
-      .map(a => ({
-        name: a.name.trim(),
-        values: a.values
-          .split("|")
-          .map(s => s.trim())
-          .filter(Boolean),
-      }));
-
-    const prefix = skuPrefix.value;
+      .filter(attr => normalizeId(attr.name) && normalizeId(attr.values))
+      .map(attr => ({
+        name: normalizeId(attr.name),
+        values: parseVariantValues(attr.values),
+      }))
+      .filter(attr => attr.values.length);
 
     if (!attrs.length) {
-      skus.splice(0, skus.length, {
+      skus.splice(0, skus.length, makeSkuRow({
         attrs: {},
-        error: "",
-        images: "",
-        inputs: makeDefaultSkuInputs(),
+        index: 0,
         key: productName.value || "默认",
-        results: {},
-        skuCode: prefix ? `${prefix}001` : "",
-      });
+        oldInputs: skus[0]?.inputs,
+        parts: [],
+      }));
       return;
     }
 
+    const oldInputsByKey = new Map(skus.map(sku => [sku.key, { ...(sku.inputs || {}) }]));
     const combos = attrs.reduce(
-      (rows, attr) =>
-        rows.flatMap(row =>
-          attr.values.map(v => ({
-            ...row,
-            [attr.name]: v,
-          })),
-        ),
+      (rows, attr) => rows.flatMap(row => attr.values.map(value => ({ ...row, [attr.name]: value }))),
       [{}],
     );
 
-    const oldSkus = {};
-    for (const s of skus) {
-      if (s.key)
-        oldSkus[s.key] = s.inputs;
-    }
-
-    const newSkus = combos.map((combo, idx) => {
-      const key = attrs.map(a => combo[a.name]).join(",");
-      const num = String(idx + 1).padStart(3, "0");
-      const parts = attrs.map(a => combo[a.name]).join("-");
-      const code = prefix ? `${prefix}${num}-${parts}` : `${num}-${parts}`;
-      return {
+    const rows = combos.map((combo, index) => {
+      const parts = attrs.map(attr => combo[attr.name]);
+      const key = parts.join(",");
+      return makeSkuRow({
         attrs: combo,
-        error: "",
-        images: "",
-        inputs: oldSkus[key] || makeDefaultSkuInputs(),
+        index,
         key,
-        results: {},
-        skuCode: code,
-      };
+        oldInputs: oldInputsByKey.get(key),
+        parts,
+      });
     });
-    skus.splice(0, skus.length, ...newSkus);
+    skus.splice(0, skus.length, ...rows);
   }
 
-  function makeDefaultSkuInputs() {
-    const inputs = {};
-    for (const f of skuInputFields.value) {
-      if (f.默认值) {
-        inputs[f.字段键] = f.默认值;
-      }
-      else if (f.类型 === "下拉" && f.选项组编号) {
-        const items = configStore.getOptionItemsByGroup(f.选项组编号);
-        if (items.length)
-          inputs[f.字段键] = items[0].选项值;
-        else
-          inputs[f.字段键] = "";
-      }
-      else {
-        inputs[f.字段键] = "";
-      }
-    }
-    return inputs;
+  function makeSkuRow({ attrs, index, key, oldInputs, parts }) {
+    const num = String(index + 1).padStart(3, "0");
+    const suffix = parts.length ? `-${parts.join("-")}` : "";
+    return {
+      attrs,
+      error: "",
+      images: "",
+      inputs: oldInputs || makeDefaultSkuInputs(),
+      key,
+      results: {},
+      skuCode: skuPrefix.value ? `${skuPrefix.value}${num}${suffix}` : `${num}${suffix}`,
+      traces: {},
+    };
   }
 
   function updateSkuInput(skuIndex, fieldKey, value) {
-    if (!skus[skuIndex])
-      return;
-    skus[skuIndex].inputs[fieldKey] = value;
+    if (skus[skuIndex])
+      skus[skuIndex].inputs[fieldKey] = value;
   }
 
   function updateSkuField(skuIndex, field, value) {
@@ -223,64 +179,58 @@ export const useCreateStore = defineStore("create", () => {
       skus[skuIndex].skuCode = value;
     else if (field === "images")
       skus[skuIndex].images = value;
-    else updateSkuInput(skuIndex, field, value);
+    else
+      updateSkuInput(skuIndex, field, value);
   }
 
-  // ── 计算 ──
   function calculateAll() {
     calculating.value = true;
-
-    // 确保已生成 SKU
     if (!skus.length)
       generateSkus();
 
-    const rules = currentRules.value;
-    const tables = configStore.lookupTables;
-
     for (const sku of skus) {
       try {
-        const merged = {
+        const inputs = {
           ...productInputs,
-          ...sku.inputs,
+          ...(sku.inputs || {}),
         };
-        const { errors, results, traces } = execute(rules, tables, merged);
+        const { errors, results, traces } = execute(currentRules.value, configStore.lookupTables, inputs);
         sku.results = results;
         sku.traces = traces;
         sku.error = errors.length ? errors.join("; ") : "";
       }
-      catch (e) {
-        sku.error = e.message;
+      catch (error) {
+        sku.error = error.message;
         sku.results = {};
+        sku.traces = {};
       }
     }
 
     calculating.value = false;
-    lastCalculatedAt.value = new Date().toISOString().slice(0, 19).replace("T", " ");
+    lastCalculatedAt.value = nowText();
   }
 
-  // ── 展平为保存行 ──
   function productRows() {
-    const now = lastCalculatedAt.value || new Date().toISOString().slice(0, 10);
-
-    return skus.map(sku => ({
-      SKU码: sku.skuCode || "",
-      商品ID: productId.value,
-      商品名称: productName.value,
-      国家平台编号: selectedCountryId.value,
-      模板编号: selectedTemplateId.value,
-      ...sku.attrs,
-      ...productInputs,
-      ...sku.inputs,
-      ...sku.results,
-      图片: sku.images || "", // 写入时嵌入浮动画片，单元格文本留空
-      计算时间: now,
-    }));
+    return buildProductRows({
+      calculatedAt: lastCalculatedAt.value,
+      productId: productId.value,
+      productInputs,
+      productName: productName.value,
+      selectedCountryId: selectedCountryId.value,
+      selectedTemplateId: selectedTemplateId.value,
+      skus,
+    });
   }
 
   function reset() {
     selectedCountryId.value = "";
     selectedTemplateId.value = "";
     resetForm();
+  }
+
+  function clearObject(target) {
+    for (const key of Object.keys(target))
+      delete target[key];
   }
 
   return {
@@ -290,6 +240,7 @@ export const useCreateStore = defineStore("create", () => {
     currentRules,
     generateSkus,
     lastCalculatedAt,
+    makeDefaultSkuInputs,
     productFields,
     productId,
     productInputs,
@@ -297,6 +248,7 @@ export const useCreateStore = defineStore("create", () => {
     productRows,
     removeVariantAttribute,
     reset,
+    resetForTemplate,
     resetForm,
     selectCountry,
     selectedCountryId,

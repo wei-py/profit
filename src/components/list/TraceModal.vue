@@ -2,12 +2,15 @@
 import { ref, watch } from "vue";
 import { useCreateStore } from "@/stores/create";
 
+import { useModalEsc } from "@/composables/useModalEsc";
+
 const props = defineProps({
   fieldKey: String,
   open: Boolean,
   skuKey: String,
 });
 const emit = defineEmits(["close"]);
+useModalEsc(() => props.open, () => emit("close"));
 
 const createStore = useCreateStore();
 const traceContent = ref("");
@@ -24,7 +27,7 @@ watch(
 </script>
 
 <template>
-  <dialog class="modal" :open="open">
+  <dialog class="modal" :open="open" @cancel.prevent>
     <div class="max-w-lg modal-box">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">计算过程：{{ fieldKey }}</h3>

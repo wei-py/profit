@@ -4,11 +4,14 @@ import { execute } from "@/services/rule-engine";
 import { useConfigStore } from "@/stores/config";
 import { useCreateStore } from "@/stores/create";
 
+import { useModalEsc } from "@/composables/useModalEsc";
+
 const props = defineProps({
   open: Boolean,
   skuIndex: Number,
 });
 const emit = defineEmits(["apply", "close"]);
+useModalEsc(() => props.open, () => emit("close"));
 
 const configStore = useConfigStore();
 const createStore = useCreateStore();
@@ -136,8 +139,8 @@ function applyCalc() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open">
-    <div class="max-w-sm modal-box">
+  <dialog class="modal" :open="open" @cancel.prevent>
+    <div class="modal-box w-[min(24rem,calc(100vw-1rem))] max-w-none">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">反推计算</h3>
         <button @click="emit('close')" class="btn btn-circle btn-ghost btn-sm">✕</button>

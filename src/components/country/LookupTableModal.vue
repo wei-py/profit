@@ -5,15 +5,19 @@ import { vDraggable } from "vue-draggable-plus";
 import { useConfigStore } from "@/stores/config";
 import "driver.js/dist/driver.css";
 
+import { useModalEsc } from "@/composables/useModalEsc";
+
 const props = defineProps({
   open: Boolean,
   tableName: String,
 });
 const emit = defineEmits(["close"]);
+useModalEsc(() => props.open, () => emit("close"));
 
 const store = useConfigStore();
 const newName = ref("");
 const rowsLocal = ref([]);
+let rowUid = 0;
 
 const dragOpts = {
   animation: 150,
@@ -54,17 +58,18 @@ watch(
     if (!v)
       return;
     newName.value = props.tableName;
-    rowsLocal.value = JSON.parse(JSON.stringify(store.lookupTables[props.tableName] || []));
+    rowUid = 0;
+    rowsLocal.value = JSON.parse(JSON.stringify(store.lookupTables[props.tableName] || [])).map(row => ({ ...row, _uid: ++rowUid }));
   },
 );
 
 function addRow() {
   if (!rowsLocal.value.length) {
-    rowsLocal.value.push({});
+    rowsLocal.value.push({ _uid: ++rowUid });
     return;
   }
-  const row = {};
-  for (const k of Object.keys(rowsLocal.value[0])) row[k] = "";
+  const row = { _uid: ++rowUid };
+  for (const k of Object.keys(rowsLocal.value[0]).filter(k => k !== "_uid")) row[k] = "";
   rowsLocal.value.push(row);
 }
 function delRow(i) {
@@ -77,7 +82,7 @@ function addCol() {
   if (!col)
     return;
   for (const row of rowsLocal.value) {
-    if (!(col in row))
+    if (col !== "_uid" && !(col in row))
       row[col] = "";
   }
   rowsLocal.value = [...rowsLocal.value];
@@ -88,6 +93,10 @@ function delCol(col) {
   rowsLocal.value = [...rowsLocal.value];
 }
 
+function cleanRows() {
+  return rowsLocal.value.map(({ _uid, ...row }) => row);
+}
+
 function save() {
   const oldName = props.tableName;
   const nn = newName.value.trim();
@@ -96,7 +105,7 @@ function save() {
   if (oldName !== nn) {
     store.lookupTables = {
       ...store.lookupTables,
-      [nn]: rowsLocal.value,
+      [nn]: cleanRows(),
     };
     delete store.lookupTables[oldName];
     for (const r of store["费用规则"]) {
@@ -107,7 +116,7 @@ function save() {
   else {
     store.lookupTables = {
       ...store.lookupTables,
-      [nn]: rowsLocal.value,
+      [nn]: cleanRows(),
     };
   }
   emit("close");
@@ -115,8 +124,8 @@ function save() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open">
-    <div class="max-h-[85vh] max-w-4xl modal-box overflow-y-auto w-11/12">
+  <dialog class="modal" :open="open" @cancel.prevent>
+    <div class="modal-box max-h-[85vh] w-[min(52rem,calc(100vw-1rem))] max-w-none overflow-y-auto">
       <div class="flex gap-2 items-center mb-4">
         <h3 class="font-bold text-lg">查表：</h3>
         <input v-model="newName" class="font-mono input input-bordered input-sm w-48">
@@ -139,7 +148,7 @@ function save() {
           <thead>
             <tr>
               <th class="w-8" />
-              <th v-for="k in Object.keys(rowsLocal[0] || {})" :key="k" class="group relative">
+              <th v-for="k in Object.keys(rowsLocal[0] || {}).filter(k => k !== '_uid')" :key="k" class="group relative">
                 {{ k }}
                 <button
                   @click="delCol(k)"
@@ -152,13 +161,13 @@ function save() {
             </tr>
           </thead>
           <tbody v-draggable="[rowsLocal, dragOpts]">
-            <tr v-for="(row, i) in rowsLocal" :key="i">
+            <tr v-for="(row, i) in rowsLocal" :key="row._uid">
               <td>
                 <span
                   class="drag-handle flex hover:text-base-content items-center justify-center select-none text-base-content/30 text-xs"
                 >☰</span>
               </td>
-              <td v-for="k in Object.keys(rowsLocal[0] || {})" :key="k">
+              <td v-for="k in Object.keys(rowsLocal[0] || {}).filter(k => k !== '_uid')" :key="k">
                 <input v-model="row[k]" class="input input-bordered input-xs w-full">
               </td>
               <td>

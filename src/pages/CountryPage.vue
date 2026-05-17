@@ -11,7 +11,7 @@ import { useFileIO } from "@/composables/useFileIO";
 import { useConfigStore } from "@/stores/config";
 
 const store = useConfigStore();
-const { openConfigExcel, saveConfigExcel, restoreRemoteUrl } = useFileIO();
+const { openConfigExcel, restoreRemoteUrl, saveConfigExcel } = useFileIO();
 const CORE_KEYS = ["编号", "国家", "平台", "货币", "货币符号", "汇率", "启用"];
 
 const dragOpts = {
@@ -24,8 +24,19 @@ const dragOpts = {
   handle: ".drag-handle",
 };
 const dragOptsCountry = {
-  ...dragOpts,
+  animation: 150,
+  chosenClass: "drag-chosen",
+  dragClass: "drag-drag",
   draggable: ".country-main-row",
+  fallbackOnBody: true,
+  forceFallback: true,
+  ghostClass: "drag-ghost",
+  handle: ".country-row-drag-handle",
+};
+const dragOptsOptionGroup = {
+  ...dragOpts,
+  draggable: ".option-source-row",
+  handle: ".option-source-drag-handle",
 };
 
 const allKeys = computed(() => {
@@ -78,17 +89,36 @@ const expOptGroupsSource = computed(() =>
   cpId.value ? store.getOptionGroupsByCountry(cpId.value) : [],
 );
 const localOptGroups = ref([]);
+const isDraggingOptGroups = ref(false);
+
+function sortOptionGroups(groups) {
+  return [...(groups || [])].sort((a, b) => {
+    const oa = Number(a?.排序);
+    const ob = Number(b?.排序);
+    const aHasOrder = Number.isFinite(oa);
+    const bHasOrder = Number.isFinite(ob);
+    if (aHasOrder || bHasOrder) {
+      const na = aHasOrder ? oa : Number.MAX_SAFE_INTEGER;
+      const nb = bHasOrder ? ob : Number.MAX_SAFE_INTEGER;
+      if (na !== nb)
+        return na - nb;
+    }
+    return String(a?.名称 || a?.编号 || "").localeCompare(String(b?.名称 || b?.编号 || ""), "zh-Hans-CN");
+  });
+}
+
+function rootOptionGroups(groups) {
+  return sortOptionGroups((groups || []).filter(g => !g.父级编号));
+}
+
 watch(
   expOptGroupsSource,
   (v) => {
-    localOptGroups.value = [...v];
+    if (!isDraggingOptGroups.value)
+      localOptGroups.value = rootOptionGroups(v);
   },
   { immediate: true },
 );
-function onOptGroupsDragEnd() {
-  const other = store["选项组"].filter(g => g.所属国家平台 !== cpId.value);
-  store["选项组"] = [...other, ...localOptGroups.value];
-}
 
 const expTemplatesSource = computed(() =>
   cpId.value ? store.getTemplatesByCountry(cpId.value) : [],
@@ -141,13 +171,108 @@ function deleteField(idx) {
     store["计算字段"].splice(x, 1);
   localFields.value.splice(idx, 1);
 }
-function deleteOpt(idx) {
-  const groups = store.getOptionGroupsByCountry(cpId.value);
-  const g = groups[idx];
-  store["选项组"] = store["选项组"].filter(r => r.编号 !== g.编号);
-  store["选项值"] = store["选项值"].filter(r => r.所属分组 !== g.编号);
-  localOptGroups.value.splice(idx, 1);
+function deleteOptGroup(group) {
+  if (!group)
+    return;
+  const ids = collectDescendantIds(group.编号);
+  ids.add(group.编号);
+  store["选项组"] = store["选项组"].filter(r => !ids.has(r.编号));
+  store["选项值"] = store["选项值"].filter(r => !ids.has(r.所属分组));
+  localOptGroups.value = localOptGroups.value.filter(r => !ids.has(r.编号));
 }
+
+function collectDescendantIds(rootId) {
+  const ids = new Set();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const g of store["选项组"]) {
+      if (g.父级编号 && (ids.has(g.父级编号) || g.父级编号 === rootId || g.编号 === rootId) && !ids.has(g.编号)) {
+        ids.add(g.编号);
+        changed = true;
+      }
+    }
+  }
+  return ids;
+}
+function dragTargetIndex(evt, selector = "") {
+  if (evt?.newDraggableIndex !== undefined && evt?.newDraggableIndex !== null)
+    return evt.newDraggableIndex;
+  if (selector && evt?.to && evt?.item) {
+    const items = [...evt.to.children].filter(el => el.matches?.(selector));
+    const index = items.indexOf(evt.item);
+    if (index >= 0)
+      return index;
+  }
+  return evt?.newIndex;
+}
+
+function ensureDraggedItemPosition(listRef, evt, getKey, selector = "") {
+  const targetIndex = dragTargetIndex(evt, selector);
+  const dragKey = evt?.item?.dataset?.dragKey;
+  if (!dragKey || targetIndex === undefined || targetIndex === null)
+    return;
+
+  if (String(getKey(listRef.value[targetIndex]) || "") === dragKey)
+    return;
+
+  const currentIndex = listRef.value.findIndex(item => String(getKey(item) || "") === dragKey);
+  if (currentIndex < 0 || currentIndex === targetIndex)
+    return;
+
+  const [moved] = listRef.value.splice(currentIndex, 1);
+  listRef.value.splice(targetIndex, 0, moved);
+}
+
+function onOptionGroupDragStart() {
+  isDraggingOptGroups.value = true;
+}
+
+function onOptionGroupsDragEnd(evt) {
+  ensureDraggedItemPosition(localOptGroups, evt, group => group?.编号, ".option-source-row");
+  localOptGroups.value.forEach((group, index) => {
+    group.排序 = index + 1;
+  });
+  reorderOptionGroupsForCurrentCountry();
+  isDraggingOptGroups.value = false;
+}
+
+function reorderOptionGroupsForCurrentCountry() {
+  if (!cpId.value)
+    return;
+
+  const localIds = new Set(expOptGroupsSource.value.map(group => group.编号));
+  const otherGroups = store["选项组"].filter(group => !localIds.has(group.编号));
+  const byParent = new Map();
+  for (const group of expOptGroupsSource.value) {
+    const parentId = group.父级编号 || "";
+    const list = byParent.get(parentId) || [];
+    list.push(group);
+    byParent.set(parentId, list);
+  }
+
+  const orderedCountryGroups = [];
+  const appendedIds = new Set();
+  const appendTree = (group) => {
+    if (!group || appendedIds.has(group.编号))
+      return;
+    orderedCountryGroups.push(group);
+    appendedIds.add(group.编号);
+    for (const child of sortOptionGroups(byParent.get(group.编号) || []))
+      appendTree(child);
+  };
+
+  for (const root of localOptGroups.value)
+    appendTree(root);
+
+  for (const group of expOptGroupsSource.value) {
+    if (!appendedIds.has(group.编号))
+      orderedCountryGroups.push(group);
+  }
+
+  store["选项组"] = [...otherGroups, ...orderedCountryGroups];
+}
+
 function deleteTpl(idx) {
   const templates = store.getTemplatesByCountry(cpId.value);
   const t = templates[idx];
@@ -164,30 +289,35 @@ const editingCountryId = ref("");
 const showFieldModal = ref(false);
 const editingFieldIdx = ref(-1);
 const showOptModal = ref(false);
-const editingOptIdx = ref(-1);
+const editingOptGroupId = ref("");
 const showTplModal = ref(false);
 const editingTplIdx = ref(-1);
 const showConfigColModal = ref(false);
 
-let isDraggingCp = false;
+const isDraggingCp = ref(false);
+const dragExpandedId = ref(null);
 const local国家平台 = ref([]);
-const tbodyKey = ref(0);
 watch(
-  () => [...store['国家平台']],
+  () => [...store["国家平台"]],
   (v) => {
-    if (!isDraggingCp)
+    if (!isDraggingCp.value)
       local国家平台.value.splice(0, local国家平台.value.length, ...v);
   },
   { immediate: true },
 );
 function onCountryDragStart() {
-  isDraggingCp = true;
+  isDraggingCp.value = true;
+  dragExpandedId.value = expandedId.value;
   expandedId.value = null;
 }
-function onCountryDragEnd() {
-  store['国家平台'].splice(0, store['国家平台'].length, ...local国家平台.value);
-  isDraggingCp = false;
-  tbodyKey.value++;
+function onCountryDragEnd(evt) {
+  ensureDraggedItemPosition(local国家平台, evt, row => row?.编号, ".country-main-row");
+  store["国家平台"].splice(0, store["国家平台"].length, ...local国家平台.value);
+  const restoreId = dragExpandedId.value;
+  const shouldRestore = restoreId && store["国家平台"].some(row => row.编号 === restoreId);
+  dragExpandedId.value = null;
+  isDraggingCp.value = false;
+  expandedId.value = shouldRestore ? restoreId : null;
 }
 
 function openEditCountry(row) {
@@ -203,11 +333,11 @@ function openEditField(idx) {
   showFieldModal.value = true;
 }
 function openNewOpt() {
-  editingOptIdx.value = -1;
+  editingOptGroupId.value = "";
   showOptModal.value = true;
 }
-function openEditOpt(idx) {
-  editingOptIdx.value = idx;
+function openEditOptGroup(group) {
+  editingOptGroupId.value = group?.编号 || "";
   showOptModal.value = true;
 }
 function openNewTpl() {
@@ -240,12 +370,12 @@ onMounted(() => {
             打开配置
           </button>
           <div class="dropdown dropdown-end">
-            <button tabindex="0" class="btn btn-outline btn-sm rounded-l-none border-l-base-300 border-l-0">
+            <button class="btn btn-outline btn-sm rounded-l-none border-l-base-300 border-l-0" tabindex="0">
               ▼
             </button>
-            <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-box z-10 w-40 p-1 shadow-sm">
-              <li><button class="text-xs" @click="openConfigExcel">📁 本地文件</button></li>
-              <li><button class="text-xs" @click="showRemoteModal = true">🔗 远程链接</button></li>
+            <ul class="dropdown-content menu bg-base-200 rounded-box z-10 w-40 p-1 shadow-sm" tabindex="0">
+              <li><button @click="openConfigExcel" class="text-xs">📁 本地文件</button></li>
+              <li><button @click="showRemoteModal = true" class="text-xs">🔗 远程链接</button></li>
             </ul>
           </div>
         </div>
@@ -296,15 +426,16 @@ onMounted(() => {
                   <th class="w-24">操作</th>
                 </tr>
               </thead>
-              <tbody :key="tbodyKey" v-draggable="[local国家平台, { ...dragOptsCountry, onStart: onCountryDragStart, onEnd: onCountryDragEnd }]">
+              <tbody v-draggable="[local国家平台, { ...dragOptsCountry, onStart: onCountryDragStart, onEnd: onCountryDragEnd }]">
                 <template v-for="(row, ri) in local国家平台" :key="row.编号 || ri">
                   <tr
                     class="country-main-row hover"
                     :class="{ 'bg-base-200': expandedId === row.编号 }"
+                    :data-drag-key="row.编号"
                   >
                     <td>
                       <span
-                        class="drag-handle flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
+                        class="country-row-drag-handle flex hover:text-base-content cursor-grab items-center justify-center px-1 py-0.5 select-none text-base-content/30"
                       >☰</span>
                     </td>
                     <td>
@@ -333,7 +464,7 @@ onMounted(() => {
                       </button>
                     </td>
                   </tr>
-                  <tr v-if="expandedId === row.编号">
+                  <tr v-if="expandedId === row.编号 && !isDraggingCp" class="country-expand-row">
                     <td class="bg-base-200/50 p-4" :colspan="configColumns.length + 3">
                       <div class="gap-4 grid grid-cols-3">
                         <div class="bg-base-100 card card-sm">
@@ -376,31 +507,35 @@ onMounted(() => {
                         <div class="bg-base-100 card card-sm">
                           <div class="card-body p-3">
                             <div class="flex items-center justify-between mb-2">
-                              <span class="font-semibold text-sm">选项组（{{ localOptGroups.length }}）</span>
+                              <span class="font-semibold text-sm">选项来源（{{ localOptGroups.length }}）</span>
                               <button @click="openNewOpt" class="btn btn-primary btn-xs">＋</button>
                             </div>
                             <div v-if="!localOptGroups.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else v-draggable="[localOptGroups, { ...dragOpts, onEnd: onOptGroupsDragEnd }]">
+                            <div v-else v-draggable="[localOptGroups, { ...dragOptsOptionGroup, onStart: onOptionGroupDragStart, onEnd: onOptionGroupsDragEnd }]">
                               <div
-                                v-for="(g, i) in localOptGroups"
-                                :key="g.编号 || i"
-                                class="border-b border-base-200 flex items-center justify-between py-1 text-xs"
+                                v-for="(group, i) in localOptGroups"
+                                :key="group.编号 || i"
+                                class="option-source-row border-b border-base-200 flex items-center justify-between py-1 text-xs"
+                                :data-drag-key="group.编号"
                               >
-                                <span class="flex gap-2 items-center">
+                                <span class="flex min-w-0 flex-1 gap-2 items-center">
                                   <span
-                                    class="drag-handle flex hover:text-base-content items-center px-1.5 py-0.5 select-none text-base-content/30"
+                                    class="option-source-drag-handle flex hover:text-base-content cursor-grab items-center px-1.5 py-0.5 select-none text-base-content/30"
+                                    title="拖动排序"
                                   >☰</span>
                                   <span
-                                    @click="openEditOpt(i)"
-                                    class="cursor-pointer hover:text-primary"
+                                    @click="openEditOptGroup(group)"
+                                    class="min-w-0 cursor-pointer font-semibold truncate hover:text-primary"
                                   >
-                                    {{ g.名称 || "(新)" }}
-                                    <span class="text-base-content/40">{{ g.编号 }}</span></span>
+                                    {{ group.名称 || group.编号 || "(新)" }}
+                                    <span class="text-base-content/40">{{ group.编号 }}</span>
+                                  </span>
+                                  <span v-if="collectDescendantIds(group.编号).size" class="badge badge-ghost badge-xs">子级</span>
                                 </span>
                                 <button
-                                  @click="deleteOpt(i)"
+                                  @click="deleteOptGroup(group)"
                                   class="btn btn-ghost btn-xs text-error"
                                 >
                                   ✕
@@ -474,8 +609,8 @@ onMounted(() => {
     <OptionGroupModal
       @close="showOptModal = false"
       :cpId="cpId"
-      :groupIdx="editingOptIdx"
       :open="showOptModal"
+      :selectedGroupId="editingOptGroupId"
     />
     <TemplateModal
       @close="showTplModal = false"

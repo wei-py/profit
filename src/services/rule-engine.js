@@ -1,222 +1,249 @@
-/**
- * 执行费用计算。
- * @param {object[]} feeRules
- * @param {object} lookupTables
- * @param {object} userInputs
- * @returns {{ results: object, errors: string[], traces: object }} Calculation results
- */
+import XEUtils from "xe-utils";
+import { parseCascadePath } from "@/utils/optionCascade";
+import { isBlank, normalizeText, parseDelimited, readJson, toNumber, toRate } from "@/utils/value";
+
+const ENABLED_VALUES = new Set(["是", "TRUE", "true", "1", "启用", ""]);
+const FUNCTION_ALIASES = {
+  如果: "IF",
+  且: "AND",
+  或: "OR",
+  取整: "ROUND",
+  向上取整: "CEIL",
+  向下取整: "FLOOR",
+  绝对值: "ABS",
+  最大值: "MAX",
+  最小值: "MIN",
+};
+
+const FORMULA_FUNCTIONS = {
+  ABS: Math.abs,
+  AND: (...args) => args.every(Boolean) ? 1 : 0,
+  AVG: (...args) => {
+    const nums = args.map(v => toNumber(v, 0));
+    return nums.length ? nums.reduce((s, n) => s + n, 0) / nums.length : 0;
+  },
+  CEIL: Math.ceil,
+  CLAMP: (value, min, max) => Math.min(Math.max(toNumber(value, 0), toNumber(min, 0)), toNumber(max, 0)),
+  DIV: (a, b) => (toNumber(b, 0) === 0 ? 0 : toNumber(a, 0) / toNumber(b, 0)),
+  FLOOR: Math.floor,
+  IF: (cond, yes, no) => (cond ? yes : no),
+  MAX: (...args) => Math.max(...args.map(v => toNumber(v, 0))),
+  MIN: (...args) => Math.min(...args.map(v => toNumber(v, 0))),
+  MUL: (...args) => args.map(v => toNumber(v, 0)).reduce((s, n) => s * n, 1),
+  OR: (...args) => args.some(Boolean) ? 1 : 0,
+  PCT: value => toRate(value, 0),
+  ROUND: (value, digits = 2) => {
+    const factor = 10 ** toNumber(digits, 0);
+    return Math.round(toNumber(value, 0) * factor) / factor;
+  },
+  SUM: (...args) => args.map(v => toNumber(v, 0)).reduce((s, n) => s + n, 0),
+};
+
 export function execute(feeRules, lookupTables, userInputs) {
   const results = {};
   const errors = [];
   const traces = {};
+  const context = {
+    ...(userInputs || {}),
+  };
 
-  const enabled = feeRules.filter(r => r.启用 === "是" || r.启用 === "TRUE");
-  const sorted = enabled.sort((a, b) => Number(a.计算顺序) - Number(b.计算顺序));
-
-  // 所有可用字段键（输入 + 已计算结果），公式替换时用
-  const allKeys = [
-    ...new Set([...Object.keys(userInputs), ...sorted.map(r => r.输出字段键).filter(Boolean)]),
-  ];
+  const enabled = (feeRules || []).filter(rule => ENABLED_VALUES.has(normalizeText(rule.启用 || "是")));
+  const sorted = XEUtils.orderBy(enabled, [rule => toNumber(rule.计算顺序, 0)], ["asc"]);
 
   for (const rule of sorted) {
     try {
-      // 条件判断 — 通过条件结构树递归求值
-      if (!evalConditions(rule, userInputs, results))
+      if (!evalConditions(rule, context))
         continue;
 
-      const key = rule.输出字段键;
+      const key = normalizeText(rule.输出字段键);
       if (!key)
         continue;
 
-      switch (rule.计算方式) {
-        case "查表": {
-          const { trace, val } = doLookup(rule, lookupTables, userInputs, results);
-          results[key] = val;
-          traces[key] = trace;
-          break;
-        }
-        case "百分比": {
-          const { trace, val } = doPercent(rule, userInputs, results);
-          results[key] = val;
-          traces[key] = trace;
-          break;
-        }
-        case "固定值": {
-          results[key] = Number(rule.固定金额) || 0;
-          traces[key] = `${rule.费用名称 || key} = ${results[key]}（固定值）`;
-          break;
-        }
-        case "加总": {
-          const { trace, val } = doSum(rule, userInputs, results);
-          results[key] = val;
-          traces[key] = trace;
-          break;
-        }
-        case "公式": {
-          const { trace, val } = doFormula(rule, userInputs, results, allKeys);
-          results[key] = val;
-          traces[key] = trace;
-          break;
-        }
-      }
+      const { trace, val } = calculateRule(rule, lookupTables || {}, context);
+      const oldValue = toNumber(context[key], 0);
+      const nextValue = rule.累加 === "是" ? oldValue + toNumber(val, 0) : val;
+      results[key] = nextValue;
+      context[key] = nextValue;
+      traces[key] = trace;
     }
-    catch (e) {
-      errors.push(`[${rule.编号}] ${e.message}`);
+    catch (error) {
+      errors.push(`[${rule.编号 || rule.费用名称 || "规则"}] ${error.message}`);
     }
   }
 
-  return {
-    errors,
-    results,
-    traces,
-  };
+  return { errors, results, traces };
 }
 
-// ── helpers ──
-
-/** 按条件数据求值。 优先从 条件数据 JSON 读取完整树，否则从条件1-4列读取（AND）。 */
-function evalConditions(rule, inputs, results) {
-  // 优先：条件数据 JSON 树
-  if (rule.条件数据) {
-    try {
-      const d = JSON.parse(rule.条件数据);
-      if (d.tree)
-        return evalTree(d.tree, d.pool || [], inputs, results);
-    }
-    catch {
-      /* fall through */
-    }
+function calculateRule(rule, lookupTables, context) {
+  switch (rule.计算方式) {
+    case "查表":
+      return doLookup(rule, lookupTables, context);
+    case "百分比":
+      return doPercent(rule, context);
+    case "固定值":
+      return doFixed(rule);
+    case "加总":
+      return doSum(rule, context);
+    case "公式":
+    case "表达式":
+      return doFormula(rule, context);
+    default:
+      return { trace: "未选择计算方式", val: 0 };
   }
+}
 
-  // 或：解析 条件结构
-  const 结构 = (rule.条件结构 || "").trim();
-  if (结构)
-    return evalStruct(结构, rule, inputs, results);
+export function evalConditions(rule, context) {
+  const treeData = readJson(rule.条件数据, null);
+  if (treeData?.tree)
+    return evalTree(treeData.tree, treeData.pool || [], context);
 
-  // 兜底：所有非空条件 AND
-  for (let i = 1; i <= 4; i++) {
-    const f = rule[`条件${i}字段`];
-    if (!f)
+  const structure = normalizeText(rule.条件结构);
+  if (structure && /^\d/.test(structure))
+    return evalLegacyStruct(structure, rule, context);
+
+  for (let i = 1; i <= 4; i += 1) {
+    const field = normalizeText(rule[`条件${i}字段`]);
+    if (!field)
       continue;
-    if (
-      !matches(
-        getVal(f, inputs, results),
-        rule[`条件${i}运算符`],
-        rule[`条件${i}值`],
-        rule[`条件${i}值2`],
-      )
-    ) {
+    if (!matches(getVal(field, context), rule[`条件${i}运算符`], rule[`条件${i}值`], rule[`条件${i}值2`]))
       return false;
-    }
   }
   return true;
 }
 
-function evalTree(node, pool, inputs, results) {
+function evalTree(node, pool, context) {
+  if (!node || typeof node !== "object")
+    return true;
+
   if (node.type === "cond") {
-    const c = pool[node.idx];
-    if (!c || !c.字段)
+    const cond = pool?.[Number(node.idx)] || {};
+    const field = normalizeText(cond.字段);
+    if (!field)
       return true;
-    return matches(getVal(c.字段, inputs, results), c.运算符, c.值, "");
+    return matches(getVal(field, context), cond.运算符, cond.值, cond.值2);
   }
-  // group: evaluate children with their individual connectors
+
+  const children = Array.isArray(node.children) ? node.children : [];
+  if (!children.length)
+    return true;
+
   let result = null;
-  for (const ch of node.children) {
-    const chResult = evalTree(ch, pool, inputs, results);
+  for (const child of children) {
+    const childResult = evalTree(child, pool, context);
     if (result === null) {
-      result = chResult;
+      result = childResult;
+      continue;
     }
-    else {
-      const op = ch.type === "cond" ? ch.op || "AND" : ch.linkOp || "AND";
-      result = op === "AND" ? result && chResult : result || chResult;
-    }
+    const linkOp = child.type === "group" ? child.linkOp : child.op;
+    result = linkOp === "OR" ? result || childResult : result && childResult;
   }
-  return result === null ? true : result;
+  return result ?? true;
 }
 
-function evalStruct(结构, rule, inputs, results) {
-  const groups = 结构.split("|").map(g => g.split(",").map(s => s.trim()));
+function evalLegacyStruct(structure, rule, context) {
+  const groups = structure.split("|").map(group => group.split(",").map(s => s.trim()));
   for (const group of groups) {
-    let ok = true;
-    for (const idx of group) {
+    const ok = group.every((idx) => {
       const i = Number(idx) + 1;
       if (i < 1 || i > 4)
-        continue;
-      const f = rule[`条件${i}字段`];
-      if (!f)
-        continue;
-      if (
-        !matches(
-          getVal(f, inputs, results),
-          rule[`条件${i}运算符`],
-          rule[`条件${i}值`],
-          rule[`条件${i}值2`],
-        )
-      ) {
-        ok = false;
-        break;
-      }
-    }
+        return true;
+      const field = normalizeText(rule[`条件${i}字段`]);
+      return !field || matches(getVal(field, context), rule[`条件${i}运算符`], rule[`条件${i}值`], rule[`条件${i}值2`]);
+    });
     if (ok)
       return true;
   }
   return false;
 }
 
-function getVal(fieldKey, inputs, results) {
-  if (results[fieldKey] !== undefined && results[fieldKey] !== null)
-    return results[fieldKey];
-  return inputs[fieldKey];
+function getVal(fieldKey, context) {
+  return context?.[fieldKey];
 }
 
-function matches(val, op, target, _target2) {
-  const sVal = String(val ?? "");
-  const sTgt = String(target ?? "");
-  const nVal = Number(val);
-  const nTgt = Number(target);
-  switch (op) {
+export function matches(value, op, target, target2 = "") {
+  const operator = normalizeText(op || "等于");
+  const sVal = normalizeText(value);
+  const sTarget = normalizeText(target);
+  const nVal = toNumber(value, Number.NaN);
+  const nTarget = toNumber(target, Number.NaN);
+  const nTarget2 = toNumber(target2, Number.NaN);
+
+  switch (operator) {
     case "等于":
-      return sVal === sTgt;
+      return textMatches(sVal, sTarget);
     case "不等于":
-      return sVal !== sTgt;
+      return !textMatches(sVal, sTarget);
     case "大于":
-      return nVal > nTgt;
+      return nVal > nTarget;
     case "大于等于":
-      return nVal >= nTgt;
+      return nVal >= nTarget;
     case "小于":
-      return nVal < nTgt;
+      return nVal < nTarget;
     case "小于等于":
-      return nVal <= nTgt;
+      return nVal <= nTarget;
+    case "包含":
+      return sVal.includes(sTarget);
+    case "不包含":
+      return !sVal.includes(sTarget);
+    case "为空":
+      return isBlank(value);
+    case "不为空":
+      return !isBlank(value);
+    case "介于":
+      return nVal >= Math.min(nTarget, nTarget2) && nVal <= Math.max(nTarget, nTarget2);
+    case "不介于":
+      return !(nVal >= Math.min(nTarget, nTarget2) && nVal <= Math.max(nTarget, nTarget2));
+    case "属于":
+      return parseDelimited(target).some(item => textMatches(sVal, item));
+    case "不属于":
+      return !parseDelimited(target).some(item => textMatches(sVal, item));
+    case "开头是":
+      return sVal.startsWith(sTarget);
+    case "结尾是":
+      return sVal.endsWith(sTarget);
     default:
       return false;
   }
 }
 
-function doLookup(rule, lookupTables, inputs, results) {
-  const table = lookupTables[rule.查表名称];
-  if (!table || !table.length)
-    throw new Error(`费率表「${rule.查表名称}」不存在或为空`);
+function textMatches(value, target) {
+  if (value === target)
+    return true;
+
+  const valuePath = parseCascadePath(value);
+  const targetPath = parseCascadePath(target);
+  if (!valuePath.length || !targetPath.length || targetPath.length > valuePath.length)
+    return false;
+  return targetPath.every((part, index) => valuePath[index] === part);
+}
+
+function doLookup(rule, lookupTables, context) {
+  const tableName = normalizeText(rule.查表名称);
+  const table = lookupTables[tableName];
+  if (!table?.length)
+    throw new Error(`费率表「${tableName}」不存在或为空`);
 
   const mappings = parseMappings(rule.输入映射);
   const isRange = rule.匹配方式 === "区间";
+  const outputCol = normalizeText(rule.输出列);
 
   for (const row of table) {
     const condParts = [];
     let ok = true;
     for (const [fieldKey, colName] of mappings) {
-      const inputVal = getVal(fieldKey, inputs, results);
+      const inputVal = getVal(fieldKey, context);
       if (isRange) {
-        const v = Number(inputVal);
-        const lo = Number(row[`${colName}下限`]);
-        const hi = Number(row[`${colName}上限`]);
-        if (v < lo || v > hi) {
+        const v = toNumber(inputVal, Number.NaN);
+        const lo = toNumber(row[`${colName}下限`], Number.NEGATIVE_INFINITY);
+        const hi = toNumber(row[`${colName}上限`], Number.POSITIVE_INFINITY);
+        if (Number.isNaN(v) || v < lo || v > hi) {
           ok = false;
           break;
         }
-        condParts.push(`${fieldKey}=${inputVal}(${colName}：${lo}~${hi})`);
+        condParts.push(`${fieldKey}=${inputVal}(${colName}:${lo}~${hi})`);
       }
       else {
-        if (String(inputVal) !== String(row[colName])) {
+        if (!textMatches(normalizeText(inputVal), normalizeText(row[colName]))) {
           ok = false;
           break;
         }
@@ -224,98 +251,122 @@ function doLookup(rule, lookupTables, inputs, results) {
       }
     }
     if (ok) {
-      const val = Number(row[rule.输出列]) || 0;
-      const trace = `查表「${rule.查表名称}」→ ${condParts.join("，")} → ${rule.输出列}=${val}`;
+      const val = toNumber(row[outputCol], 0);
       return {
-        trace,
+        trace: `查表「${tableName}」→ ${condParts.join("，")} → ${outputCol}=${val}`,
         val,
       };
     }
   }
-  throw new Error(`查表「${rule.查表名称}」未找到匹配行`);
+  throw new Error(`查表「${tableName}」未找到匹配行`);
 }
 
-function doPercent(rule, inputs, results) {
-  const base = Number(getVal(rule.百分比基数, inputs, results)) || 0;
-  let rate, rateDesc;
-  if (rule.百分比来源字段) {
-    rate = Number(getVal(rule.百分比来源字段, inputs, results)) || 0;
-    rateDesc = `${rule.百分比来源字段}(${rate})`;
-  }
-  else {
-    rate = Number(rule.百分比值) / 100 || 0;
-    rateDesc = `${rule.百分比值}%`;
-  }
+function doPercent(rule, context) {
+  const baseKey = normalizeText(rule.百分比基数);
+  const sourceKey = normalizeText(rule.百分比来源字段);
+  const base = toNumber(getVal(baseKey, context), 0);
+  const rawRate = sourceKey ? getVal(sourceKey, context) : rule.百分比值;
+  const rate = toRate(rawRate, 0);
   const val = base * rate;
-  const trace = `${rule.百分比基数}(${base}) × ${rateDesc} = ${val.toFixed(2)}`;
   return {
-    trace,
+    trace: `${baseKey}(${base}) × ${sourceKey ? `${sourceKey}(${rawRate})` : `${rule.百分比值}%`} = ${val.toFixed(2)}`,
     val,
   };
 }
 
-function doSum(rule, inputs, results) {
-  if (!rule.加总字段) {
-    return {
-      trace: "",
-      val: 0,
-    };
-  }
-  const fields = rule.加总字段.split(",").map(s => s.trim());
+function doFixed(rule) {
+  const val = toNumber(rule.固定金额, 0);
+  return {
+    trace: `${rule.费用名称 || rule.输出字段键} = ${val}（固定值）`,
+    val,
+  };
+}
+
+function doSum(rule, context) {
+  const fields = parseDelimited(rule.加总字段);
   const parts = [];
   let total = 0;
-  for (const fk of fields) {
-    const v = Number(getVal(fk, inputs, results)) || 0;
-    parts.push(`${fk}(${v.toFixed(2)})`);
-    total += v;
+  for (const field of fields) {
+    const value = toNumber(getVal(field, context), 0);
+    parts.push(`${field}(${value.toFixed(2)})`);
+    total += value;
   }
-  const trace = `加总：${parts.join(" + ")} = ${total.toFixed(2)}`;
   return {
-    trace,
+    trace: `加总：${parts.join(" + ")} = ${total.toFixed(2)}`,
     val: total,
   };
 }
 
-function doFormula(rule, inputs, results, allKeys) {
-  let expr = rule.公式;
-  if (!expr) {
-    return {
-      trace: "",
-      val: 0,
-    };
-  }
-  const traceParts = [];
+function doFormula(rule, context) {
+  const formula = normalizeText(rule.公式);
+  if (!formula)
+    return { trace: "", val: 0 };
 
-  const sorted = [...allKeys].sort((a, b) => b.length - a.length);
-  for (const fk of sorted) {
-    const val = Number(getVal(fk, inputs, results)) || 0;
-    if (expr.includes(fk)) {
-      traceParts.push(`${fk}=${val}`);
-      expr = expr.replaceAll(fk, val);
-    }
-  }
-
-  if (!/^[\d\s+\-*/().]+$/.test(expr)) {
-    throw new Error(`公式含非法字符：${rule.公式}`);
-  }
+  const { expr, traceParts } = compileFormula(formula, context);
+  const functionNames = Object.keys(FORMULA_FUNCTIONS);
+  const invalid = collectIdentifiers(expr).filter(name => !functionNames.includes(name));
+  if (invalid.length)
+    throw new Error(`公式含未知标识：${invalid.join(", ")}`);
 
   // eslint-disable-next-line no-new-func
-  const val = new Function(`"use strict"; return (${expr})`)();
-  const trace = `公式「${rule.公式}」：${traceParts.join("，")} → ${Number(val).toFixed(4)}`;
+  const fn = new Function(...functionNames, `"use strict"; return (${expr});`);
+  const val = fn(...functionNames.map(name => FORMULA_FUNCTIONS[name]));
   return {
-    trace,
-    val,
+    trace: `公式「${formula}」：${traceParts.join("，")} → ${toNumber(val, 0).toFixed(4)}`,
+    val: toNumber(val, 0),
   };
 }
 
+function compileFormula(formula, context) {
+  let expr = formula;
+  const traceParts = [];
+
+  for (const [cn, en] of Object.entries(FUNCTION_ALIASES))
+    expr = expr.replaceAll(cn, en);
+
+  expr = expr.replace(/\{([^{}]+)\}/g, (_, fieldKey) => {
+    const value = toNumber(getVal(fieldKey.trim(), context), 0);
+    traceParts.push(`${fieldKey.trim()}=${value}`);
+    return String(value);
+  });
+
+  const keys = Object.keys(context || {}).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (!key || !expr.includes(key))
+      continue;
+    const safePattern = new RegExp(escapeRegExp(key), "g");
+    const value = toNumber(getVal(key, context), 0);
+    expr = expr.replace(safePattern, String(value));
+    if (!traceParts.some(part => part.startsWith(`${key}=`)))
+      traceParts.push(`${key}=${value}`);
+  }
+
+  if (!/^[\d\s+\-*/%().,?:<>=!&|A-Z_]+$/.test(expr))
+    throw new Error(`公式含非法字符：${formula}`);
+
+  return { expr, traceParts };
+}
+
+function collectIdentifiers(expr) {
+  const result = new Set();
+  const re = /\b[A-Z_][A-Z0-9_]*\b/g;
+  let match = re.exec(expr);
+  while (match) {
+    result.add(match[0]);
+    match = re.exec(expr);
+  }
+  return [...result];
+}
+
 function parseMappings(inputMap) {
-  if (!inputMap)
-    return [];
-  return inputMap
-    .split(",")
-    .map((p) => {
-      const parts = p.split("=").map(s => s.trim());
-      return [parts[0], parts[1]];
+  return parseDelimited(inputMap)
+    .map((part) => {
+      const [fieldKey, colName] = part.split("=").map(s => s.trim());
+      return [fieldKey, colName];
     })
-    .filter(m => m[0] && m[1]);
+    .filter(([fieldKey, colName]) => fieldKey && colName);
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

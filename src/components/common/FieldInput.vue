@@ -1,5 +1,7 @@
 <script setup>
 import { computed } from "vue";
+import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
+import { getEnabledOptionItems, toSelectOptions } from "@/utils/optionCascade";
 
 const props = defineProps({
   field: {
@@ -12,6 +14,10 @@ const props = defineProps({
     type: Boolean,
   },
   optionGroups: {
+    type: Array,
+    default: () => [],
+  },
+  optionGroupsData: {
     type: Array,
     default: () => [],
   },
@@ -29,36 +35,30 @@ const funit = computed(() => props.field.unit || props.field.单位);
 const frequired = computed(() => props.field.required || props.field.必填 === "是");
 const fdesc = computed(() => props.field.description || props.field.说明 || "");
 
-const options = computed(() => {
-  const gid = props.field.optionGroupId || props.field.选项组编号;
+const isDropdown = computed(() => ftype.value === "select" || ftype.value === "下拉");
+const groupId = computed(() => props.field.optionGroupId || props.field.选项组编号);
+const hasOptionTreeData = computed(() =>
+  !!groupId.value && props.optionGroupsData.length > 0 && props.optionItems.length > 0,
+);
+
+const options = computed(() => getItems(groupId.value));
+
+function getItems(gid) {
   if (!gid)
     return [];
-  // 新数据模型：optionItems [{所属分组, 选项值, 显示名, 启用}]
-  if (props.optionItems.length) {
-    return props.optionItems
-      .filter(i => i.所属分组 === gid && i.启用 !== "否" && i.启用 !== "FALSE")
-      .map(i => ({
-        label: i.显示名 || i.选项值,
-        value: i.选项值,
-      }));
-  }
-  // 旧模型兼容
+  if (props.optionItems.length)
+    return toSelectOptions(getEnabledOptionItems(props.optionItems, gid));
+
   const group = props.optionGroups.find(g => String(g.groupId || g.编号) === String(gid));
   if (!group || !group.items)
     return [];
   return group.items
     .filter(i => i.enabled !== false)
-    .map(i => ({
-      label: i.itemLabel || i.itemValue,
-      value: i.itemValue,
-    }));
-});
+    .map(i => ({ label: i.itemLabel || i.itemValue, value: i.itemValue }));
+}
 
 function onInput(e) {
   emit("update:modelValue", e.target.value);
-}
-function _onCheck(e) {
-  emit("update:modelValue", e.target.checked);
 }
 </script>
 
@@ -69,18 +69,25 @@ function _onCheck(e) {
       <span v-if="funit" class="label-text-alt opacity-60">{{ funit }}</span>
     </label>
 
-    <select
-      v-if="ftype === 'select' || ftype === '下拉'"
-      @change="onInput"
-      class="select select-bordered select-xs w-full"
-      :required="frequired"
-      :value="modelValue"
-    >
-      <option value="">-- 选择 --</option>
-      <option v-for="opt in options" :key="opt.value" :value="opt.value">
-        {{ opt.label }}
-      </option>
-    </select>
+    <OptionTreeSelect
+      v-if="isDropdown && hasOptionTreeData"
+      :modelValue="modelValue"
+      :optionGroupsData="optionGroupsData"
+      :optionItems="optionItems"
+      :placeholder="`请选择${fname || ''}`"
+      :rootGroupId="groupId"
+      size="xs"
+      @update:modelValue="emit('update:modelValue', $event)"
+    />
+
+    <OptionTreeSelect
+      v-else-if="isDropdown"
+      :modelValue="modelValue"
+      :options="options"
+      :placeholder="`请选择${fname || ''}`"
+      size="xs"
+      @update:modelValue="emit('update:modelValue', $event)"
+    />
 
     <div v-else-if="ftype === 'boolean' || ftype === '布尔'" class="flex gap-2 items-center">
       <input
@@ -117,17 +124,25 @@ function _onCheck(e) {
   </div>
 
   <template v-else>
-    <select
-      v-if="ftype === 'select' || ftype === '下拉'"
-      @change="onInput"
-      class="select select-bordered select-xs"
-      :value="modelValue"
-    >
-      <option value="">--</option>
-      <option v-for="opt in options" :key="opt.value" :value="opt.value">
-        {{ opt.label }}
-      </option>
-    </select>
+    <OptionTreeSelect
+      v-if="isDropdown && hasOptionTreeData"
+      :modelValue="modelValue"
+      :optionGroupsData="optionGroupsData"
+      :optionItems="optionItems"
+      :placeholder="'请选择'"
+      :rootGroupId="groupId"
+      size="xs"
+      @update:modelValue="emit('update:modelValue', $event)"
+    />
+
+    <OptionTreeSelect
+      v-else-if="isDropdown"
+      :modelValue="modelValue"
+      :options="options"
+      placeholder="请选择"
+      size="xs"
+      @update:modelValue="emit('update:modelValue', $event)"
+    />
 
     <div v-else-if="ftype === 'boolean' || ftype === '布尔'" class="flex items-center">
       <input

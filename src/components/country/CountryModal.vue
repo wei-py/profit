@@ -1,8 +1,11 @@
 <script setup>
 import { driver } from "driver.js";
 import { reactive, watch } from "vue";
+import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
 import { useConfigStore } from "@/stores/config";
 import "driver.js/dist/driver.css";
+
+import { useModalEsc } from "@/composables/useModalEsc";
 
 const props = defineProps({
   allKeys: Array,
@@ -10,9 +13,11 @@ const props = defineProps({
   open: Boolean,
 });
 const emit = defineEmits(["close"]);
+useModalEsc(() => props.open, () => emit("close"));
 
 const store = useConfigStore();
 const form = reactive({});
+const yesNoOptions = ["是", "否"];
 
 const countryEditSteps = [
   {
@@ -57,7 +62,7 @@ function save() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open">
+  <dialog class="modal" :open="open" @cancel.prevent>
     <div class="max-w-lg modal-box">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">编辑国家</h3>
@@ -73,10 +78,7 @@ function save() {
             v-model="form[k]"
             class="input input-bordered input-sm w-full"
           >
-          <select v-else v-model="form.启用" class="select select-bordered select-sm w-full">
-            <option>是</option>
-            <option>否</option>
-          </select>
+          <OptionTreeSelect v-else v-model="form.启用" :options="yesNoOptions" placeholder="—" size="sm" />
         </div>
       </div>
       <div class="modal-action">

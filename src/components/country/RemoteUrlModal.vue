@@ -3,10 +3,13 @@ import { ref, watch } from "vue";
 import { useConfigStore } from "@/stores/config";
 import { useFileIO } from "@/composables/useFileIO";
 
+import { useModalEsc } from "@/composables/useModalEsc";
+
 const props = defineProps({
   open: Boolean,
 });
 const emit = defineEmits(["close"]);
+useModalEsc(() => props.open, () => emit("close"));
 
 const store = useConfigStore();
 const { openRemoteConfigExcel } = useFileIO();
@@ -43,7 +46,7 @@ async function load() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open">
+  <dialog class="modal" :open="open" @cancel.prevent>
     <div class="max-w-md modal-box">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">远程配置</h3>

@@ -158,7 +158,7 @@ const tourSteps = {
     {
       element: "[data-tour=\"option-group-list\"]",
       popover: {
-        description: "展示所有选项分组，点击分组可编辑右侧选项项。",
+        description: "展示所有选项分组和子选项组，点击分组可编辑右侧选项项。",
         title: "分组列表",
       },
     },
@@ -182,7 +182,7 @@ const tourSteps = {
     {
       element: "[data-tour=\"option-edit-modal\"]",
       popover: {
-        description: "修改分组名称和说明，保存后更新列表。",
+        description: "修改分组名称、说明和子级适用的父选项，保存后更新列表。",
         title: "编辑分组弹窗",
       },
     },

@@ -1,8 +1,19 @@
 <script setup>
 import { previewImages } from "hevue-img-preview/v3";
 import { computed, nextTick, ref, watch } from "vue";
+import {
+  groupRecordsByProductId,
+  inferVariantAttributes,
+  makeRecordProductKey,
+  makeVariantKeyFromAttrs,
+  makeVariantKeyFromRow,
+  normalizeProductId,
+  normalizeVariantValues,
+} from "@/domain/product-records";
+import { vDraggable } from "vue-draggable-plus";
 import ColEditorModal from "@/components/common/ColEditorModal.vue";
 import FieldInput from "@/components/common/FieldInput.vue";
+import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
 import ReverseCalcModal from "@/components/list/ReverseCalcModal.vue";
 import TraceModal from "@/components/list/TraceModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
@@ -15,6 +26,36 @@ const configStore = useConfigStore();
 const createStore = useCreateStore();
 const listStore = useListStore();
 const { openListExcel, saveListExcel } = useFileIO();
+
+const baseDragOpts = {
+  animation: 150,
+  chosenClass: "drag-chosen",
+  dragClass: "drag-drag",
+  fallbackOnBody: true,
+  forceFallback: true,
+  ghostClass: "drag-ghost",
+};
+
+const skuDragOpts = {
+  ...baseDragOpts,
+  draggable: ".sku-draggable-row",
+  handle: ".sku-drag-handle",
+  onStart: () => {
+    isDraggingSku.value = true;
+  },
+  onEnd: onSkuDragEnd,
+};
+
+const recordGroupDragOpts = {
+  ...baseDragOpts,
+  draggable: ".product-record-group",
+  handle: ".record-group-drag-handle",
+  onStart: () => {
+    isDraggingRecordGroup.value = true;
+  },
+  onEnd: onRecordGroupDragEnd,
+};
+const RESERVED_LIST_COLUMNS = new Set(["_uid", "操作"]);
 
 const showCreatePanel = ref(true);
 
@@ -32,13 +73,15 @@ const availableTemplates = computed(() =>
     ? configStore.getTemplatesByCountry(createStore.selectedCountryId)
     : [],
 );
+const countryOptions = computed(() => enabledCountries.value.map(c => ({
+  label: `${c.国家} - ${c.平台}`,
+  value: c.编号,
+})));
+const templateOptions = computed(() => availableTemplates.value.map(t => ({
+  label: t.名称,
+  value: t.编号,
+})));
 
-function handleCountryChange(e) {
-  createStore.selectCountry(e.target.value);
-}
-function handleTemplateChange(e) {
-  createStore.selectTemplate(e.target.value);
-}
 function handleCalculate() {
   createStore.calculateAll();
 }
@@ -46,8 +89,25 @@ function handleSaveToList() {
   if (!createStore.lastCalculatedAt)
     createStore.calculateAll();
   const rows = createStore.productRows();
-  if (rows.length)
+  if (!rows.length)
+    return;
+
+  if (isEditingProduct.value)
+    listStore.replaceRecordsByProductId(editingSourceProductId.value || createStore.productId, rows);
+  else
     listStore.addRecords(rows);
+
+  clearEditMode();
+}
+
+function handleCountrySelect(countryId) {
+  clearEditMode();
+  createStore.selectCountry(countryId);
+}
+
+function handleTemplateSelect(templateId) {
+  clearEditMode();
+  createStore.selectTemplate(templateId);
 }
 
 function batchSetSkuInput(fieldKey) {
@@ -67,13 +127,16 @@ const showColModal = ref(false);
 const skuColModal = ref(false);
 const skuColOrder = ref([]);
 const skuHiddenKeys = ref([]);
-const skuViewMode = ref(localStorage.getItem("skuViewMode") || "table");
-const recordViewMode = ref(localStorage.getItem("recordViewMode") || "table");
+const skuViewMode = ref("table");
+const recordViewMode = ref("table");
 const skuCardExpanded = ref(localStorage.getItem("skuCardExpanded") === "true");
 const recordCardExpanded = ref(localStorage.getItem("recordCardExpanded") === "true");
+const editingSourceProductId = ref("");
+const editingRecordUids = ref(new Set());
 
-watch(skuViewMode, v => localStorage.setItem("skuViewMode", v));
-watch(recordViewMode, v => localStorage.setItem("recordViewMode", v));
+const isEditingProduct = computed(() => !!editingSourceProductId.value || editingRecordUids.value.size > 0);
+const createPanelTitle = computed(() => (isEditingProduct.value ? "修改商品" : "新建商品"));
+
 watch(skuCardExpanded, v => localStorage.setItem("skuCardExpanded", String(v)));
 watch(recordCardExpanded, v => localStorage.setItem("recordCardExpanded", String(v)));
 
@@ -107,30 +170,84 @@ watch(
 const currentPage = ref(1);
 const pageSize = ref(20);
 
-const pageOffset = computed(() => (currentPage.value - 1) * pageSize.value);
-
-const pagedRecordsWritable = computed({
-  get: () => {
-    const start = pageOffset.value;
-    return listStore.records.slice(start, start + pageSize.value);
-  },
-  set: (newPaged) => {
-    const offset = pageOffset.value;
-    const count = Math.min(pageSize.value, Math.max(0, listStore.records.length - offset));
-    listStore.records.splice(offset, count, ...newPaged);
-  },
+const recordGroups = computed(() => {
+  const groups = [];
+  const groupByKey = new Map();
+  for (const row of listStore.records) {
+    const key = makeRecordProductKey(row);
+    let group = groupByKey.get(key);
+    if (!group) {
+      group = {
+        key,
+        rows: [],
+      };
+      groupByKey.set(key, group);
+      groups.push(group);
+    }
+    group.rows.push(row);
+  }
+  return groups;
 });
 
-const totalPages = computed(() => Math.ceil(listStore.records.length / pageSize.value) || 1);
+function buildRecordGroupPages(groups, maxRows) {
+  const size = Math.max(1, Number(maxRows) || 20);
+  const pages = [];
+  let page = [];
+  let rowsCount = 0;
+
+  for (const group of groups) {
+    const groupSize = Math.max(1, group.rows.length);
+    if (page.length && rowsCount + groupSize > size) {
+      pages.push(page);
+      page = [];
+      rowsCount = 0;
+    }
+    page.push(group);
+    rowsCount += groupSize;
+  }
+
+  if (page.length)
+    pages.push(page);
+  return pages;
+}
+
+const recordGroupPages = computed(() => buildRecordGroupPages(recordGroups.value, pageSize.value));
+const totalPages = computed(() => recordGroupPages.value.length || 1);
+const pagedRecordGroups = ref([]);
+const isDraggingRecordGroup = ref(false);
+
+function syncPagedRecordGroups() {
+  if (isDraggingRecordGroup.value)
+    return;
+  pagedRecordGroups.value = [...(recordGroupPages.value[currentPage.value - 1] || [])];
+}
+
+watch(
+  [recordGroupPages, currentPage, pageSize],
+  syncPagedRecordGroups,
+  { immediate: true },
+);
 
 const skuPage = ref(1);
 const skuPageSize = ref(20);
 const skuPageOffset = computed(() => (skuPage.value - 1) * skuPageSize.value);
-const skuPaged = computed(() => {
+const pagedSkus = ref([]);
+const isDraggingSku = ref(false);
+
+function syncPagedSkus() {
+  if (isDraggingSku.value)
+    return;
   const start = skuPageOffset.value;
-  return createStore.skus.slice(start, start + skuPageSize.value)
+  pagedSkus.value = createStore.skus.slice(start, start + skuPageSize.value)
     .map((sku, i) => ({ origIdx: start + i, sku }));
-});
+}
+
+watch(
+  [() => createStore.skus.map(sku => sku.key).join("\u001F"), skuPage, skuPageSize],
+  syncPagedSkus,
+  { immediate: true },
+);
+
 const skuTotalPages = computed(() => Math.ceil(createStore.skus.length / skuPageSize.value) || 1);
 
 watch(pageSize, () => {
@@ -165,8 +282,112 @@ const listColumns = computed(() => {
   if (!listStore.records.length)
     return [];
   const hiddenSet = new Set(listStore.hiddenColumns);
-  return listStore.columnOrder.filter(k => k !== "_uid" && !hiddenSet.has(k));
+  return listStore.columnOrder.filter(k => !RESERVED_LIST_COLUMNS.has(k) && !hiddenSet.has(k));
 });
+
+function dragTargetIndex(evt, selector = "") {
+  if (evt?.newDraggableIndex !== undefined && evt?.newDraggableIndex !== null)
+    return evt.newDraggableIndex;
+  if (selector && evt?.to && evt?.item) {
+    const items = [...evt.to.children].filter(el => el.matches?.(selector));
+    const index = items.indexOf(evt.item);
+    if (index >= 0)
+      return index;
+  }
+  return evt?.newIndex;
+}
+
+function ensureDraggedItemPosition(listRef, evt, getKey, selector = "") {
+  const targetIndex = dragTargetIndex(evt, selector);
+  const dragKey = evt?.item?.dataset?.dragKey;
+  if (!dragKey || targetIndex === undefined || targetIndex === null)
+    return;
+
+  if (String(getKey(listRef.value[targetIndex]) || "") === dragKey)
+    return;
+
+  const currentIndex = listRef.value.findIndex(item => String(getKey(item) || "") === dragKey);
+  if (currentIndex < 0 || currentIndex === targetIndex)
+    return;
+
+  const [moved] = listRef.value.splice(currentIndex, 1);
+  listRef.value.splice(targetIndex, 0, moved);
+}
+
+function onSkuDragEnd(evt) {
+  ensureDraggedItemPosition(pagedSkus, evt, item => item?.sku?.key, ".sku-draggable-row");
+  const offset = skuPageOffset.value;
+  const count = Math.min(skuPageSize.value, Math.max(0, createStore.skus.length - offset));
+  const nextRows = pagedSkus.value.map(item => item?.sku).filter(Boolean);
+  createStore.skus.splice(offset, count, ...nextRows);
+  isDraggingSku.value = false;
+  syncPagedSkus();
+}
+
+function onRecordGroupDragEnd(evt) {
+  ensureDraggedItemPosition(pagedRecordGroups, evt, group => group?.key, ".product-record-group");
+  const currentGroups = recordGroups.value;
+  const firstPageGroup = recordGroupPages.value[currentPage.value - 1]?.[0];
+  const startIndex = firstPageGroup
+    ? currentGroups.findIndex(group => group.key === firstPageGroup.key)
+    : -1;
+
+  if (startIndex >= 0) {
+    const nextGroups = [...currentGroups];
+    nextGroups.splice(startIndex, pagedRecordGroups.value.length, ...pagedRecordGroups.value);
+    const nextRecords = nextGroups.flatMap(group => group.rows);
+    listStore.records.splice(0, listStore.records.length, ...nextRecords);
+  }
+
+  isDraggingRecordGroup.value = false;
+  syncPagedRecordGroups();
+}
+
+function findRecordIndex(row) {
+  return listStore.records.findIndex(item => item?._uid === row?._uid);
+}
+
+function loadRecordBackByRow(row) {
+  const idx = findRecordIndex(row);
+  if (idx >= 0)
+    loadRecordBack(idx);
+}
+
+function removeRecordByRow(row) {
+  const idx = findRecordIndex(row);
+  if (idx >= 0)
+    listStore.removeRecord(idx);
+}
+
+const recordProductStripeMap = computed(() => {
+  const map = new Map();
+  let index = 0;
+  for (const row of listStore.records) {
+    const key = makeRecordProductKey(row);
+    if (!map.has(key))
+      map.set(key, index++);
+  }
+  return map;
+});
+
+function isRecordInEditingGroup(row) {
+  const productId = normalizeProductId(row?.["商品ID"]);
+  if (editingSourceProductId.value && productId)
+    return productId === editingSourceProductId.value;
+  return editingRecordUids.value.has(row?._uid);
+}
+
+function recordVisualClass(row) {
+  if (isRecordInEditingGroup(row))
+    return "record-selected";
+  const idx = recordProductStripeMap.value.get(makeRecordProductKey(row)) || 0;
+  return idx % 2 === 0 ? "record-stripe-even" : "record-stripe-odd";
+}
+
+function clearEditMode() {
+  editingSourceProductId.value = "";
+  editingRecordUids.value = new Set();
+}
 
 function openCalcModal(si) {
   calcSkuIndex.value = si;
@@ -268,29 +489,72 @@ const skuRowHeights = computed(() => {
 
 async function loadRecordBack(idx) {
   const row = listStore.records[idx];
-  if (!row["国家平台编号"] || !row["模板编号"])
+  if (!row || !row["国家平台编号"] || !row["模板编号"])
     return;
+
+  const productId = normalizeProductId(row["商品ID"]);
+  const relatedRows = groupRecordsByProductId(listStore.records, productId, row);
+
   createStore.selectCountry(row["国家平台编号"]);
   createStore.selectTemplate(row["模板编号"]);
   await nextTick();
-  createStore.productId = row["商品ID"] || "";
-  createStore.productName = row["商品名称"] || "";
-  for (const f of createStore.productFields) {
-    if (row[f.字段键] !== undefined)
-      createStore.productInputs[f.字段键] = row[f.字段键];
-  }
-  createStore.generateSkus();
-  if (createStore.skus.length) {
-    const sku = createStore.skus[0];
-    sku.skuCode = row["SKU码"] || "";
-    for (const f of createStore.skuInputFields) {
-      if (row[f.字段键] !== undefined)
-        sku.inputs[f.字段键] = row[f.字段键];
+
+  const firstRow = relatedRows[0] || row;
+  createStore.productId = firstRow["商品ID"] || "";
+  createStore.productName = firstRow["商品名称"] || "";
+
+  for (const k of Object.keys(createStore.productInputs))
+    delete createStore.productInputs[k];
+  for (const f of createStore.productFields)
+    createStore.productInputs[f.字段键] = firstRow[f.字段键] ?? "";
+
+  const variantAttrs = inferVariantAttributes(relatedRows, configStore.getFieldsByCountry(createStore.selectedCountryId));
+  createStore.variantAttributes = variantAttrs;
+  if (!variantAttrs.length && relatedRows.length > 1)
+    buildSkuRowsWithoutVariants(relatedRows);
+  else
+    createStore.generateSkus();
+
+  const skuByKey = new Map(createStore.skus.map(sku => [makeVariantKeyFromAttrs(sku.attrs, variantAttrs), sku]));
+  relatedRows.forEach((sourceRow, rowIndex) => {
+    const key = makeVariantKeyFromRow(sourceRow, variantAttrs);
+    const sku = variantAttrs.length ? skuByKey.get(key) : createStore.skus[rowIndex] || createStore.skus[0];
+    if (!sku)
+      return;
+
+    sku.skuCode = sourceRow["SKU码"] || "";
+    sku.images = sourceRow["图片"] || "";
+    for (const f of createStore.skuInputFields)
+      sku.inputs[f.字段键] = sourceRow[f.字段键] ?? "";
+    for (const f of createStore.skuOutputFields) {
+      if (sourceRow[f.字段键] !== undefined)
+        sku.results[f.字段键] = sourceRow[f.字段键];
     }
-    sku.images = row["图片"] || "";
-  }
+  });
+
+  editingSourceProductId.value = productId;
+  editingRecordUids.value = new Set(relatedRows.map(r => r._uid));
   showCreatePanel.value = true;
 }
+
+function buildSkuRowsWithoutVariants(rows) {
+  createStore.generateSkus();
+  const baseInputs = { ...(createStore.skus[0]?.inputs || {}) };
+  createStore.skus.splice(
+    0,
+    createStore.skus.length,
+    ...rows.map((row, index) => ({
+      attrs: {},
+      error: "",
+      images: "",
+      inputs: { ...baseInputs },
+      key: row["SKU码"] || `row_${index + 1}`,
+      results: {},
+      skuCode: row["SKU码"] || "",
+    })),
+  );
+}
+
 
 const jumpPage = ref("");
 const jumpSkuPage = ref("");
@@ -311,9 +575,6 @@ function handleJumpSkuPage() {
   }
 }
 
-function normalizeVariantValues(val) {
-  return val.replace(/[,，、]/g, "|");
-}
 </script>
 
 <template>
@@ -333,55 +594,60 @@ function normalizeVariantValues(val) {
       <!-- 新建面板 -->
       <div v-if="showCreatePanel" class="bg-base-100 border border-base-300 card card-sm">
         <div class="card-body">
-          <h2 class="card-title text-lg">新建商品</h2>
-          <div class="flex flex-wrap gap-4 items-end">
-            <div class="form-control">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="card-title text-lg">
+              {{ createPanelTitle }}
+              <span v-if="isEditingProduct" class="badge badge-primary badge-sm">商品ID：{{ editingSourceProductId || createStore.productId }}</span>
+            </h2>
+            <button
+              v-if="isEditingProduct"
+              @click="clearEditMode"
+              class="btn btn-ghost btn-xs"
+              title="退出修改状态"
+            >
+              退出修改
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-4 items-start">
+            <div class="flex flex-col gap-1">
               <label class="label py-1"><span class="label-text">国家平台</span></label>
-              <select
-                @change="handleCountryChange"
-                class="select select-bordered"
-                :value="createStore.selectedCountryId"
-              >
-                <option value="">-- 选择 --</option>
-                <option v-for="c in enabledCountries" :key="c.编号" :value="c.编号">
-                  {{ c.国家 }} - {{ c.平台 }}
-                </option>
-              </select>
+              <OptionTreeSelect
+                @update:model-value="handleCountrySelect($event)"
+                :modelValue="createStore.selectedCountryId"
+                :options="countryOptions"
+                placeholder="-- 选择 --"
+              />
             </div>
-            <div v-if="createStore.selectedCountryId" class="form-control">
+            <div v-if="createStore.selectedCountryId" class="flex flex-col gap-1">
               <label class="label py-1"><span class="label-text">模板</span></label>
-              <select
-                @change="handleTemplateChange"
-                class="select select-bordered"
-                :value="createStore.selectedTemplateId"
-              >
-                <option value="">-- 选择 --</option>
-                <option v-for="t in availableTemplates" :key="t.编号" :value="t.编号">
-                  {{ t.名称 }}
-                </option>
-              </select>
+              <OptionTreeSelect
+                @update:model-value="handleTemplateSelect($event)"
+                :modelValue="createStore.selectedTemplateId"
+                :options="templateOptions"
+                placeholder="-- 选择 --"
+              />
             </div>
-            <div class="form-control">
+            <div class="flex flex-col gap-1">
               <label class="label py-1"><span class="label-text">商品ID</span></label>
               <input
                 v-model="createStore.productId"
-                class="input input-bordered w-28"
+                class="input input-bordered input-sm w-20"
                 placeholder="P001"
               >
             </div>
-            <div class="form-control">
+            <div class="flex flex-col gap-1">
               <label class="label py-1"><span class="label-text">商品名称</span></label>
               <input
                 v-model="createStore.productName"
-                class="input input-bordered w-32"
+                class="input input-bordered input-sm w-28"
                 placeholder="如：T恤"
               >
             </div>
           </div>
 
           <template v-if="createStore.selectedTemplateId">
-            <div class="flex gap-4 mt-4">
-              <div class="shrink-0 space-y-2 w-60">
+            <div class="flex flex-col gap-4 mt-4 lg:flex-row">
+              <div class="w-full shrink-0 space-y-2 lg:w-60">
                 <div class="font-semibold text-sm">商品级字段</div>
                 <FieldInput
                   @update:model-value="createStore.productInputs[f.字段键] = $event"
@@ -389,18 +655,19 @@ function normalizeVariantValues(val) {
                   :key="f.字段键"
                   :field="f"
                   :modelValue="createStore.productInputs[f.字段键]"
+                  :optionGroupsData="configStore['选项组']"
                   :optionItems="configStore['选项值']"
                 />
-                <div class="flex gap-2 items-center pt-3">
-                  <span class="text-xs">SKU前缀</span>
+                <div class="flex flex-col gap-1 pt-3">
+                  <label class="label py-0"><span class="label-text text-xs">SKU前缀</span></label>
                   <input
                     v-model="createStore.skuPrefix"
-                    class="input input-bordered input-xs w-20"
+                    class="input input-bordered input-sm w-20"
                     placeholder="如: RS"
                   >
                 </div>
                 <div class="font-semibold pt-2 text-sm">变体属性</div>
-                <div v-for="(attr, i) in createStore.variantAttributes" :key="i" class="flex gap-1">
+                <div v-for="(attr, i) in createStore.variantAttributes" :key="i" class="flex gap-1 items-center">
                   <input
                     v-model="attr.name"
                     class="input input-bordered input-sm w-16"
@@ -409,12 +676,12 @@ function normalizeVariantValues(val) {
                   <input
                     v-model="attr.values"
                     @input="attr.values = normalizeVariantValues(attr.values)"
-                    class="flex-1 input input-bordered input-sm"
+                    class="flex-1 input input-bordered input-sm min-w-0"
                     placeholder="红|蓝"
                   >
                   <button
                     @click="createStore.removeVariantAttribute(i)"
-                    class="btn btn-ghost btn-xs text-error"
+                    class="btn btn-ghost btn-sm h-9 min-h-9 px-2 text-error"
                   >
                     ✕
                   </button>
@@ -432,12 +699,12 @@ function normalizeVariantValues(val) {
                     计算
                   </button>
                   <button @click="handleSaveToList" class="btn btn-sm btn-success">
-                    保存到列表
+                    {{ isEditingProduct ? "保存修改" : "保存到列表" }}
                   </button>
                 </div>
               </div>
 
-              <div class="flex-1 min-w-0 overflow-x-auto">
+              <div class="min-w-0 flex-1 overflow-x-auto">
                 <div class="flex items-center justify-between mb-1">
                   <span class="font-semibold text-sm">SKU 列表</span>
                   <div class="flex gap-1 items-center text-xs">
@@ -457,6 +724,7 @@ function normalizeVariantValues(val) {
                     >
                       {{ skuCardExpanded ? '收起' : '展开' }}
                     </button>
+                    <span v-if="createStore.skus.length" class="mx-1 opacity-40">{{ skuPage }}/{{ skuTotalPages }}</span>
                     <button @click="skuColModal = true" class="btn btn-ghost btn-xs">
                       ⚙️ 编辑列
                     </button>
@@ -467,8 +735,8 @@ function normalizeVariantValues(val) {
                     <thead>
                       <tr>
                         <th class="bg-base-100 left-0 sticky w-10 z-10" />
-                        <th>SKU码</th>
                         <th class="w-8 text-xs">反推</th>
+                        <th class="text-xs">SKU码</th>
                         <th
                           v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
                           :key="a.name"
@@ -490,23 +758,18 @@ function normalizeVariantValues(val) {
                         </th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody v-draggable="[pagedSkus, skuDragOpts]">
                       <tr
-                        v-for="(item, pIdx) in skuPaged"
+                        v-for="(item, pIdx) in pagedSkus"
                         :key="item.sku.key"
+                        class="sku-draggable-row"
+                        :data-drag-key="item.sku.key"
                         :style="{ height: `${skuRowHeights[item.origIdx]}px` }"
                       >
                         <td class="bg-base-100 left-0 sticky z-10">
                           <span
-                            class="flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
+                            class="sku-drag-handle flex hover:text-base-content cursor-grab items-center justify-center px-1 py-0.5 select-none text-base-content/30"
                           >☰</span>
-                        </td>
-                        <td>
-                          <input
-                            v-model="item.sku.skuCode"
-                            class="input input-bordered input-xs w-20"
-                            placeholder="SKU"
-                          >
                         </td>
                         <td>
                           <button
@@ -516,6 +779,13 @@ function normalizeVariantValues(val) {
                           >
                             🧮
                           </button>
+                        </td>
+                        <td>
+                          <input
+                            v-model="item.sku.skuCode"
+                            class="input input-bordered input-xs w-20"
+                            placeholder="SKU"
+                          >
                         </td>
                         <td
                           v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
@@ -531,6 +801,7 @@ function normalizeVariantValues(val) {
                               :field="getSkuField(fk)"
                               :modelValue="item.sku.inputs[fk]"
                               noLabel
+                              :optionGroupsData="configStore['选项组']"
                               :optionItems="configStore['选项值']"
                             />
                           </template>
@@ -538,7 +809,7 @@ function normalizeVariantValues(val) {
                             <div v-if="item.sku.images" class="group h-10 relative w-10">
                               <img
                                 @click="openImagePreview(item.sku.images)"
-                                class="border cursor-pointer h-10 object-cover rounded w-10"
+                                class="border cursor-pointer h-10 object-contain bg-base-100 w-10"
                                 :src="item.sku.images"
                               >
                               <button
@@ -586,13 +857,15 @@ function normalizeVariantValues(val) {
                 </template>
 
                 <template v-else-if="skuViewMode === 'card' && createStore.skus.length">
-                  <div class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  <div v-draggable="[pagedSkus, skuDragOpts]" class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     <div
-                      v-for="(item, pIdx) in skuPaged"
+                      v-for="(item, pIdx) in pagedSkus"
                       :key="item.sku.key"
-                      class="bg-base-200 border border-base-300 flex flex-col gap-1 p-2 rounded text-xs"
+                      class="sku-draggable-row bg-base-200 border border-base-300 flex flex-col gap-1 p-2 rounded text-xs"
+                      :data-drag-key="item.sku.key"
                     >
                       <div class="flex gap-1 items-center">
+                        <span class="sku-drag-handle cursor-grab select-none text-base-content/30" title="拖动排序">☰</span>
                         <span class="font-semibold text-xs truncate">{{ item.sku.skuCode || '-' }}</span>
                         <button
                           @click="openCalcModal(item.origIdx)"
@@ -617,13 +890,14 @@ function normalizeVariantValues(val) {
                                 :field="getSkuField(fk)"
                                 :modelValue="item.sku.inputs[fk]"
                                 noLabel
+                                :optionGroupsData="configStore['选项组']"
                                 :optionItems="configStore['选项值']"
                               />
                             </div>
                           </template>
                           <template v-else-if="fk === '图片'">
                             <div v-if="item.sku.images" class="group h-10 relative w-10">
-                              <img @click="openImagePreview(item.sku.images)" class="border cursor-pointer h-10 object-cover rounded w-10" :src="item.sku.images">
+                              <img @click="openImagePreview(item.sku.images)" class="border cursor-pointer h-10 object-contain bg-base-100 w-10" :src="item.sku.images">
                               <button @click="clearImage(item.sku)" class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4">✕</button>
                             </div>
                             <label v-else class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-8 p-0 text-base-content/30 text-lg w-8" title="上传图片">＋<input
@@ -695,34 +969,47 @@ function normalizeVariantValues(val) {
               >
                 {{ recordCardExpanded ? '收起' : '展开' }}
               </button>
+              <span v-if="listStore.records.length" class="mx-1 opacity-40">{{ currentPage }}/{{ totalPages }}</span>
               <button @click="showColModal = true" class="btn btn-ghost btn-xs">⚙️ 编辑列</button>
             </div>
           </div>
           <div v-if="!listStore.records.length" class="text-base-content/40 text-sm">暂无</div>
           <template v-else>
             <div v-if="recordViewMode === 'table'" class="overflow-x-auto">
-              <table class="table table-sm">
+              <table v-draggable="[pagedRecordGroups, recordGroupDragOpts]" class="table table-sm product-record-table">
                 <thead>
                   <tr>
                     <th class="bg-base-100 left-0 sticky w-10 z-10" />
                     <th v-for="col in listColumns" :key="col" class="bg-base-100 sticky top-0 z-10">
                       {{ col }}
                     </th>
-                    <th class="bg-base-100 right-0 sticky w-24 z-10">操作</th>
+                    <th class="record-action-head">操作</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr v-for="(row, pIdx) in pagedRecordsWritable" :key="row._uid">
-                    <td class="bg-base-100 left-0 sticky z-10">
+                <tbody
+                  v-for="group in pagedRecordGroups"
+                  :key="group.key"
+                  class="product-record-group"
+                  :data-drag-key="group.key"
+                >
+                  <tr
+                    v-for="(row, rowIdx) in group.rows"
+                    :key="row._uid"
+                    class="product-record-row"
+                    :class="recordVisualClass(row)"
+                  >
+                    <td class="record-drag-cell left-0 sticky z-10">
                       <span
-                        class="flex hover:text-base-content items-center justify-center px-1 py-0.5 select-none text-base-content/30"
+                        v-if="rowIdx === 0"
+                        class="record-group-drag-handle flex hover:text-base-content cursor-grab items-center justify-center px-1 py-0.5 select-none text-base-content/30"
+                        title="拖动整个商品ID分组"
                       >☰</span>
                     </td>
                     <td v-for="col in listColumns" :key="col" class="whitespace-nowrap">
                       <template v-if="isImage(row[col])">
                         <img
                           @click="openImagePreview(row[col])"
-                          class="border cursor-pointer h-10 object-cover rounded w-10"
+                          class="border cursor-pointer h-10 object-contain bg-base-100 w-10"
                           :src="row[col]"
                         >
                       </template>
@@ -731,17 +1018,17 @@ function normalizeVariantValues(val) {
                         {{ row[col] }}
                       </template>
                     </td>
-                    <td class="bg-base-100 right-0 sticky z-10">
-                      <div class="flex gap-1">
+                    <td class="record-action-cell">
+                      <div class="flex justify-center gap-1">
                         <button
-                          @click="loadRecordBack(pageOffset + pIdx)"
+                          @click="loadRecordBackByRow(row)"
                           class="btn btn-ghost btn-xs"
-                          title="加载到新建面板"
+                          title="读取同商品ID并加载到修改面板"
                         >
                           📋
                         </button>
                         <button
-                          @click="listStore.removeRecord(pageOffset + pIdx)"
+                          @click="removeRecordByRow(row)"
                           class="btn btn-ghost btn-xs text-error"
                         >
                           ✕
@@ -753,48 +1040,62 @@ function normalizeVariantValues(val) {
               </table>
             </div>
 
-            <div v-else class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div v-else v-draggable="[pagedRecordGroups, recordGroupDragOpts]" class="gap-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               <div
-                v-for="(row, pIdx) in pagedRecordsWritable"
-                :key="row._uid"
-                class="bg-base-200 border border-base-300 flex flex-col gap-1 p-2 rounded text-xs"
+                v-for="group in pagedRecordGroups"
+                :key="group.key"
+                class="product-record-group product-record-card border border-base-300 flex flex-col gap-1 p-2 rounded text-xs"
+                :class="recordVisualClass(group.rows[0])"
+                :data-drag-key="group.key"
               >
-                <template v-if="isImage(row['图片'])">
-                  <img
-                    @click="openImagePreview(row['图片'])"
-                    class="border cursor-pointer h-16 object-cover rounded w-full"
-                    :src="row['图片']"
-                  >
-                </template>
-                <div class="flex gap-1 items-center">
-                  <span class="font-semibold truncate">{{ row['商品ID'] || row['商品名称'] || '-' }}</span>
+                <div class="flex gap-2 items-center border-b border-base-300 pb-1">
+                  <span class="record-group-drag-handle cursor-grab select-none text-base-content/30" title="拖动整个商品ID分组">☰</span>
+                  <span class="font-semibold truncate">{{ group.rows[0]?.['商品ID'] || group.rows[0]?.['商品名称'] || '-' }}</span>
+                  <span class="badge badge-xs badge-outline ml-auto">{{ group.rows.length }} SKU</span>
                 </div>
-                <div v-if="row['商品名称']" class="text-base-content/60 truncate">{{ row['商品名称'] }}</div>
-                <div v-if="row['SKU码']" class="badge badge-xs badge-outline">{{ row['SKU码'] }}</div>
-                <template v-if="recordCardExpanded">
-                  <div v-for="col in listColumns" :key="col" class="border-t border-base-300 flex justify-between pt-0.5">
-                    <span class="opacity-60 truncate mr-1">{{ col }}</span>
-                    <span class="text-right truncate">
-                      <template v-if="isImage(row[col])">📷</template>
-                      <template v-else-if="isDispimg(row[col])">📷</template>
-                      <template v-else>{{ row[col] || '—' }}</template>
-                    </span>
+                <div
+                  v-for="row in group.rows"
+                  :key="row._uid"
+                  class="border-b border-base-300/60 flex flex-col gap-1 pb-1 last:border-b-0"
+                >
+                  <div class="flex gap-2 items-start">
+                    <div class="min-w-0 flex-1">
+                      <div v-if="row['商品名称']" class="text-base-content/60 truncate">{{ row['商品名称'] }}</div>
+                      <div v-if="row['SKU码']" class="badge badge-xs badge-outline">{{ row['SKU码'] }}</div>
+                    </div>
+                    <img
+                      v-if="isImage(row['图片'])"
+                      @click="openImagePreview(row['图片'])"
+                      class="border cursor-pointer h-14 object-contain bg-base-100 w-14"
+                      :src="row['图片']"
+                    >
+                    <div v-else-if="isDispimg(row['图片'])" class="border flex h-14 items-center justify-center text-base-content/40 w-14">📷</div>
                   </div>
-                </template>
-                <div class="flex gap-1 mt-1">
-                  <button
-                    @click="loadRecordBack(pageOffset + pIdx)"
-                    class="btn btn-ghost btn-xs flex-1"
-                    title="加载到新建面板"
-                  >
-                    📋
-                  </button>
-                  <button
-                    @click="listStore.removeRecord(pageOffset + pIdx)"
-                    class="btn btn-ghost btn-xs text-error"
-                  >
-                    ✕
-                  </button>
+                  <template v-if="recordCardExpanded">
+                    <div v-for="col in listColumns" :key="col" class="border-t border-base-300 flex justify-between pt-0.5">
+                      <span class="opacity-60 truncate mr-1">{{ col }}</span>
+                      <span class="text-right truncate">
+                        <template v-if="isImage(row[col])">📷</template>
+                        <template v-else-if="isDispimg(row[col])">📷</template>
+                        <template v-else>{{ row[col] || '—' }}</template>
+                      </span>
+                    </div>
+                  </template>
+                  <div class="flex gap-1 mt-1">
+                    <button
+                      @click="loadRecordBackByRow(row)"
+                      class="btn btn-ghost btn-xs flex-1"
+                      title="读取同商品ID并加载到修改面板"
+                    >
+                      📋
+                    </button>
+                    <button
+                      @click="removeRecordByRow(row)"
+                      class="btn btn-ghost btn-xs text-error"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -1,104 +1,92 @@
 import * as XLSX from "xlsx";
+import { CONFIG_HEADERS, META_SHEET_NAME, REQUIRED_CONFIG_SHEETS } from "@/constants/schema";
+import { normalizeConfig } from "@/domain/config-normalizer";
 
-const STD_SHEETS = ["国家平台", "计算字段", "选项组", "选项值", "计算模板", "费用规则"];
-
-/**
- * 解析配置工作簿 ArrayBuffer。
- * @param {ArrayBuffer} buffer
- * @returns {object} 配置对象
- */
 export function readWorkbookBuffer(buffer) {
   const wb = XLSX.read(new Uint8Array(buffer), { type: "array" });
   return readConfigWorkbook(wb);
 }
 
 function readConfigWorkbook(wb) {
-  const names = wb.SheetNames;
-
-  for (const s of STD_SHEETS) {
-    if (!names.includes(s))
-      throw new Error(`配置缺少 sheet：「${s}」`);
+  const names = wb.SheetNames || [];
+  for (const sheetName of REQUIRED_CONFIG_SHEETS) {
+    if (!names.includes(sheetName))
+      throw new Error(`配置缺少 sheet：「${sheetName}」`);
   }
 
-  const 国家平台ColOrder = getSheetHeaders(wb, "国家平台");
-  const 国家平台HiddenCols = readHiddenCols(wb);
-
-  const config = {
+  const raw = {
     lookupTables: {},
-    国家平台: s2j(wb, "国家平台"),
-    国家平台ColOrder,
-    国家平台HiddenCols,
-    模板参数: s2j(wb, "模板参数", true),
-    计算字段: s2j(wb, "计算字段"),
-    计算模板: s2j(wb, "计算模板"),
-    费用规则: s2j(wb, "费用规则"),
-    选项值: s2j(wb, "选项值"),
-    选项组: s2j(wb, "选项组"),
+    国家平台: sheetToRows(wb, "国家平台"),
+    国家平台ColOrder: getSheetHeaders(wb, "国家平台"),
+    国家平台HiddenCols: readMetaArray(wb, "国家平台HiddenCols"),
+    模板参数: sheetToRows(wb, "模板参数", true),
+    计算字段: sheetToRows(wb, "计算字段"),
+    计算模板: sheetToRows(wb, "计算模板"),
+    费用规则: sheetToRows(wb, "费用规则"),
+    选项值: sheetToRows(wb, "选项值"),
+    选项组: sheetToRows(wb, "选项组"),
   };
 
-  // 动态费率表：扫描费用规则中的查表名称
-  const refs = new Set();
-  for (const r of config["费用规则"]) {
-    if (r.查表名称)
-      refs.add(r.查表名称);
-  }
-  for (const n of refs) {
-    if (names.includes(n))
-      config.lookupTables[n] = s2j(wb, n);
-  }
+  for (const sheetName of collectLookupSheetNames(names, raw.费用规则))
+    raw.lookupTables[sheetName] = sheetToRows(wb, sheetName, true);
 
-  return config;
+  return normalizeConfig(raw);
 }
 
-function s2j(wb, name, optional) {
+function collectLookupSheetNames(sheetNames, rules) {
+  const standard = new Set([...REQUIRED_CONFIG_SHEETS, "模板参数", "配置说明", "规则字典", META_SHEET_NAME]);
+  const refs = new Set();
+
+  for (const rule of rules || []) {
+    if (rule.查表名称)
+      refs.add(String(rule.查表名称).trim());
+  }
+
+  for (const sheetName of sheetNames) {
+    if (standard.has(sheetName))
+      continue;
+    if (refs.has(sheetName) || /table|表/i.test(sheetName))
+      refs.add(sheetName);
+  }
+  return [...refs].filter(name => sheetNames.includes(name));
+}
+
+function sheetToRows(wb, name, optional = false) {
   const ws = wb.Sheets[name];
   if (!ws) {
-    return optional
-      ? []
-      : (() => {
-          throw new Error(`Sheet「${name}」不存在`);
-        })();
+    if (optional)
+      return [];
+    throw new Error(`Sheet「${name}」不存在`);
   }
-  return XLSX.utils.sheet_to_json(ws, { defval: "" });
-}
 
-/**
- * @deprecated Use `list-excel-reader.js` instead — this version lacks WPS DISPIMG image
- * extraction and columnOrder support.
- */
-export function readListWorkbook(buffer) {
-  const wb = XLSX.read(new Uint8Array(buffer), { type: "array" });
-  const ws = wb.Sheets["商品记录"];
-  return ws ? XLSX.utils.sheet_to_json(ws, { defval: "" }) : [];
+  return XLSX.utils.sheet_to_json(ws, {
+    defval: "",
+    raw: false,
+  });
 }
 
 function getSheetHeaders(wb, name) {
   const ws = wb.Sheets[name];
   if (!ws || !ws["!ref"])
-    return [];
+    return CONFIG_HEADERS[name] || [];
   const range = XLSX.utils.decode_range(ws["!ref"]);
   const headers = [];
-  for (let c = range.s.c; c <= range.e.c; c++) {
-    const cell
-      = ws[
-        XLSX.utils.encode_cell({
-          c,
-          r: range.s.r,
-        })
-      ];
-    headers.push(cell ? String(cell.v) : "");
+  for (let c = range.s.c; c <= range.e.c; c += 1) {
+    const cell = ws[XLSX.utils.encode_cell({ c, r: range.s.r })];
+    if (cell?.v)
+      headers.push(String(cell.v));
   }
-  return headers.filter(h => h);
+  return headers.length ? headers : CONFIG_HEADERS[name] || [];
 }
 
-function readHiddenCols(wb) {
+function readMetaArray(wb, key) {
   try {
-    const ws = wb.Sheets["__meta__"];
-    if (!ws || !ws["!ref"])
+    const ws = wb.Sheets[META_SHEET_NAME];
+    if (!ws)
       return [];
-    const json = XLSX.utils.sheet_to_json(ws, { defval: "", header: 1 });
-    for (const row of json) {
-      if (Array.isArray(row) && row[0] === "国家平台HiddenCols" && row[1]) {
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: "", header: 1 });
+    for (const row of rows) {
+      if (row?.[0] === key && row[1]) {
         const parsed = JSON.parse(row[1]);
         return Array.isArray(parsed) ? parsed : [];
       }
@@ -106,4 +94,11 @@ function readHiddenCols(wb) {
   }
   catch {}
   return [];
+}
+
+/** @deprecated 业务列表请使用 list-excel-reader.js，保留该导出兼容旧调用。 */
+export function readListWorkbook(buffer) {
+  const wb = XLSX.read(new Uint8Array(buffer), { type: "array" });
+  const ws = wb.Sheets["商品记录"];
+  return ws ? XLSX.utils.sheet_to_json(ws, { defval: "" }) : [];
 }

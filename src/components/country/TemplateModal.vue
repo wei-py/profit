@@ -1,12 +1,17 @@
 <script setup>
 import { driver } from "driver.js";
-import { computed, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
+import FieldInput from "@/components/common/FieldInput.vue";
+import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
+import { execute } from "@/services/rule-engine";
 import { useConfigStore } from "@/stores/config";
 import ConfirmModal from "./ConfirmModal.vue";
 import LookupTableModal from "./LookupTableModal.vue";
 import RuleEditorModal from "./RuleEditorModal.vue";
 import "driver.js/dist/driver.css";
+
+import { useModalEsc } from "@/composables/useModalEsc";
 
 const props = defineProps({
   cpId: String,
@@ -14,9 +19,11 @@ const props = defineProps({
   templateIdx: Number,
 });
 const emit = defineEmits(["close"]);
+useModalEsc(() => props.open, () => emit("close"));
 
 const store = useConfigStore();
 const form = reactive({});
+const yesNoOptions = ["是", "否"];
 const rules = ref([]);
 let _ruleUid = 0;
 
@@ -39,10 +46,21 @@ const lookupTableName = ref("");
 const showConfirmModal = ref(false);
 const confirmMessage = ref("");
 const confirmAction = ref(() => {});
+const showRulePreview = ref(false);
+const previewInputs = reactive({});
+const previewResult = ref(null);
 
 const allLookupNames = computed(() => Object.keys(store.lookupTables));
 const newLookupName = ref("");
 const showNewLookupInput = ref(false);
+
+const previewFields = computed(() =>
+  props.cpId
+    ? store
+        .getFieldsByCountry(props.cpId)
+        .filter(f => f.输入输出 === "输入" && (f.启用 === "是" || f.启用 === "TRUE" || !f.启用))
+    : [],
+);
 
 const templateEditSteps = [
   {
@@ -90,11 +108,13 @@ watch(
     if (!v)
       return;
     _ruleUid = 0;
+    Object.keys(form).forEach(k => delete form[k]);
     if (props.templateIdx >= 0) {
       const templates = store.getTemplatesByCountry(props.cpId);
-      Object.assign(form, JSON.parse(JSON.stringify(templates[props.templateIdx])));
+      const currentTemplate = templates[props.templateIdx] || {};
+      Object.assign(form, JSON.parse(JSON.stringify(currentTemplate)));
       rules.value = JSON.parse(
-        JSON.stringify(store.getFeeRulesByTemplate(templates[props.templateIdx].编号)),
+        JSON.stringify(store.getFeeRulesByTemplate(currentTemplate.编号)),
       ).map(r => ({
         ...r,
         _uid: ++_ruleUid,
@@ -110,6 +130,9 @@ watch(
       });
       rules.value = [];
     }
+    showRulePreview.value = false;
+    previewResult.value = null;
+    syncPreviewInputs();
   },
 );
 
@@ -135,6 +158,47 @@ function condSummary(r) {
   return a || b || "—";
 }
 
+function syncPreviewInputs() {
+  const keys = new Set(previewFields.value.map(f => f.字段键));
+  for (const k of Object.keys(previewInputs)) {
+    if (!keys.has(k))
+      delete previewInputs[k];
+  }
+
+  for (const f of previewFields.value) {
+    if (previewInputs[f.字段键] !== undefined)
+      continue;
+    previewInputs[f.字段键] = f.默认值 || "";
+  }
+}
+
+function runRulePreview() {
+  syncPreviewInputs();
+  try {
+    const { errors, results, traces } = execute(rules.value, store.lookupTables, { ...previewInputs });
+    previewResult.value = {
+      errors,
+      results,
+      traces,
+    };
+  }
+  catch (e) {
+    previewResult.value = {
+      errors: [e.message],
+      results: {},
+      traces: {},
+    };
+  }
+}
+
+function toggleRulePreview() {
+  showRulePreview.value = !showRulePreview.value;
+  if (showRulePreview.value) {
+    syncPreviewInputs();
+    runRulePreview();
+  }
+}
+
 function openNewRule() {
   editingRuleIdx.value = -1;
   showRuleModal.value = true;
@@ -143,9 +207,10 @@ function openNewRule() {
 function openEditRule(idx) {
   editingRuleIdx.value = idx;
   showRuleModal.value = true;
-  if (ruleRef.value) {
-    ruleRef.value.openEdit(rules.value[idx]);
-  }
+  nextTick(() => {
+    if (ruleRef.value)
+      ruleRef.value.openEdit(rules.value[idx]);
+  });
 }
 
 function onRuleSave(formData) {
@@ -210,18 +275,30 @@ function deleteLookup(name) {
   showConfirmModal.value = true;
 }
 
+function cleanRuleForSave(rule, index) {
+  const { _uid, ...data } = rule;
+  return {
+    ...data,
+    所属模板: form.编号,
+    计算顺序: data.计算顺序 || index + 1,
+  };
+}
+
 function save() {
+  const rulesForSave = rules.value.map(cleanRuleForSave);
   if (props.templateIdx >= 0) {
     const templates = store.getTemplatesByCountry(props.cpId);
-    const x = store["计算模板"].indexOf(templates[props.templateIdx]);
+    const currentTemplate = templates[props.templateIdx];
+    const previousTemplateId = currentTemplate?.编号 || form.编号;
+    const x = store["计算模板"].indexOf(currentTemplate);
     if (x !== -1)
       store["计算模板"][x] = { ...form };
-    const keepR = store["费用规则"].filter(r => r.所属模板 !== form.编号);
-    store["费用规则"] = [...keepR, ...rules.value];
+    const keepR = store["费用规则"].filter(r => r.所属模板 !== previousTemplateId && r.所属模板 !== form.编号);
+    store["费用规则"] = [...keepR, ...rulesForSave];
   }
   else {
     store["计算模板"].push({ ...form });
-    store["费用规则"] = [...store["费用规则"], ...rules.value];
+    store["费用规则"] = [...store["费用规则"], ...rulesForSave];
   }
   emit("close");
 }
@@ -243,8 +320,8 @@ function onConfirmOk() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open">
-    <div class="max-h-[90vh] max-w-4xl modal-box overflow-y-auto w-11/12">
+  <dialog class="modal" :open="open" @cancel.prevent>
+    <div class="modal-box max-h-[90vh] w-[min(54rem,calc(100vw-1rem))] max-w-none overflow-y-auto">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
           {{ templateIdx >= 0 ? "编辑模板" : "新建模板" }}
@@ -253,7 +330,7 @@ function onConfirmOk() {
           ?
         </button>
       </div>
-      <div class="gap-3 grid grid-cols-4 mb-4">
+      <div class="gap-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-4">
         <div>
           <label class="label py-0 text-xs">编号</label><input v-model="form.编号" class="input input-bordered input-sm w-full">
         </div>
@@ -262,10 +339,7 @@ function onConfirmOk() {
         </div>
         <div>
           <label class="label py-0 text-xs">启用</label>
-          <select v-model="form.启用" class="select select-bordered select-sm w-full">
-            <option>是</option>
-            <option>否</option>
-          </select>
+          <OptionTreeSelect v-model="form.启用" :options="yesNoOptions" placeholder="—" size="sm" />
         </div>
         <div>
           <label class="label py-0 text-xs">说明</label><input v-model="form.说明" class="input input-bordered input-sm w-full">
@@ -276,7 +350,12 @@ function onConfirmOk() {
       <div class="mb-4">
         <div class="flex items-center justify-between mb-2">
           <span class="font-semibold text-sm">费用规则（{{ rules.length }} 条）</span>
-          <button @click="openNewRule" class="btn btn-primary btn-xs">＋</button>
+          <div class="flex gap-1">
+            <button @click="toggleRulePreview" class="btn btn-outline btn-xs">
+              {{ showRulePreview ? "收起" : "试算" }}
+            </button>
+            <button @click="openNewRule" class="btn btn-primary btn-xs">＋</button>
+          </div>
         </div>
         <table v-if="rules.length" class="table table-xs">
           <thead>
@@ -327,6 +406,50 @@ function onConfirmOk() {
           </tbody>
         </table>
         <div v-else class="text-base-content/40 text-xs">暂无规则</div>
+
+        <div v-if="showRulePreview" class="mt-2 border border-base-300 bg-base-100 p-3">
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <div class="font-semibold text-sm">试算</div>
+            <button @click="runRulePreview" class="btn btn-primary btn-xs">计算</button>
+          </div>
+
+          <div v-if="previewFields.length" class="grid grid-cols-2 gap-2 md:grid-cols-3">
+            <FieldInput
+              v-for="f in previewFields"
+              :key="f.字段键"
+              v-model="previewInputs[f.字段键]"
+              :field="f"
+              :optionGroupsData="store['选项组']"
+              :optionItems="store['选项值']"
+            />
+          </div>
+          <div v-else class="text-xs opacity-50">无输入字段</div>
+
+          <div v-if="previewResult" class="mt-3 space-y-2">
+            <table v-if="Object.keys(previewResult.results || {}).length" class="table table-xs bg-base-200">
+              <tbody>
+                <tr v-for="(val, key) in previewResult.results" :key="key">
+                  <td class="font-mono">{{ key }}</td>
+                  <td class="text-right">{{ typeof val === 'number' ? Number(val).toFixed(4) : val }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="bg-base-200 p-2 text-xs opacity-50">暂无结果</div>
+
+            <div v-if="previewResult.errors?.length" class="bg-error/10 p-2 text-error text-xs">
+              <div v-for="err in previewResult.errors" :key="err">{{ err }}</div>
+            </div>
+
+            <details v-if="Object.keys(previewResult.traces || {}).length" class="collapse collapse-arrow bg-base-200">
+              <summary class="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">命中</summary>
+              <div class="collapse-content px-3 pb-2 text-xs">
+                <div v-for="(trace, key) in previewResult.traces" :key="key" class="break-all">
+                  <span class="font-mono opacity-70">{{ key }}：</span>{{ trace }}
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
       </div>
 
       <!-- 查表数据 — table展示 -->

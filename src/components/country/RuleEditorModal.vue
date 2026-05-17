@@ -1,6 +1,11 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
+import { BUILTIN_FORMULA_HELPERS, CALC_METHOD_OPTIONS, CONDITION_OPERATOR_OPTIONS, MATCH_MODE_OPTIONS, YES_NO_OPTIONS } from "@/constants/schema";
+import { createEmptyCondition, createEmptyRule, createInitialConditionTree, serializeConditionState } from "@/domain/rule-form";
+import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
 import { useConfigStore } from "@/stores/config";
+
+import { useModalEsc } from "@/composables/useModalEsc";
 
 const props = defineProps({
   cpId: String,
@@ -9,6 +14,7 @@ const props = defineProps({
   templateId: String,
 });
 const emit = defineEmits(["save", "delete", "close"]);
+useModalEsc(() => props.open, () => emit("close"));
 
 const store = useConfigStore();
 const form = reactive({});
@@ -20,30 +26,120 @@ const condTree = ref({
   type: "group",
 });
 
-const countryFieldKeys = computed(() => store.getFieldsByCountry(props.cpId).map(f => f.字段键));
 const outputKeys = computed(() =>
   store
     .getFieldsByCountry(props.cpId)
     .filter(f => f.输入输出 === "输出")
-    .map(f => f.字段键),
+    .map(f => ({
+      label: f.字段名称 ? `${f.字段名称}（${f.字段键}）` : f.字段键,
+      value: f.字段键,
+    })),
 );
 const allLookupNames = computed(() => Object.keys(store.lookupTables));
 const flatTree = computed(() => (condTree.value ? flattenTree(condTree.value) : []));
+const fieldSelectOptions = computed(() => store.getFieldsByCountry(props.cpId).map(f => ({ label: f.字段名称 ? `${f.字段名称}（${f.字段键}）` : f.字段键, value: f.字段键 })));
+
+const yesNoOptions = YES_NO_OPTIONS;
+const operatorOptions = CONDITION_OPERATOR_OPTIONS;
+const calcMethodOptions = CALC_METHOD_OPTIONS;
+const matchModeOptions = MATCH_MODE_OPTIONS;
+const formulaHelpers = BUILTIN_FORMULA_HELPERS;
+const formulaFieldToAdd = ref("");
+const sumFieldToAdd = ref("");
+
+function emptyCond() {
+  return createEmptyCondition();
+}
+
+function ensureCond(idx) {
+  const n = Number(idx);
+  if (!Number.isInteger(n) || n < 0)
+    return null;
+  if (!Array.isArray(condPool.value))
+    condPool.value = [];
+  while (condPool.value.length <= n)
+    condPool.value.push(emptyCond());
+  condPool.value[n] = {
+    ...emptyCond(),
+    ...(condPool.value[n] || {}),
+  };
+  return condPool.value[n];
+}
+
+function getCondValue(idx, key) {
+  return ensureCond(idx)?.[key] ?? "";
+}
+
+function setCondValue(idx, key, value) {
+  const cond = ensureCond(idx);
+  if (cond)
+    cond[key] = value;
+}
+
+function normalizeCondState() {
+  if (!Array.isArray(condPool.value))
+    condPool.value = [];
+  condPool.value = condPool.value.map(c => ({ ...emptyCond(), ...(c || {}) }));
+
+  function normalizeNode(node, isRoot = false) {
+    if (!node || typeof node !== "object") {
+      return isRoot
+        ? { children: [], linkOp: "", op: "AND", type: "group" }
+        : null;
+    }
+
+    if (node.type === "cond") {
+      let idx = Number(node.idx);
+      if (!Number.isInteger(idx) || idx < 0) {
+        idx = condPool.value.length;
+        condPool.value.push(emptyCond());
+      }
+      ensureCond(idx);
+      return {
+        idx,
+        op: node.op || "",
+        type: "cond",
+      };
+    }
+
+    const rawChildren = Array.isArray(node.children) ? node.children : [];
+    const children = rawChildren.map(ch => normalizeNode(ch)).filter(Boolean);
+    return {
+      children,
+      linkOp: node.linkOp || "",
+      op: node.op === "OR" ? "OR" : "AND",
+      type: "group",
+    };
+  }
+
+  const root = normalizeNode(condTree.value, true);
+  condTree.value = root && root.type === "group"
+    ? root
+    : { children: [], linkOp: "", op: "AND", type: "group" };
+
+  if (!condTree.value.children.length) {
+    ensureCond(0);
+    condTree.value.children.push({ idx: 0, op: "", type: "cond" });
+  }
+}
 
 function flattenTree(node, depth = 0, parent = null, idx = 0) {
+  if (!node || typeof node !== "object")
+    return [];
+  const nodeType = node.type === "group" ? "group-open" : "cond";
   const items = [
     {
       depth,
       idx,
       node,
       parent,
-      type: node.type === "group" ? "group-open" : "cond",
+      type: nodeType,
     },
   ];
   if (node.type === "group") {
-    for (let i = 0; i < node.children.length; i++) {
-      items.push(...flattenTree(node.children[i], depth + 1, node, i));
-    }
+    const children = Array.isArray(node.children) ? node.children : [];
+    for (let i = 0; i < children.length; i++)
+      items.push(...flattenTree(children[i], depth + 1, node, i));
     items.push({
       depth,
       idx,
@@ -56,34 +152,13 @@ function flattenTree(node, depth = 0, parent = null, idx = 0) {
 }
 
 function initCondTree() {
-  condPool.value = [
-    {
-      值: "",
-      字段: "",
-      运算符: "",
-    },
-  ];
-  condTree.value = {
-    children: [
-      {
-        idx: 0,
-        op: "",
-        type: "cond",
-      },
-    ],
-    linkOp: "",
-    op: "AND",
-    type: "group",
-  };
+  condPool.value = [emptyCond()];
+  condTree.value = createInitialConditionTree();
 }
 
 function addCond(parentGroup, op) {
   const idx = condPool.value.length;
-  condPool.value.push({
-    值: "",
-    字段: "",
-    运算符: "",
-  });
+  condPool.value.push(emptyCond());
   parentGroup.children.push({
     idx,
     op: op || "AND",
@@ -116,34 +191,13 @@ function toggleLinkOp(item) {
 }
 
 function serializeCondTree() {
-  function dfs(node) {
-    if (node.type === "cond")
-      return `C${node.idx}`;
-    const parts = [];
-    for (const ch of node.children) {
-      let prefix = "";
-      if (ch.type === "cond" && ch.op)
-        prefix = ch.op[0];
-      else if (ch.type === "group" && ch.linkOp)
-        prefix = ch.linkOp[0];
-      parts.push(prefix + dfs(ch));
-    }
-    return `G${node.op[0]}[${parts.join(",")}]`;
-  }
-  const result = { ...form };
-  result.条件结构 = dfs(condTree.value);
-  for (let i = 1; i <= 4; i++) {
-    const c = condPool.value[i - 1];
-    result[`条件${i}字段`] = c ? c.字段 : "";
-    result[`条件${i}运算符`] = c ? c.运算符 : "";
-    result[`条件${i}值`] = c ? c.值 : "";
-    result[`条件${i}值2`] = "";
-  }
-  result.条件数据 = JSON.stringify({
+  normalizeCondState();
+
+  return serializeConditionState({
+    form,
     pool: condPool.value,
     tree: condTree.value,
   });
-  return result;
 }
 
 function deserializeCondTree(r) {
@@ -163,6 +217,7 @@ function deserializeCondTree(r) {
         op: "AND",
         type: "group",
       };
+      normalizeCondState();
       return;
     }
     catch {
@@ -173,8 +228,9 @@ function deserializeCondTree(r) {
   for (let i = 1; i <= 4; i++) {
     condPool.value.push({
       值: r[`条件${i}值`] || "",
+      值2: r[`条件${i}值2`] || "",
       字段: r[`条件${i}字段`] || "",
-      运算符: r[`条件${i}运算符`] || "",
+      运算符: r[`条件${i}运算符`] || "等于",
     });
   }
   condTree.value = {
@@ -199,6 +255,52 @@ function deserializeCondTree(r) {
       type: "cond",
     });
   }
+  normalizeCondState();
+}
+
+function getFieldDef(fieldKey) {
+  return store.getField(fieldKey, props.cpId) || {};
+}
+
+function getFieldOptionRootId(fieldKey) {
+  const field = getFieldDef(fieldKey);
+  return field.类型 === "下拉" ? field.选项组编号 || "" : "";
+}
+
+function conditionNeedsSecondValue(idx) {
+  return ["介于", "不介于"].includes(getCondValue(idx, "运算符"));
+}
+
+function appendFieldToFormula(fieldKey) {
+  if (!fieldKey)
+    return;
+  form.公式 = `${form.公式 || ""}{${fieldKey}}`;
+  formulaFieldToAdd.value = "";
+}
+
+function appendHelperToFormula(value) {
+  if (!value)
+    return;
+  form.公式 = `${form.公式 || ""}${value}`;
+}
+
+function appendFieldToSum(fieldKey) {
+  if (!fieldKey)
+    return;
+  const parts = String(form.加总字段 || "")
+    .split(/[|,，;；、\n]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  if (!parts.includes(fieldKey))
+    parts.push(fieldKey);
+  form.加总字段 = parts.join(",");
+  sumFieldToAdd.value = "";
+}
+
+function resetRuleForm() {
+  Object.keys(form).forEach(k => delete form[k]);
+  Object.assign(form, createEmptyRule(props.templateId));
+  initCondTree();
 }
 
 watch(
@@ -206,37 +308,15 @@ watch(
   (v) => {
     if (!v)
       return;
-    if (props.ruleIdx >= 0) {
-      Object.assign(form, {
-        公式: "",
-        加总字段: "",
-        匹配方式: "",
-        启用: "是",
-        固定金额: "",
-        所属模板: props.templateId,
-        条件结构: "",
-        查表名称: "",
-        百分比值: "",
-        百分比基数: "",
-        百分比来源字段: "",
-        累加: "否",
-        编号: "",
-        计算方式: "",
-        计算顺序: "",
-        说明: "",
-        费用名称: "",
-        输入映射: "",
-        输出列: "",
-        输出字段键: "",
-      });
-      initCondTree();
-    }
+    if (props.ruleIdx < 0)
+      resetRuleForm();
   },
 );
 
 defineExpose({
   openEdit(ruleData) {
-    Object.assign(form, JSON.parse(JSON.stringify(ruleData)));
+    Object.keys(form).forEach(k => delete form[k]);
+    Object.assign(form, JSON.parse(JSON.stringify(ruleData)), { 所属模板: props.templateId });
     deserializeCondTree(ruleData);
   },
   save() {
@@ -246,14 +326,14 @@ defineExpose({
 </script>
 
 <template>
-  <dialog class="modal" :open="open">
-    <div class="max-h-[85vh] max-w-3xl modal-box overflow-y-auto w-11/12">
+  <dialog class="modal" :open="open" @cancel.prevent>
+    <div class="modal-box max-h-[85vh] w-[min(44rem,calc(100vw-1rem))] max-w-none overflow-y-auto">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
           {{ ruleIdx >= 0 ? "编辑规则" : "新建规则" }}
         </h3>
       </div>
-      <div class="gap-2 grid grid-cols-4 mb-4">
+      <div class="gap-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-4">
         <div>
           <label class="label py-0 text-xs">编号</label><input v-model="form.编号" class="input input-bordered input-sm w-full">
         </div>
@@ -268,23 +348,21 @@ defineExpose({
           >
         </div>
         <div>
-          <label class="label py-0 text-xs">启用</label><select v-model="form.启用" class="select select-bordered select-sm w-full">
-            <option>是</option>
-            <option>否</option>
-          </select>
+          <label class="label py-0 text-xs">启用</label>
+          <OptionTreeSelect v-model="form.启用" :options="yesNoOptions" placeholder="—" size="sm" />
         </div>
       </div>
       <div class="mb-3">
-        <label class="label py-0 text-xs">输出字段键</label><input
+        <label class="label py-0 text-xs">输出字段键</label>
+        <OptionTreeSelect
           v-model="form.输出字段键"
-          class="input input-bordered input-sm w-full"
-          list="rOutputKeys"
-        ><datalist id="rOutputKeys">
-          <option v-for="k in outputKeys" :key="k" :value="k" />
-        </datalist>
+          :options="outputKeys"
+          placeholder="选择输出字段"
+          size="sm"
+        />
       </div>
 
-      <fieldset class="bg-base-200 fieldset mb-3 p-3 rounded">
+      <fieldset class="bg-base-200 fieldset mb-3 p-3">
         <legend class="font-semibold text-sm">条件</legend>
         <template v-for="(item, i) in flatTree" :key="i">
           <div
@@ -319,65 +397,71 @@ defineExpose({
               {{ item.node.op }}
             </button>
             <span v-else class="w-8" />
-            <input
-              v-model="condPool[item.node.idx].字段"
-              class="flex-1 input input-bordered input-xs"
-              list="rFieldKeys"
-              placeholder="字段"
-            >
-            <select
-              v-model="condPool[item.node.idx].运算符"
-              class="select select-bordered select-xs w-24"
-            >
-              <option value="">—</option>
-              <option>等于</option>
-              <option>不等于</option>
-              <option>大于</option>
-              <option>大于等于</option>
-              <option>小于</option>
-              <option>小于等于</option>
-            </select>
-            <input
-              v-model="condPool[item.node.idx].值"
-              class="input input-bordered input-xs w-20"
-              placeholder="值"
-            >
+            <div class="min-w-32 flex-1">
+              <OptionTreeSelect
+                :modelValue="getCondValue(item.node.idx, '字段')"
+                :options="fieldSelectOptions"
+                @update:modelValue="setCondValue(item.node.idx, '字段', $event)"
+                placeholder="字段"
+                size="xs"
+              />
+            </div>
+            <div class="w-28">
+              <OptionTreeSelect
+                :modelValue="getCondValue(item.node.idx, '运算符')"
+                :options="operatorOptions"
+                @update:modelValue="setCondValue(item.node.idx, '运算符', $event)"
+                placeholder="—"
+                size="xs"
+              />
+            </div>
+            <div class="w-32">
+              <OptionTreeSelect
+                v-if="getFieldOptionRootId(getCondValue(item.node.idx, '字段'))"
+                :modelValue="getCondValue(item.node.idx, '值')"
+                :optionGroupsData="store['选项组']"
+                :optionItems="store['选项值']"
+                placeholder="值"
+                :rootGroupId="getFieldOptionRootId(getCondValue(item.node.idx, '字段'))"
+                size="xs"
+                @update:modelValue="setCondValue(item.node.idx, '值', $event)"
+              />
+              <input
+                v-else
+                :value="getCondValue(item.node.idx, '值')"
+                class="input input-bordered input-xs w-full"
+                @input="setCondValue(item.node.idx, '值', $event.target.value)"
+                placeholder="值"
+              >
+            </div>
+            <div v-if="conditionNeedsSecondValue(item.node.idx)" class="w-28">
+              <input
+                :value="getCondValue(item.node.idx, '值2')"
+                class="input input-bordered input-xs w-full"
+                placeholder="值2"
+                @input="setCondValue(item.node.idx, '值2', $event.target.value)"
+              >
+            </div>
             <button @click="delNode(item.parent, item.idx)" class="btn btn-ghost btn-xs text-error">
               ✕
             </button>
           </div>
         </template>
       </fieldset>
-      <datalist id="rFieldKeys">
-        <option v-for="k in countryFieldKeys" :key="k" :value="k" />
-      </datalist>
-
       <fieldset class="fieldset mb-3">
         <legend class="font-semibold text-sm">计算配置</legend>
-        <select v-model="form.计算方式" class="mb-2 select select-bordered select-sm">
-          <option value="">— 选择 —</option>
-          <option>查表</option>
-          <option>百分比</option>
-          <option>固定值</option>
-          <option>加总</option>
-          <option>公式</option>
-        </select>
+        <div class="mb-2 w-40">
+          <OptionTreeSelect v-model="form.计算方式" :options="calcMethodOptions" placeholder="— 选择 —" size="sm" />
+        </div>
         <template v-if="form.计算方式 === '查表'">
-          <div class="gap-2 grid grid-cols-2">
+          <div class="gap-2 grid grid-cols-1 sm:grid-cols-2">
             <div>
-              <label class="label py-0 text-xs">查表名称</label><select v-model="form.查表名称" class="select select-bordered select-sm w-full">
-                <option value="">—</option>
-                <option v-for="n in allLookupNames" :key="n" :value="n">
-                  {{ n }}
-                </option>
-              </select>
+              <label class="label py-0 text-xs">查表名称</label>
+              <OptionTreeSelect v-model="form.查表名称" :options="allLookupNames" placeholder="—" size="sm" />
             </div>
             <div>
-              <label class="label py-0 text-xs">匹配方式</label><select v-model="form.匹配方式" class="select select-bordered select-sm w-full">
-                <option value="">—</option>
-                <option>精确</option>
-                <option>区间</option>
-              </select>
+              <label class="label py-0 text-xs">匹配方式</label>
+              <OptionTreeSelect v-model="form.匹配方式" :options="matchModeOptions" placeholder="—" size="sm" />
             </div>
             <div>
               <label class="label py-0 text-xs">输入映射</label><input v-model="form.输入映射" class="input input-bordered input-sm w-full">
@@ -388,23 +472,17 @@ defineExpose({
           </div>
         </template>
         <template v-if="form.计算方式 === '百分比'">
-          <div class="gap-2 grid grid-cols-3">
+          <div class="gap-2 grid grid-cols-1 sm:grid-cols-3">
             <div>
-              <label class="label py-0 text-xs">基数</label><input
-                v-model="form.百分比基数"
-                class="input input-bordered input-sm w-full"
-                list="rFieldKeys"
-              >
+              <label class="label py-0 text-xs">基数</label>
+              <OptionTreeSelect v-model="form.百分比基数" :options="fieldSelectOptions" placeholder="选择基数字段" size="sm" />
             </div>
             <div>
               <label class="label py-0 text-xs">固定%值</label><input v-model="form.百分比值" class="input input-bordered input-sm w-full">
             </div>
             <div>
-              <label class="label py-0 text-xs">动态来源</label><input
-                v-model="form.百分比来源字段"
-                class="input input-bordered input-sm w-full"
-                list="rFieldKeys"
-              >
+              <label class="label py-0 text-xs">动态来源</label>
+              <OptionTreeSelect v-model="form.百分比来源字段" :options="fieldSelectOptions" placeholder="选择来源字段" size="sm" />
             </div>
           </div>
         </template>
@@ -414,17 +492,49 @@ defineExpose({
           </div>
         </template>
         <template v-if="form.计算方式 === '加总'">
-          <div>
-            <label class="label py-0 text-xs">加总字段（逗号分隔）</label><input
+          <div class="space-y-2">
+            <label class="label py-0 text-xs">加总字段（逗号分隔）</label>
+            <input
               v-model="form.加总字段"
               class="input input-bordered input-sm w-full"
-              list="rFieldKeys"
+              placeholder="如：销售佣金金额,运费"
             >
+            <div class="flex gap-2 items-center">
+              <OptionTreeSelect
+                v-model="sumFieldToAdd"
+                :options="fieldSelectOptions"
+                placeholder="选择字段追加"
+                size="xs"
+              />
+              <button class="btn btn-ghost btn-xs" @click="appendFieldToSum(sumFieldToAdd)">追加</button>
+            </div>
           </div>
         </template>
         <template v-if="form.计算方式 === '公式'">
-          <div>
-            <label class="label py-0 text-xs">公式</label><input v-model="form.公式" class="font-mono input input-bordered input-sm w-full">
+          <div class="space-y-2">
+            <label class="label py-0 text-xs">公式</label>
+            <input
+              v-model="form.公式"
+              class="font-mono input input-bordered input-sm w-full"
+              placeholder="支持 {售价} - {总费用}、IF、SUM、ROUND、MIN、MAX"
+            >
+            <div class="flex flex-wrap gap-2 items-center">
+              <OptionTreeSelect
+                v-model="formulaFieldToAdd"
+                :options="fieldSelectOptions"
+                placeholder="选择字段插入"
+                size="xs"
+              />
+              <button class="btn btn-ghost btn-xs" @click="appendFieldToFormula(formulaFieldToAdd)">插入字段</button>
+              <button
+                v-for="helper in formulaHelpers"
+                :key="helper.value"
+                class="btn btn-ghost btn-xs"
+                @click="appendHelperToFormula(helper.value)"
+              >
+                {{ helper.label }}
+              </button>
+            </div>
           </div>
         </template>
       </fieldset>

@@ -2,6 +2,8 @@
 import { ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
 
+import { useModalEsc } from "@/composables/useModalEsc";
+
 const props = defineProps({
   filterKey: {
     default: "_uid",
@@ -22,6 +24,7 @@ const props = defineProps({
   },
 });
 const emit = defineEmits(["close", "update", "update-hidden"]);
+useModalEsc(() => props.open, () => emit("close"));
 
 const localOrder = ref([]);
 const localHidden = ref(new Set());
@@ -64,7 +67,7 @@ function saveOrder() {
 
 <template>
   <div v-if="open" class="modal modal-open">
-    <div class="max-h-[80vh] max-w-lg modal-box">
+    <div class="max-h-[80vh] modal-box" style="width: min(48rem, calc(100vw - 1rem));">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
           {{ title }}
@@ -72,11 +75,11 @@ function saveOrder() {
         <button @click="emit('close')" class="btn btn-circle btn-ghost btn-sm">✕</button>
       </div>
       <div class="mb-2 text-base-content/50 text-xs">拖拽左侧三条杠调整列顺序，点击右侧开关控制显示/隐藏</div>
-      <div v-draggable="[localOrder, options]" class="overflow-y-auto drag-list">
+      <div v-draggable="[localOrder, options]" class="grid max-h-[10.25rem] grid-cols-3 gap-2 overflow-y-auto drag-list">
         <div
           v-for="col in localOrder"
           :key="col"
-          class="bg-base-200 flex gap-2 items-center mb-1 p-2 rounded text-sm drag-item"
+          class="bg-base-200 flex h-11 gap-2 items-center p-2 text-sm drag-item"
           :class="{ 'opacity-50': localHidden.has(col) }"
         >
           <span

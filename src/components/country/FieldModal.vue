@@ -1,8 +1,11 @@
 <script setup>
 import { driver } from "driver.js";
-import { reactive, watch } from "vue";
+import { computed, reactive, watch } from "vue";
+import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
 import { useConfigStore } from "@/stores/config";
 import "driver.js/dist/driver.css";
+
+import { useModalEsc } from "@/composables/useModalEsc";
 
 const props = defineProps({
   cpId: String,
@@ -10,10 +13,10 @@ const props = defineProps({
   open: Boolean,
 });
 const emit = defineEmits(["close"]);
+useModalEsc(() => props.open, () => emit("close"));
 
 const store = useConfigStore();
 const form = reactive({});
-const _CORE_KEYS = ["编号", "国家", "平台", "货币", "货币符号", "汇率", "启用", "排序"];
 
 const fieldEditSteps = [
   {
@@ -26,21 +29,14 @@ const fieldEditSteps = [
   {
     element: "[data-tour=\"field-type\"]",
     popover: {
-      description: "下拉=选择框（需关联选项组），布尔=是/否，数字和文本=输入框。",
+      description: "下拉字段会直接使用选项树，默认值也在树上选择，不再手填选项编号。",
       title: "字段类型",
-    },
-  },
-  {
-    element: "[data-tour=\"field-level\"]",
-    popover: {
-      description: "商品级=所有SKU共享（如刊登类型），SKU级=每个变体独立（如售价、重量）。",
-      title: "字段层级",
     },
   },
   {
     element: "[data-tour=\"field-default\"]",
     popover: {
-      description: "新建商品时自动填入的值。布尔字段选是/否，下拉字段选选项值，其他字段直接输入。",
+      description: "默认值可以停在任意层级，也可以继续选择子级。",
       title: "默认值",
     },
   },
@@ -67,6 +63,7 @@ watch(
     if (props.fieldIdx >= 0) {
       const fields = store.getFieldsByCountry(props.cpId);
       Object.assign(form, JSON.parse(JSON.stringify(fields[props.fieldIdx])));
+      normalizeOptionSourceToRoot();
     }
     else {
       Object.assign(form, {
@@ -86,7 +83,67 @@ watch(
   },
 );
 
+const isDropdownField = computed(() => form.类型 === "下拉");
+
+const rootGroupRows = computed(() =>
+  store
+    .getOptionGroupsByCountry(props.cpId)
+    .filter(group => !group.父级编号)
+    .sort((a, b) => String(a.名称 || a.编号).localeCompare(String(b.名称 || b.编号), "zh-Hans-CN"))
+    .map(group => ({
+      group,
+      label: group.名称 || group.编号,
+    })),
+);
+
+const rootGroupOptions = computed(() => rootGroupRows.value.map(row => ({ label: row.label, value: row.group.编号 })));
+const fieldTypeOptions = ["数字", "文本", "下拉", "布尔"];
+const fieldLevelOptions = ["商品级", "SKU级"];
+const inputOutputOptions = ["输入", "输出"];
+const yesNoOptions = ["是", "否"];
+
+const canUseTreeDefault = computed(() =>
+  isDropdownField.value && form.选项组编号 && store["选项组"].length > 0 && store["选项值"].length > 0,
+);
+
+function selectOptionGroup(groupId) {
+  if (form.选项组编号 !== groupId) {
+    form.选项组编号 = groupId;
+    form.默认值 = "";
+  }
+}
+
+function findRootGroupId(groupId) {
+  if (!groupId)
+    return "";
+  const groups = store.getOptionGroupsByCountry(props.cpId);
+  const map = new Map(groups.map(group => [group.编号, group]));
+  let cur = map.get(groupId);
+  if (!cur)
+    return "";
+  const guard = new Set();
+  while (cur?.父级编号 && map.has(cur.父级编号) && !guard.has(cur.编号)) {
+    guard.add(cur.编号);
+    cur = map.get(cur.父级编号);
+  }
+  return cur?.编号 || "";
+}
+
+function normalizeOptionSourceToRoot() {
+  if (!form.选项组编号)
+    return;
+  const rootId = findRootGroupId(form.选项组编号);
+  if (rootId && rootId !== form.选项组编号)
+    form.选项组编号 = rootId;
+}
+
 function save() {
+  normalizeOptionSourceToRoot();
+
+  if (!isDropdownField.value) {
+    form.选项组编号 = "";
+  }
+
   if (props.fieldIdx >= 0) {
     const fields = store.getFieldsByCountry(props.cpId);
     const x = store["计算字段"].indexOf(fields[props.fieldIdx]);
@@ -111,8 +168,8 @@ function deleteField() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open">
-    <div class="max-w-lg modal-box">
+  <dialog class="modal" :open="open" @cancel.prevent>
+    <div class="modal-box w-[min(32rem,calc(100vw-1rem))] max-w-none">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
           {{ fieldIdx >= 0 ? "编辑字段" : "新建字段" }}
@@ -121,7 +178,8 @@ function deleteField() {
           ?
         </button>
       </div>
-      <div class="gap-3 grid grid-cols-2">
+
+      <div class="gap-3 grid grid-cols-1 sm:grid-cols-2">
         <div>
           <label class="label py-0 text-xs">字段键</label>
           <input v-model="form.字段键" class="input input-bordered input-sm w-full">
@@ -132,68 +190,62 @@ function deleteField() {
         </div>
         <div data-tour="field-type">
           <label class="label py-0 text-xs">类型</label>
-          <select v-model="form.类型" class="select select-bordered select-sm w-full">
-            <option>数字</option>
-            <option>文本</option>
-            <option>下拉</option>
-            <option>布尔</option>
-          </select>
+          <OptionTreeSelect v-model="form.类型" :options="fieldTypeOptions" placeholder="—" size="sm" />
         </div>
-        <div data-tour="field-level">
+        <div>
           <label class="label py-0 text-xs">层级</label>
-          <select v-model="form.层级" class="select select-bordered select-sm w-full">
-            <option>商品级</option>
-            <option>SKU级</option>
-          </select>
+          <OptionTreeSelect v-model="form.层级" :options="fieldLevelOptions" placeholder="—" size="sm" />
         </div>
         <div>
           <label class="label py-0 text-xs">输入/输出</label>
-          <select v-model="form.输入输出" class="select select-bordered select-sm w-full">
-            <option>输入</option>
-            <option>输出</option>
-          </select>
+          <OptionTreeSelect v-model="form.输入输出" :options="inputOutputOptions" placeholder="—" size="sm" />
         </div>
         <div>
           <label class="label py-0 text-xs">单位</label>
           <input v-model="form.单位" class="input input-bordered input-sm w-full">
         </div>
         <div>
-          <label class="label py-0 text-xs">选项组编号</label>
-          <input v-model="form.选项组编号" class="input input-bordered input-sm w-full">
-        </div>
-        <div>
           <label class="label py-0 text-xs">必填</label>
-          <select v-model="form.必填" class="select select-bordered select-sm w-full">
-            <option>是</option>
-            <option>否</option>
-          </select>
+          <OptionTreeSelect v-model="form.必填" :options="yesNoOptions" placeholder="—" size="sm" />
         </div>
       </div>
-      <div class="mt-2" data-tour="field-default">
+
+      <div v-if="isDropdownField" class="mt-3">
+        <label class="label py-0 text-xs">选项来源</label>
+        <OptionTreeSelect
+          :modelValue="form.选项组编号"
+          :options="rootGroupOptions"
+          placeholder="选择选项来源"
+          size="sm"
+          @update:modelValue="selectOptionGroup"
+        />
+      </div>
+
+      <div class="mt-3" data-tour="field-default">
         <label class="label py-0 text-xs">默认值</label>
-        <select
+        <OptionTreeSelect
           v-if="form.类型 === '布尔'"
           v-model="form.默认值"
-          class="select select-bordered select-sm w-full"
+          :options="yesNoOptions"
+          placeholder="—"
+          size="sm"
+        />
+        <OptionTreeSelect
+          v-else-if="canUseTreeDefault"
+          :modelValue="form.默认值"
+          :optionGroupsData="store['选项组']"
+          :optionItems="store['选项值']"
+          placeholder="选择默认值"
+          :rootGroupId="form.选项组编号"
+          size="sm"
+          @update:modelValue="form.默认值 = $event"
+        />
+        <div
+          v-else-if="isDropdownField"
+          class="border border-dashed border-base-300 px-3 py-2 text-sm opacity-60"
         >
-          <option value="">—</option>
-          <option>是</option>
-          <option>否</option>
-        </select>
-        <select
-          v-else-if="form.类型 === '下拉' && form.选项组编号"
-          v-model="form.默认值"
-          class="select select-bordered select-sm w-full"
-        >
-          <option value="">—</option>
-          <option
-            v-for="item in store.getOptionItemsByGroup(form.选项组编号)"
-            :key="item.选项值"
-            :value="item.选项值"
-          >
-            {{ item.显示名 }} ({{ item.选项值 }})
-          </option>
-        </select>
+          先选择选项来源
+        </div>
         <input
           v-else
           v-model="form.默认值"
@@ -201,6 +253,7 @@ function deleteField() {
           placeholder="默认值"
         >
       </div>
+
       <div class="mt-2">
         <label class="label py-0 text-xs">说明</label>
         <input v-model="form.说明" class="input input-bordered input-sm w-full">

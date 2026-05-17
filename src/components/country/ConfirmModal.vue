@@ -1,13 +1,15 @@
 <script setup>
-defineProps({
+import { useModalEsc } from "@/composables/useModalEsc";
+const props = defineProps({
   message: String,
   open: Boolean,
 });
 const emit = defineEmits(["ok", "close"]);
+useModalEsc(() => props.open, () => emit("close"));
 </script>
 
 <template>
-  <dialog class="modal" :open="open">
+  <dialog class="modal" :open="open" @cancel.prevent>
     <div class="max-w-sm modal-box">
       <h3 class="font-bold mb-4 text-lg">确认操作</h3>
       <p class="text-sm">
