@@ -1,6 +1,14 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { checkCode, createCodes, deleteCode, getTemplate, listCodes, saveTemplate, updateRemark } from "@/api/admin";
+import {
+  checkCode,
+  createCodes,
+  deleteCode,
+  getTemplate,
+  listCodes,
+  saveTemplate,
+  updateRemark,
+} from "@/api/admin";
 
 export const useAdminStore = defineStore("admin", () => {
   const apiBase = ref(

@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { computed, reactive, ref } from "vue";
 import { buildProductRows, parseVariantValues } from "@/domain/product-records";
 import { execute } from "@/services/rule-engine";
-import { nowText, normalizeId } from "@/utils/value";
+import { normalizeId, nowText } from "@/utils/value";
 import { useConfigStore } from "./config";
 
 export const useCreateStore = defineStore("create", () => {
@@ -72,7 +72,9 @@ export const useCreateStore = defineStore("create", () => {
 
   function applyDefaultProductInputs() {
     const paramDefaults = new Map(
-      configStore.getTemplateParams(selectedTemplateId.value).map(param => [param.字段键, param.默认值]),
+      configStore
+        .getTemplateParams(selectedTemplateId.value)
+        .map(param => [param.字段键, param.默认值]),
     );
     for (const field of productFields.value)
       productInputs[field.字段键] = defaultValueForField(field, paramDefaults.get(field.字段键));
@@ -90,7 +92,9 @@ export const useCreateStore = defineStore("create", () => {
 
   function makeDefaultSkuInputs() {
     const paramDefaults = new Map(
-      configStore.getTemplateParams(selectedTemplateId.value).map(param => [param.字段键, param.默认值]),
+      configStore
+        .getTemplateParams(selectedTemplateId.value)
+        .map(param => [param.字段键, param.默认值]),
     );
     const inputs = {};
     for (const field of skuInputFields.value)
@@ -122,19 +126,24 @@ export const useCreateStore = defineStore("create", () => {
       .filter(attr => attr.values.length);
 
     if (!attrs.length) {
-      skus.splice(0, skus.length, makeSkuRow({
-        attrs: {},
-        index: 0,
-        key: productName.value || "默认",
-        oldInputs: skus[0]?.inputs,
-        parts: [],
-      }));
+      skus.splice(
+        0,
+        skus.length,
+        makeSkuRow({
+          attrs: {},
+          index: 0,
+          key: productName.value || "默认",
+          oldInputs: skus[0]?.inputs,
+          parts: [],
+        }),
+      );
       return;
     }
 
     const oldInputsByKey = new Map(skus.map(sku => [sku.key, { ...(sku.inputs || {}) }]));
     const combos = attrs.reduce(
-      (rows, attr) => rows.flatMap(row => attr.values.map(value => ({ ...row, [attr.name]: value }))),
+      (rows, attr) =>
+        rows.flatMap(row => attr.values.map(value => ({ ...row, [attr.name]: value }))),
       [{}],
     );
 
@@ -179,8 +188,7 @@ export const useCreateStore = defineStore("create", () => {
       skus[skuIndex].skuCode = value;
     else if (field === "images")
       skus[skuIndex].images = value;
-    else
-      updateSkuInput(skuIndex, field, value);
+    else updateSkuInput(skuIndex, field, value);
   }
 
   function calculateAll() {
@@ -194,7 +202,11 @@ export const useCreateStore = defineStore("create", () => {
           ...productInputs,
           ...(sku.inputs || {}),
         };
-        const { errors, results, traces } = execute(currentRules.value, configStore.lookupTables, inputs);
+        const { errors, results, traces } = execute(
+          currentRules.value,
+          configStore.lookupTables,
+          inputs,
+        );
         sku.results = results;
         sku.traces = traces;
         sku.error = errors.length ? errors.join("; ") : "";
@@ -229,8 +241,7 @@ export const useCreateStore = defineStore("create", () => {
   }
 
   function clearObject(target) {
-    for (const key of Object.keys(target))
-      delete target[key];
+    for (const key of Object.keys(target)) delete target[key];
   }
 
   return {
@@ -248,8 +259,8 @@ export const useCreateStore = defineStore("create", () => {
     productRows,
     removeVariantAttribute,
     reset,
-    resetForTemplate,
     resetForm,
+    resetForTemplate,
     selectCountry,
     selectedCountryId,
     selectedTemplate,

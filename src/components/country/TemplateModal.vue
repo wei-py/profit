@@ -4,14 +4,14 @@ import { computed, nextTick, reactive, ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
 import FieldInput from "@/components/common/FieldInput.vue";
 import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
+import { useModalEsc } from "@/composables/useModalEsc";
 import { execute } from "@/services/rule-engine";
 import { useConfigStore } from "@/stores/config";
 import ConfirmModal from "./ConfirmModal.vue";
 import LookupTableModal from "./LookupTableModal.vue";
 import RuleEditorModal from "./RuleEditorModal.vue";
-import "driver.js/dist/driver.css";
 
-import { useModalEsc } from "@/composables/useModalEsc";
+import "driver.js/dist/driver.css";
 
 const props = defineProps({
   cpId: String,
@@ -19,7 +19,10 @@ const props = defineProps({
   templateIdx: Number,
 });
 const emit = defineEmits(["close"]);
-useModalEsc(() => props.open, () => emit("close"));
+useModalEsc(
+  () => props.open,
+  () => emit("close"),
+);
 
 const store = useConfigStore();
 const form = reactive({});
@@ -36,7 +39,9 @@ const dragOpts = {
   ghostClass: "drag-ghost",
   handle: ".drag-handle",
   onEnd: () => {
-    rules.value.forEach((r, i) => { r.计算顺序 = i + 1; });
+    rules.value.forEach((r, i) => {
+      r.计算顺序 = i + 1;
+    });
   },
 };
 const editingRuleIdx = ref(-1);
@@ -175,7 +180,9 @@ function syncPreviewInputs() {
 function runRulePreview() {
   syncPreviewInputs();
   try {
-    const { errors, results, traces } = execute(rules.value, store.lookupTables, { ...previewInputs });
+    const { errors, results, traces } = execute(rules.value, store.lookupTables, {
+      ...previewInputs,
+    });
     previewResult.value = {
       errors,
       results,
@@ -293,7 +300,9 @@ function save() {
     const x = store["计算模板"].indexOf(currentTemplate);
     if (x !== -1)
       store["计算模板"][x] = { ...form };
-    const keepR = store["费用规则"].filter(r => r.所属模板 !== previousTemplateId && r.所属模板 !== form.编号);
+    const keepR = store["费用规则"].filter(
+      r => r.所属模板 !== previousTemplateId && r.所属模板 !== form.编号,
+    );
     store["费用规则"] = [...keepR, ...rulesForSave];
   }
   else {
@@ -320,7 +329,7 @@ function onConfirmOk() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open" @cancel.prevent>
+  <dialog @cancel.prevent class="modal" :open="open">
     <div class="modal-box max-h-[90vh] w-[min(54rem,calc(100vw-1rem))] max-w-none overflow-y-auto">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
@@ -339,7 +348,12 @@ function onConfirmOk() {
         </div>
         <div>
           <label class="label py-0 text-xs">启用</label>
-          <OptionTreeSelect v-model="form.启用" :options="yesNoOptions" placeholder="—" size="sm" />
+          <OptionTreeSelect
+            v-model="form.启用"
+            :options="yesNoOptions"
+            placeholder="—"
+            size="sm"
+          />
         </div>
         <div>
           <label class="label py-0 text-xs">说明</label><input v-model="form.说明" class="input input-bordered input-sm w-full">
@@ -370,11 +384,7 @@ function onConfirmOk() {
             </tr>
           </thead>
           <tbody v-draggable="[rules, dragOpts]">
-            <tr
-              v-for="(r, i) in rules"
-              :key="r._uid || r.编号 || i"
-              class="cursor-pointer hover"
-            >
+            <tr v-for="(r, i) in rules" :key="r._uid || r.编号 || i" class="cursor-pointer hover">
               <td>
                 <span
                   class="drag-handle flex hover:text-base-content items-center justify-center select-none text-base-content/30 text-xs"
@@ -415,9 +425,9 @@ function onConfirmOk() {
 
           <div v-if="previewFields.length" class="grid grid-cols-2 gap-2 md:grid-cols-3">
             <FieldInput
+              v-model="previewInputs[f.字段键]"
               v-for="f in previewFields"
               :key="f.字段键"
-              v-model="previewInputs[f.字段键]"
               :field="f"
               :optionGroupsData="store['选项组']"
               :optionItems="store['选项值']"
@@ -426,11 +436,16 @@ function onConfirmOk() {
           <div v-else class="text-xs opacity-50">无输入字段</div>
 
           <div v-if="previewResult" class="mt-3 space-y-2">
-            <table v-if="Object.keys(previewResult.results || {}).length" class="table table-xs bg-base-200">
+            <table
+              v-if="Object.keys(previewResult.results || {}).length"
+              class="table table-xs bg-base-200"
+            >
               <tbody>
                 <tr v-for="(val, key) in previewResult.results" :key="key">
                   <td class="font-mono">{{ key }}</td>
-                  <td class="text-right">{{ typeof val === 'number' ? Number(val).toFixed(4) : val }}</td>
+                  <td class="text-right">
+                    {{ typeof val === "number" ? Number(val).toFixed(4) : val }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -440,7 +455,10 @@ function onConfirmOk() {
               <div v-for="err in previewResult.errors" :key="err">{{ err }}</div>
             </div>
 
-            <details v-if="Object.keys(previewResult.traces || {}).length" class="collapse collapse-arrow bg-base-200">
+            <details
+              v-if="Object.keys(previewResult.traces || {}).length"
+              class="collapse collapse-arrow bg-base-200"
+            >
               <summary class="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">命中</summary>
               <div class="collapse-content px-3 pb-2 text-xs">
                 <div v-for="(trace, key) in previewResult.traces" :key="key" class="break-all">

@@ -7,7 +7,7 @@ const store = useActivationStore();
 const code = ref("");
 const fingerprint = ref("");
 const loading = ref(false);
-const response = ref<any>(null);
+const response = ref < any > (null);
 
 onMounted(async () => {
   fingerprint.value = await getFingerprint();
@@ -15,7 +15,8 @@ onMounted(async () => {
 
 async function handleActivate() {
   const trimmed = code.value.trim();
-  if (!trimmed) return;
+  if (!trimmed)
+    return;
   loading.value = true;
   const res = await store.activate(trimmed);
   response.value = res;
@@ -24,7 +25,8 @@ async function handleActivate() {
 
 async function handleValidate() {
   const trimmed = code.value.trim();
-  if (!trimmed) return;
+  if (!trimmed)
+    return;
   loading.value = true;
   const res = await validateCode(trimmed);
   response.value = res;
@@ -36,9 +38,11 @@ async function handleClear() {
   response.value = null;
 }
 
-function statusBadge(s: string) {
-  if (s === "activated") return "badge-success";
-  if (s === "checking") return "badge-info";
+function statusBadge(s) {
+  if (s === "activated")
+    return "badge-success";
+  if (s === "checking")
+    return "badge-info";
   return "badge-warning";
 }
 </script>
@@ -75,12 +79,8 @@ function statusBadge(s: string) {
             <span v-if="loading" class="loading loading-spinner loading-xs" />
             激活
           </button>
-          <button @click="handleValidate" class="btn btn-sm" :disabled="loading">
-            校验
-          </button>
-          <button @click="handleClear" class="btn btn-sm btn-ghost">
-            清除
-          </button>
+          <button @click="handleValidate" class="btn btn-sm" :disabled="loading">校验</button>
+          <button @click="handleClear" class="btn btn-sm btn-ghost">清除</button>
         </div>
       </div>
     </div>
@@ -88,7 +88,9 @@ function statusBadge(s: string) {
     <div v-if="response" class="bg-base-100 card">
       <div class="card-body gap-2">
         <h3 class="font-bold text-sm">响应</h3>
-        <pre class="bg-base-200 overflow-auto p-3 rounded text-xs">{{ JSON.stringify(response, null, 2) }}</pre>
+        <pre class="bg-base-200 overflow-auto p-3 rounded text-xs">{{
+          JSON.stringify(response, null, 2)
+        }}</pre>
       </div>
     </div>
   </div>

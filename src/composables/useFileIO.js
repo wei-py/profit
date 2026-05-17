@@ -207,7 +207,8 @@ export function useFileIO() {
     configStore.loading = true;
     try {
       const resp = await fetch(url);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok)
+        throw new Error(`HTTP ${resp.status}`);
       const buffer = await resp.arrayBuffer();
       await configStore.loadFromBuffer(buffer, null, { remote: true, remoteUrl: url });
       await saveLastPath("lastRemoteUrl", url);
@@ -216,7 +217,7 @@ export function useFileIO() {
     catch (e) {
       configStore.loading = false;
       configStore.error = `远程配置加载失败: ${e.message}`;
-      return { success: false, error: e.message };
+      return { error: e.message, success: false };
     }
   }
 

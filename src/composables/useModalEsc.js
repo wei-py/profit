@@ -28,8 +28,7 @@ export function useModalEsc(openSource, close) {
     (open) => {
       if (open)
         add(id);
-      else
-        remove(id);
+      else remove(id);
     },
     { immediate: true },
   );

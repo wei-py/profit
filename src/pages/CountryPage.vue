@@ -103,7 +103,10 @@ function sortOptionGroups(groups) {
       if (na !== nb)
         return na - nb;
     }
-    return String(a?.名称 || a?.编号 || "").localeCompare(String(b?.名称 || b?.编号 || ""), "zh-Hans-CN");
+    return String(a?.名称 || a?.编号 || "").localeCompare(
+      String(b?.名称 || b?.编号 || ""),
+      "zh-Hans-CN",
+    );
   });
 }
 
@@ -187,7 +190,11 @@ function collectDescendantIds(rootId) {
   while (changed) {
     changed = false;
     for (const g of store["选项组"]) {
-      if (g.父级编号 && (ids.has(g.父级编号) || g.父级编号 === rootId || g.编号 === rootId) && !ids.has(g.编号)) {
+      if (
+        g.父级编号
+        && (ids.has(g.父级编号) || g.父级编号 === rootId || g.编号 === rootId)
+        && !ids.has(g.编号)
+      ) {
         ids.add(g.编号);
         changed = true;
       }
@@ -258,12 +265,10 @@ function reorderOptionGroupsForCurrentCountry() {
       return;
     orderedCountryGroups.push(group);
     appendedIds.add(group.编号);
-    for (const child of sortOptionGroups(byParent.get(group.编号) || []))
-      appendTree(child);
+    for (const child of sortOptionGroups(byParent.get(group.编号) || [])) appendTree(child);
   };
 
-  for (const root of localOptGroups.value)
-    appendTree(root);
+  for (const root of localOptGroups.value) appendTree(root);
 
   for (const group of expOptGroupsSource.value) {
     if (!appendedIds.has(group.编号))
@@ -370,10 +375,16 @@ onMounted(() => {
             打开配置
           </button>
           <div class="dropdown dropdown-end">
-            <button class="btn btn-outline btn-sm rounded-l-none border-l-base-300 border-l-0" tabindex="0">
+            <button
+              class="btn btn-outline btn-sm rounded-l-none border-l-base-300 border-l-0"
+              tabindex="0"
+            >
               ▼
             </button>
-            <ul class="dropdown-content menu bg-base-200 rounded-box z-10 w-40 p-1 shadow-sm" tabindex="0">
+            <ul
+              class="dropdown-content menu bg-base-200 rounded-box z-10 w-40 p-1 shadow-sm"
+              tabindex="0"
+            >
               <li><button @click="openConfigExcel" class="text-xs">📁 本地文件</button></li>
               <li><button @click="showRemoteModal = true" class="text-xs">🔗 远程链接</button></li>
             </ul>
@@ -426,7 +437,12 @@ onMounted(() => {
                   <th class="w-24">操作</th>
                 </tr>
               </thead>
-              <tbody v-draggable="[local国家平台, { ...dragOptsCountry, onStart: onCountryDragStart, onEnd: onCountryDragEnd }]">
+              <tbody
+                v-draggable="[
+                  local国家平台,
+                  { ...dragOptsCountry, onStart: onCountryDragStart, onEnd: onCountryDragEnd },
+                ]"
+              >
                 <template v-for="(row, ri) in local国家平台" :key="row.编号 || ri">
                   <tr
                     class="country-main-row hover"
@@ -478,7 +494,10 @@ onMounted(() => {
                             <div v-if="!localFields.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else v-draggable="[localFields, { ...dragOpts, onEnd: onFieldsDragEnd }]">
+                            <div
+                              v-else
+                              v-draggable="[localFields, { ...dragOpts, onEnd: onFieldsDragEnd }]"
+                            >
                               <div
                                 v-for="(f, i) in localFields"
                                 :key="f.字段键 || i"
@@ -513,7 +532,17 @@ onMounted(() => {
                             <div v-if="!localOptGroups.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else v-draggable="[localOptGroups, { ...dragOptsOptionGroup, onStart: onOptionGroupDragStart, onEnd: onOptionGroupsDragEnd }]">
+                            <div
+                              v-else
+                              v-draggable="[
+                                localOptGroups,
+                                {
+                                  ...dragOptsOptionGroup,
+                                  onStart: onOptionGroupDragStart,
+                                  onEnd: onOptionGroupsDragEnd,
+                                },
+                              ]"
+                            >
                               <div
                                 v-for="(group, i) in localOptGroups"
                                 :key="group.编号 || i"
@@ -532,7 +561,10 @@ onMounted(() => {
                                     {{ group.名称 || group.编号 || "(新)" }}
                                     <span class="text-base-content/40">{{ group.编号 }}</span>
                                   </span>
-                                  <span v-if="collectDescendantIds(group.编号).size" class="badge badge-ghost badge-xs">子级</span>
+                                  <span
+                                    v-if="collectDescendantIds(group.编号).size"
+                                    class="badge badge-ghost badge-xs"
+                                  >子级</span>
                                 </span>
                                 <button
                                   @click="deleteOptGroup(group)"
@@ -553,7 +585,13 @@ onMounted(() => {
                             <div v-if="!localTemplates.length" class="text-base-content/40 text-xs">
                               暂无
                             </div>
-                            <div v-else v-draggable="[localTemplates, { ...dragOpts, onEnd: onTemplatesDragEnd }]">
+                            <div
+                              v-else
+                              v-draggable="[
+                                localTemplates,
+                                { ...dragOpts, onEnd: onTemplatesDragEnd },
+                              ]"
+                            >
                               <div
                                 v-for="(t, i) in localTemplates"
                                 :key="t.编号 || i"
@@ -627,9 +665,6 @@ onMounted(() => {
       :items="allConfigColumns"
       :open="showConfigColModal"
     />
-    <RemoteUrlModal
-      @close="showRemoteModal = false"
-      :open="showRemoteModal"
-    />
+    <RemoteUrlModal @close="showRemoteModal = false" :open="showRemoteModal" />
   </div>
 </template>

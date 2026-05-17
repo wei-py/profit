@@ -81,7 +81,10 @@ export function orderByNumber(rows, field, fallback = Number.MAX_SAFE_INTEGER) {
     const bv = toNumber(b?.[field], fallback);
     if (av !== bv)
       return av - bv;
-    return normalizeText(a?.编号 || a?.名称 || a?.字段键).localeCompare(normalizeText(b?.编号 || b?.名称 || b?.字段键), "zh-Hans-CN");
+    return normalizeText(a?.编号 || a?.名称 || a?.字段键).localeCompare(
+      normalizeText(b?.编号 || b?.名称 || b?.字段键),
+      "zh-Hans-CN",
+    );
   });
 }
 
@@ -123,5 +126,7 @@ export function parseDelimited(value) {
 }
 
 export function displayWidth(str) {
-  return normalizeText(str).split("").reduce((sum, char) => sum + (/[^\x00-\xff]/.test(char) ? 2 : 1), 0);
+  return normalizeText(str)
+    .split("")
+    .reduce((sum, char) => sum + (/[^\x00-\xFF]/.test(char) ? 2 : 1), 0);
 }

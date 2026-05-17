@@ -24,7 +24,11 @@ export const useListStore = defineStore("list", () => {
     if (p)
       filePath.value = p;
     try {
-      const { columnOrder: order, hiddenColumns: hidden, records: rows } = await readListWorkbook(buffer);
+      const {
+        columnOrder: order,
+        hiddenColumns: hidden,
+        records: rows,
+      } = await readListWorkbook(buffer);
       records.value = withUids(rows);
       columnOrder.value = order || [];
       hiddenColumns.value = hidden || [];

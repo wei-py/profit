@@ -4,8 +4,8 @@ import { readWorkbookBuffer } from "@/services/excel-reader";
 import { buildWorkbookBuffer } from "@/services/excel-writer";
 import {
   buildCascadeSteps,
-  getCascadeDefaultValue,
   getChildGroups as getCascadeChildGroups,
+  getCascadeDefaultValue,
   getEnabledOptionItems,
   groupHasDescendants as hasOptionGroupDescendants,
   normalizeOptionGroup,
@@ -114,12 +114,18 @@ export const useConfigStore = defineStore("config", () => {
 
   function getTemplatesByCountry(cpId) {
     const countryId = normalizeId(cpId);
-    return orderByNumber(计算模板.value.filter(t => normalizeId(t.所属国家平台) === countryId && isEnabled(t)), "排序");
+    return orderByNumber(
+      计算模板.value.filter(t => normalizeId(t.所属国家平台) === countryId && isEnabled(t)),
+      "排序",
+    );
   }
 
   function getFeeRulesByTemplate(templateId) {
     const id = normalizeId(templateId);
-    return orderByNumber(费用规则.value.filter(r => normalizeId(r.所属模板) === id), "计算顺序");
+    return orderByNumber(
+      费用规则.value.filter(r => normalizeId(r.所属模板) === id),
+      "计算顺序",
+    );
   }
 
   function getFieldsByCountry(cpId) {
@@ -174,7 +180,9 @@ export const useConfigStore = defineStore("config", () => {
     const all = orderByNumber(getOptionGroupsByCountry(countryId), "排序");
     const attachChildren = parent => ({
       ...parent,
-      children: all.filter(g => normalizeId(g.父级编号) === normalizeId(parent.编号)).map(attachChildren),
+      children: all
+        .filter(g => normalizeId(g.父级编号) === normalizeId(parent.编号))
+        .map(attachChildren),
     });
     return all.filter(g => !normalizeId(g.父级编号)).map(attachChildren);
   }
@@ -182,7 +190,9 @@ export const useConfigStore = defineStore("config", () => {
   function getField(fieldKey, cpId) {
     const key = normalizeId(fieldKey);
     const countryId = normalizeId(cpId);
-    return 计算字段.value.find(f => normalizeId(f.字段键) === key && normalizeId(f.所属国家平台) === countryId);
+    return 计算字段.value.find(
+      f => normalizeId(f.字段键) === key && normalizeId(f.所属国家平台) === countryId,
+    );
   }
 
   function getTemplateParams(templateId) {
@@ -232,9 +242,6 @@ export const useConfigStore = defineStore("config", () => {
     loading,
     lookupTables,
     remoteUrl,
-    setFilePath: (p) => {
-      filePath.value = p;
-    },
     sync国家平台ColOrder,
     workbook,
     国家平台,
@@ -246,5 +253,8 @@ export const useConfigStore = defineStore("config", () => {
     费用规则,
     选项值,
     选项组,
+    setFilePath: (p) => {
+      filePath.value = p;
+    },
   };
 });

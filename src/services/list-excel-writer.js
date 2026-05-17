@@ -188,10 +188,11 @@ function generateHex32() {
 }
 
 function displayWidth(str) {
-  if (!str) return 0;
+  if (!str)
+    return 0;
   let w = 0;
   for (const ch of str) {
-    w += /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(ch) ? 2 : 1;
+    w += /[\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF]/.test(ch) ? 2 : 1;
   }
   return w;
 }
@@ -242,5 +243,10 @@ async function injectHiddenMeta(zip, hiddenColumns) {
 }
 
 function escapeXml(str) {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }

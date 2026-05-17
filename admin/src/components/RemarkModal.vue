@@ -35,9 +35,7 @@ async function handleSave() {
           placeholder="输入备注内容"
         />
         <div class="modal-action">
-          <button @click="copyTemplate" class="btn btn-sm btn-ghost">
-            复制模板
-          </button>
+          <button @click="copyTemplate" class="btn btn-sm btn-ghost">复制模板</button>
           <button @click="emit('close')" class="btn btn-sm">取消</button>
           <button @click="handleSave" class="btn btn-sm btn-primary" :disabled="saving">
             保存

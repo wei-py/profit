@@ -2,10 +2,10 @@
 import { driver } from "driver.js";
 import { computed, reactive, watch } from "vue";
 import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
-import { useConfigStore } from "@/stores/config";
-import "driver.js/dist/driver.css";
-
 import { useModalEsc } from "@/composables/useModalEsc";
+import { useConfigStore } from "@/stores/config";
+
+import "driver.js/dist/driver.css";
 
 const props = defineProps({
   cpId: String,
@@ -13,7 +13,10 @@ const props = defineProps({
   open: Boolean,
 });
 const emit = defineEmits(["close"]);
-useModalEsc(() => props.open, () => emit("close"));
+useModalEsc(
+  () => props.open,
+  () => emit("close"),
+);
 
 const store = useConfigStore();
 const form = reactive({});
@@ -96,14 +99,20 @@ const rootGroupRows = computed(() =>
     })),
 );
 
-const rootGroupOptions = computed(() => rootGroupRows.value.map(row => ({ label: row.label, value: row.group.编号 })));
+const rootGroupOptions = computed(() =>
+  rootGroupRows.value.map(row => ({ label: row.label, value: row.group.编号 })),
+);
 const fieldTypeOptions = ["数字", "文本", "下拉", "布尔"];
 const fieldLevelOptions = ["商品级", "SKU级"];
 const inputOutputOptions = ["输入", "输出"];
 const yesNoOptions = ["是", "否"];
 
-const canUseTreeDefault = computed(() =>
-  isDropdownField.value && form.选项组编号 && store["选项组"].length > 0 && store["选项值"].length > 0,
+const canUseTreeDefault = computed(
+  () =>
+    isDropdownField.value
+    && form.选项组编号
+    && store["选项组"].length > 0
+    && store["选项值"].length > 0,
 );
 
 function selectOptionGroup(groupId) {
@@ -168,7 +177,7 @@ function deleteField() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open" @cancel.prevent>
+  <dialog @cancel.prevent class="modal" :open="open">
     <div class="modal-box w-[min(32rem,calc(100vw-1rem))] max-w-none">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
@@ -190,15 +199,30 @@ function deleteField() {
         </div>
         <div data-tour="field-type">
           <label class="label py-0 text-xs">类型</label>
-          <OptionTreeSelect v-model="form.类型" :options="fieldTypeOptions" placeholder="—" size="sm" />
+          <OptionTreeSelect
+            v-model="form.类型"
+            :options="fieldTypeOptions"
+            placeholder="—"
+            size="sm"
+          />
         </div>
         <div>
           <label class="label py-0 text-xs">层级</label>
-          <OptionTreeSelect v-model="form.层级" :options="fieldLevelOptions" placeholder="—" size="sm" />
+          <OptionTreeSelect
+            v-model="form.层级"
+            :options="fieldLevelOptions"
+            placeholder="—"
+            size="sm"
+          />
         </div>
         <div>
           <label class="label py-0 text-xs">输入/输出</label>
-          <OptionTreeSelect v-model="form.输入输出" :options="inputOutputOptions" placeholder="—" size="sm" />
+          <OptionTreeSelect
+            v-model="form.输入输出"
+            :options="inputOutputOptions"
+            placeholder="—"
+            size="sm"
+          />
         </div>
         <div>
           <label class="label py-0 text-xs">单位</label>
@@ -206,18 +230,23 @@ function deleteField() {
         </div>
         <div>
           <label class="label py-0 text-xs">必填</label>
-          <OptionTreeSelect v-model="form.必填" :options="yesNoOptions" placeholder="—" size="sm" />
+          <OptionTreeSelect
+            v-model="form.必填"
+            :options="yesNoOptions"
+            placeholder="—"
+            size="sm"
+          />
         </div>
       </div>
 
       <div v-if="isDropdownField" class="mt-3">
         <label class="label py-0 text-xs">选项来源</label>
         <OptionTreeSelect
+          @update:model-value="selectOptionGroup"
           :modelValue="form.选项组编号"
           :options="rootGroupOptions"
           placeholder="选择选项来源"
           size="sm"
-          @update:modelValue="selectOptionGroup"
         />
       </div>
 
@@ -232,13 +261,13 @@ function deleteField() {
         />
         <OptionTreeSelect
           v-else-if="canUseTreeDefault"
+          @update:model-value="form.默认值 = $event"
           :modelValue="form.默认值"
           :optionGroupsData="store['选项组']"
           :optionItems="store['选项值']"
           placeholder="选择默认值"
           :rootGroupId="form.选项组编号"
           size="sm"
-          @update:modelValue="form.默认值 = $event"
         />
         <div
           v-else-if="isDropdownField"

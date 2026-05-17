@@ -1,6 +1,15 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { createFolder, deleteFile, downloadFile, getFileDownloadUrl, listFiles, renameFile, toggleFilePublic, uploadFile } from "@/api/admin";
+import {
+  createFolder,
+  deleteFile,
+  downloadFile,
+  getFileDownloadUrl,
+  listFiles,
+  renameFile,
+  toggleFilePublic,
+  uploadFile,
+} from "@/api/admin";
 
 const breadcrumb = ref([]);
 const items = ref([]);
@@ -261,14 +270,17 @@ async function handleTogglePublic(item) {
 
 function copyLink(item) {
   const url = item._publicUrl || getFileDownloadUrl(item.r2_key);
-  navigator.clipboard.writeText(url).then(() => {
-    toast.value = "链接已复制";
-    setTimeout(() => {
-      toast.value = "";
-    }, 2000);
-  }).catch(() => {
-    error.value = "复制失败";
-  });
+  navigator.clipboard
+    .writeText(url)
+    .then(() => {
+      toast.value = "链接已复制";
+      setTimeout(() => {
+        toast.value = "";
+      }, 2000);
+    })
+    .catch(() => {
+      error.value = "复制失败";
+    });
 }
 
 async function handleDownload(item) {
@@ -316,10 +328,7 @@ async function confirmDelete() {
   >
     <!-- 面包屑 -->
     <div class="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto">
-      <button
-        @click="navigateToBreadcrumb(-1)"
-        class="btn btn-xs btn-ghost whitespace-nowrap"
-      >
+      <button @click="navigateToBreadcrumb(-1)" class="btn btn-xs btn-ghost whitespace-nowrap">
         📂 根目录
       </button>
       <template v-for="(crumb, i) in breadcrumb" :key="crumb.id">
@@ -338,18 +347,10 @@ async function confirmDelete() {
     <!-- 操作栏 -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
       <div class="flex gap-1 items-center flex-wrap">
-        <button
-          @click="startNewFolder"
-          class="btn btn-xs sm:btn-sm btn-primary"
-        >
+        <button @click="startNewFolder" class="btn btn-xs sm:btn-sm btn-primary">
           📁 新建文件夹
         </button>
-        <button
-          @click="triggerUpload"
-          class="btn btn-xs sm:btn-sm btn-ghost"
-        >
-          ⬆ 上传文件
-        </button>
+        <button @click="triggerUpload" class="btn btn-xs sm:btn-sm btn-ghost">⬆ 上传文件</button>
         <input
           @change="handleFileSelect"
           ref="uploadInput"
@@ -358,12 +359,7 @@ async function confirmDelete() {
         >
         <span class="text-xs text-base-content/50 ml-2">共 {{ items.length }} 项</span>
       </div>
-      <button
-        @click="fetchItems"
-        class="btn btn-xs sm:btn-sm btn-ghost"
-      >
-        刷新
-      </button>
+      <button @click="fetchItems" class="btn btn-xs sm:btn-sm btn-ghost">刷新</button>
     </div>
 
     <!-- 新建文件夹输入 -->
@@ -376,29 +372,14 @@ async function confirmDelete() {
         class="input input-sm input-bordered"
         placeholder="文件夹名称"
       >
-      <button
-        @click="confirmNewFolder"
-        class="btn btn-sm btn-primary"
-      >
-        确认
-      </button>
-      <button
-        @click="cancelNewFolder"
-        class="btn btn-sm btn-ghost"
-      >
-        取消
-      </button>
+      <button @click="confirmNewFolder" class="btn btn-sm btn-primary">确认</button>
+      <button @click="cancelNewFolder" class="btn btn-sm btn-ghost">取消</button>
     </div>
 
     <!-- 错误 -->
     <div v-if="error" class="alert alert-error">
       <span>{{ error }}</span>
-      <button
-        @click="error = ''"
-        class="btn btn-xs btn-ghost"
-      >
-        ✕
-      </button>
+      <button @click="error = ''" class="btn btn-xs btn-ghost">✕</button>
     </div>
 
     <!-- 加载 -->
@@ -455,13 +436,11 @@ async function confirmDelete() {
             <td class="text-xs text-base-content/60">{{ typeLabel(item) }}</td>
             <!-- 大小 -->
             <td class="text-xs text-base-content/60">
-              {{ item.type === 'folder' ? '-' : formatSize(item.size) }}
+              {{ item.type === "folder" ? "-" : formatSize(item.size) }}
             </td>
             <!-- 公开 -->
             <td>
-              <div v-if="item.type === 'folder'" class="text-base-content/30 text-xs">
-                -
-              </div>
+              <div v-if="item.type === 'folder'" class="text-base-content/30 text-xs">-</div>
               <div v-else class="flex items-center gap-1">
                 <input
                   @change="handleTogglePublic(item)"
@@ -491,23 +470,11 @@ async function confirmDelete() {
                 >
                   打开
                 </button>
-                <button
-                  v-else
-                  @click="handleDownload(item)"
-                  class="btn btn-xs btn-ghost"
-                >
+                <button v-else @click="handleDownload(item)" class="btn btn-xs btn-ghost">
                   下载
                 </button>
-                <button
-                  @click="startRename(item)"
-                  class="btn btn-xs btn-ghost"
-                >
-                  改名
-                </button>
-                <button
-                  @click="handleDelete(item)"
-                  class="btn btn-xs btn-ghost text-error"
-                >
+                <button @click="startRename(item)" class="btn btn-xs btn-ghost">改名</button>
+                <button @click="handleDelete(item)" class="btn btn-xs btn-ghost text-error">
                   删除
                 </button>
               </div>
@@ -518,8 +485,15 @@ async function confirmDelete() {
     </div>
 
     <!-- 文件卡片 (移动端) -->
-    <div v-if="!loading && items.length > 0" class="sm:hidden flex flex-col gap-2 overflow-auto flex-1">
-      <div v-for="item in items" :key="item.id" class="bg-base-100 border border-base-300 card card-sm">
+    <div
+      v-if="!loading && items.length > 0"
+      class="sm:hidden flex flex-col gap-2 overflow-auto flex-1"
+    >
+      <div
+        v-for="item in items"
+        :key="item.id"
+        class="bg-base-100 border border-base-300 card card-sm"
+      >
         <div class="card-body p-3">
           <div class="flex items-center justify-between">
             <span class="font-semibold text-sm truncate mr-2">{{ item.name }}</span>
@@ -528,21 +502,23 @@ async function confirmDelete() {
             <span>{{ typeLabel(item) }}</span>
             <span v-if="item.type !== 'folder'">· {{ formatSize(item.size) }}</span>
           </div>
-          <div class="text-xs text-base-content/50">
-            修改: {{ timeLabel(item.updated_at) }}
-          </div>
+          <div class="text-xs text-base-content/50">修改: {{ timeLabel(item.updated_at) }}</div>
           <div class="flex gap-1 mt-1">
             <template v-if="item.type === 'folder'">
               <button @click="enterFolder(item)" class="btn btn-xs btn-outline flex-1">打开</button>
             </template>
             <template v-else>
-              <button @click="handleDownload(item)" class="btn btn-xs btn-outline flex-1">下载</button>
+              <button @click="handleDownload(item)" class="btn btn-xs btn-outline flex-1">
+                下载
+              </button>
             </template>
             <button
               v-if="editingId !== item.id"
               @click="startRename(item)"
               class="btn btn-xs btn-ghost"
-            >改名</button>
+            >
+              改名
+            </button>
             <div v-else class="flex items-center gap-1">
               <input
                 v-model="editName"
@@ -552,7 +528,9 @@ async function confirmDelete() {
                 class="input input-xs input-bordered w-24"
               >
             </div>
-            <button @click="handleDelete(item)" class="btn btn-xs btn-ghost text-error">删除</button>
+            <button @click="handleDelete(item)" class="btn btn-xs btn-ghost text-error">
+              删除
+            </button>
           </div>
           <div v-if="item.type !== 'folder'" class="flex items-center gap-1 mt-1 text-xs">
             <input
@@ -592,18 +570,8 @@ async function confirmDelete() {
           同名文件 <span class="font-mono">{{ conflictFile.name }}</span> 已存在，是否覆盖？
         </p>
         <div class="modal-action">
-          <button
-            @click="conflictFile = null"
-            class="btn btn-sm"
-          >
-            取消
-          </button>
-          <button
-            @click="confirmOverwrite"
-            class="btn btn-sm btn-warning"
-          >
-            覆盖
-          </button>
+          <button @click="conflictFile = null" class="btn btn-sm">取消</button>
+          <button @click="confirmOverwrite" class="btn btn-sm btn-warning">覆盖</button>
         </div>
       </div>
       <form class="modal-backdrop" method="dialog">
@@ -622,18 +590,8 @@ async function confirmDelete() {
           吗？此操作不可恢复。
         </p>
         <div class="modal-action">
-          <button
-            @click="deleteTarget = null"
-            class="btn btn-sm"
-          >
-            取消
-          </button>
-          <button
-            @click="confirmDelete"
-            class="btn btn-sm btn-error"
-          >
-            确认删除
-          </button>
+          <button @click="deleteTarget = null" class="btn btn-sm">取消</button>
+          <button @click="confirmDelete" class="btn btn-sm btn-error">确认删除</button>
         </div>
       </div>
       <form class="modal-backdrop" method="dialog">

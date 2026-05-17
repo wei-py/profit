@@ -4,33 +4,34 @@ import { isBlank, normalizeText, parseDelimited, readJson, toNumber, toRate } fr
 
 const ENABLED_VALUES = new Set(["是", "TRUE", "true", "1", "启用", ""]);
 const FUNCTION_ALIASES = {
-  如果: "IF",
   且: "AND",
-  或: "OR",
+  最大值: "MAX",
+  最小值: "MIN",
   取整: "ROUND",
   向上取整: "CEIL",
   向下取整: "FLOOR",
+  如果: "IF",
+  或: "OR",
   绝对值: "ABS",
-  最大值: "MAX",
-  最小值: "MIN",
 };
 
 const FORMULA_FUNCTIONS = {
   ABS: Math.abs,
-  AND: (...args) => args.every(Boolean) ? 1 : 0,
+  CEIL: Math.ceil,
+  FLOOR: Math.floor,
+  AND: (...args) => (args.every(Boolean) ? 1 : 0),
   AVG: (...args) => {
     const nums = args.map(v => toNumber(v, 0));
     return nums.length ? nums.reduce((s, n) => s + n, 0) / nums.length : 0;
   },
-  CEIL: Math.ceil,
-  CLAMP: (value, min, max) => Math.min(Math.max(toNumber(value, 0), toNumber(min, 0)), toNumber(max, 0)),
+  CLAMP: (value, min, max) =>
+    Math.min(Math.max(toNumber(value, 0), toNumber(min, 0)), toNumber(max, 0)),
   DIV: (a, b) => (toNumber(b, 0) === 0 ? 0 : toNumber(a, 0) / toNumber(b, 0)),
-  FLOOR: Math.floor,
   IF: (cond, yes, no) => (cond ? yes : no),
   MAX: (...args) => Math.max(...args.map(v => toNumber(v, 0))),
   MIN: (...args) => Math.min(...args.map(v => toNumber(v, 0))),
   MUL: (...args) => args.map(v => toNumber(v, 0)).reduce((s, n) => s * n, 1),
-  OR: (...args) => args.some(Boolean) ? 1 : 0,
+  OR: (...args) => (args.some(Boolean) ? 1 : 0),
   PCT: value => toRate(value, 0),
   ROUND: (value, digits = 2) => {
     const factor = 10 ** toNumber(digits, 0);
@@ -47,7 +48,9 @@ export function execute(feeRules, lookupTables, userInputs) {
     ...(userInputs || {}),
   };
 
-  const enabled = (feeRules || []).filter(rule => ENABLED_VALUES.has(normalizeText(rule.启用 || "是")));
+  const enabled = (feeRules || []).filter(rule =>
+    ENABLED_VALUES.has(normalizeText(rule.启用 || "是")),
+  );
   const sorted = XEUtils.orderBy(enabled, [rule => toNumber(rule.计算顺序, 0)], ["asc"]);
 
   for (const rule of sorted) {
@@ -105,8 +108,16 @@ export function evalConditions(rule, context) {
     const field = normalizeText(rule[`条件${i}字段`]);
     if (!field)
       continue;
-    if (!matches(getVal(field, context), rule[`条件${i}运算符`], rule[`条件${i}值`], rule[`条件${i}值2`]))
+    if (
+      !matches(
+        getVal(field, context),
+        rule[`条件${i}运算符`],
+        rule[`条件${i}值`],
+        rule[`条件${i}值2`],
+      )
+    ) {
       return false;
+    }
   }
   return true;
 }
@@ -148,7 +159,15 @@ function evalLegacyStruct(structure, rule, context) {
       if (i < 1 || i > 4)
         return true;
       const field = normalizeText(rule[`条件${i}字段`]);
-      return !field || matches(getVal(field, context), rule[`条件${i}运算符`], rule[`条件${i}值`], rule[`条件${i}值2`]);
+      return (
+        !field
+        || matches(
+          getVal(field, context),
+          rule[`条件${i}运算符`],
+          rule[`条件${i}值`],
+          rule[`条件${i}值2`],
+        )
+      );
     });
     if (ok)
       return true;
@@ -321,8 +340,7 @@ function compileFormula(formula, context) {
   let expr = formula;
   const traceParts = [];
 
-  for (const [cn, en] of Object.entries(FUNCTION_ALIASES))
-    expr = expr.replaceAll(cn, en);
+  for (const [cn, en] of Object.entries(FUNCTION_ALIASES)) expr = expr.replaceAll(cn, en);
 
   expr = expr.replace(/\{([^{}]+)\}/g, (_, fieldKey) => {
     const value = toNumber(getVal(fieldKey.trim(), context), 0);

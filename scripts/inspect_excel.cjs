@@ -27,9 +27,11 @@ for (const name of wb.SheetNames) {
 const rules = sheetToRows(wb, "费用规则");
 const templates = sheetToRows(wb, "计算模板");
 console.log("\n模板:");
-for (const tpl of templates)
-  console.log(`  - ${tpl.编号} ${tpl.名称} (${tpl.所属国家平台})`);
+for (const tpl of templates) console.log(`  - ${tpl.编号} ${tpl.名称} (${tpl.所属国家平台})`);
 
 console.log("\n规则:");
-for (const rule of rules)
-  console.log(`  - ${rule.所属模板} / ${rule.计算顺序} / ${rule.编号} / ${rule.计算方式} -> ${rule.输出字段键}`);
+for (const rule of rules) {
+  console.log(
+    `  - ${rule.所属模板} / ${rule.计算顺序} / ${rule.编号} / ${rule.计算方式} -> ${rule.输出字段键}`,
+  );
+}

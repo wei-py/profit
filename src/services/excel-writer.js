@@ -15,9 +15,10 @@ export async function buildWorkbookBuffer(config) {
     const data = config[name] || [];
     if (!data.length && name !== "模板参数")
       continue;
-    const preferred = name === "国家平台" && config.国家平台ColOrder?.length
-      ? config.国家平台ColOrder
-      : CONFIG_HEADERS[name] || [];
+    const preferred
+      = name === "国家平台" && config.国家平台ColOrder?.length
+        ? config.国家平台ColOrder
+        : CONFIG_HEADERS[name] || [];
     appendSheet(wb, name, data, preferred);
   }
 
@@ -52,8 +53,7 @@ function appendSheet(wb, name, data, preferred = []) {
 
   ws.columns.forEach((col, index) => {
     let maxW = displayWidth(keys[index]);
-    for (const row of data || [])
-      maxW = Math.max(maxW, displayWidth(row?.[keys[index]]));
+    for (const row of data || []) maxW = Math.max(maxW, displayWidth(row?.[keys[index]]));
     col.width = Math.max(MIN_W, Math.min(MAX_W, maxW + PAD));
   });
 }
@@ -61,8 +61,7 @@ function appendSheet(wb, name, data, preferred = []) {
 function appendMetaSheet(wb, meta) {
   const ws = wb.addWorksheet(META_SHEET_NAME);
   ws.addRow(["key", "value"]);
-  for (const [key, value] of Object.entries(meta))
-    ws.addRow([key, JSON.stringify(value)]);
+  for (const [key, value] of Object.entries(meta)) ws.addRow([key, JSON.stringify(value)]);
   ws.state = "hidden";
 }
 
@@ -87,5 +86,7 @@ function collectKeys(data = [], preferred = []) {
 }
 
 function safeSheetName(name) {
-  return String(name || "Sheet").slice(0, 31).replace(/[\\/?*\[\]:]/g, "_");
+  return String(name || "Sheet")
+    .slice(0, 31)
+    .replace(/[\\/?*[\]:]/g, "_");
 }

@@ -1,9 +1,9 @@
 {
-  "version": "0.1.0",
-  "released_at": "2026-05-16T10:00:00Z",
-  "release_notes": "新版本说明",
-  "force": false,
-  "download_url": "https://example.com/download",
   "download_size": 52428800,
-  "signature": ""
+  "download_url": "https://example.com/download",
+  "force": false,
+  "release_notes": "新版本说明",
+  "released_at": "2026-05-16T10:00:00Z",
+  "signature": "",
+  "version": "0.1.0"
 }

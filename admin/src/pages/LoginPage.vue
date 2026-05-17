@@ -77,11 +77,7 @@ async function handleLogin() {
           >
         </label>
 
-        <button
-          @click="handleLogin"
-          class="btn btn-primary"
-          :disabled="loading"
-        >
+        <button @click="handleLogin" class="btn btn-primary" :disabled="loading">
           <span v-if="loading" class="loading loading-spinner" />
           登录
         </button>

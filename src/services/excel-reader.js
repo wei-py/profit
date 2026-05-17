@@ -34,7 +34,13 @@ function readConfigWorkbook(wb) {
 }
 
 function collectLookupSheetNames(sheetNames, rules) {
-  const standard = new Set([...REQUIRED_CONFIG_SHEETS, "模板参数", "配置说明", "规则字典", META_SHEET_NAME]);
+  const standard = new Set([
+    ...REQUIRED_CONFIG_SHEETS,
+    "模板参数",
+    "配置说明",
+    "规则字典",
+    META_SHEET_NAME,
+  ]);
   const refs = new Set();
 
   for (const rule of rules || []) {

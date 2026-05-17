@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const XLSX = require("xlsx");
 const XEUtils = require("xe-utils");
+const XLSX = require("xlsx");
 const { CONFIG_HEADERS } = require("./config-schema.cjs");
 
 function normalizeText(value) {
@@ -62,8 +62,7 @@ function cleanRows(rows, sheetName = "") {
   return (rows || [])
     .map((row) => {
       const next = {};
-      for (const header of headers)
-        next[header] = normalizeCell(row?.[header]);
+      for (const header of headers) next[header] = normalizeCell(row?.[header]);
       for (const [key, value] of Object.entries(row || {})) {
         if (key && !(key in next))
           next[key] = normalizeCell(value);
@@ -80,11 +79,21 @@ function normalizeCell(value) {
 
 function displayWidth(header, rows, index) {
   const values = [header, ...(rows || []).map(row => Object.values(row || {})[index])];
-  return XEUtils.max(values.map(value => normalizeText(value).split("").reduce((sum, char) => sum + (/[^\x00-\xff]/.test(char) ? 2 : 1), 0))) || 8;
+  return (
+    XEUtils.max(
+      values.map(value =>
+        normalizeText(value)
+          .split("")
+          .reduce((sum, char) => sum + (/[^\x00-\xFF]/.test(char) ? 2 : 1), 0),
+      ),
+    ) || 8
+  );
 }
 
 function safeSheetName(name) {
-  return String(name || "Sheet").replace(/[\\/?*\[\]:]/g, "_").slice(0, 31);
+  return String(name || "Sheet")
+    .replace(/[\\/?*[\]:]/g, "_")
+    .slice(0, 31);
 }
 
 function ensureDir(dir) {

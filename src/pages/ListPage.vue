@@ -1,6 +1,13 @@
 <script setup>
 import { previewImages } from "hevue-img-preview/v3";
 import { computed, nextTick, ref, watch } from "vue";
+import { vDraggable } from "vue-draggable-plus";
+import ColEditorModal from "@/components/common/ColEditorModal.vue";
+import FieldInput from "@/components/common/FieldInput.vue";
+import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
+import ReverseCalcModal from "@/components/list/ReverseCalcModal.vue";
+import TraceModal from "@/components/list/TraceModal.vue";
+import { useFileIO } from "@/composables/useFileIO";
 import {
   groupRecordsByProductId,
   inferVariantAttributes,
@@ -10,13 +17,6 @@ import {
   normalizeProductId,
   normalizeVariantValues,
 } from "@/domain/product-records";
-import { vDraggable } from "vue-draggable-plus";
-import ColEditorModal from "@/components/common/ColEditorModal.vue";
-import FieldInput from "@/components/common/FieldInput.vue";
-import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
-import ReverseCalcModal from "@/components/list/ReverseCalcModal.vue";
-import TraceModal from "@/components/list/TraceModal.vue";
-import { useFileIO } from "@/composables/useFileIO";
 import { useConfigStore } from "@/stores/config";
 import { useCreateStore } from "@/stores/create";
 import { useListStore } from "@/stores/list";
@@ -40,20 +40,20 @@ const skuDragOpts = {
   ...baseDragOpts,
   draggable: ".sku-draggable-row",
   handle: ".sku-drag-handle",
+  onEnd: onSkuDragEnd,
   onStart: () => {
     isDraggingSku.value = true;
   },
-  onEnd: onSkuDragEnd,
 };
 
 const recordGroupDragOpts = {
   ...baseDragOpts,
   draggable: ".product-record-group",
   handle: ".record-group-drag-handle",
+  onEnd: onRecordGroupDragEnd,
   onStart: () => {
     isDraggingRecordGroup.value = true;
   },
-  onEnd: onRecordGroupDragEnd,
 };
 const RESERVED_LIST_COLUMNS = new Set(["_uid", "操作"]);
 
@@ -73,14 +73,18 @@ const availableTemplates = computed(() =>
     ? configStore.getTemplatesByCountry(createStore.selectedCountryId)
     : [],
 );
-const countryOptions = computed(() => enabledCountries.value.map(c => ({
-  label: `${c.国家} - ${c.平台}`,
-  value: c.编号,
-})));
-const templateOptions = computed(() => availableTemplates.value.map(t => ({
-  label: t.名称,
-  value: t.编号,
-})));
+const countryOptions = computed(() =>
+  enabledCountries.value.map(c => ({
+    label: `${c.国家} - ${c.平台}`,
+    value: c.编号,
+  })),
+);
+const templateOptions = computed(() =>
+  availableTemplates.value.map(t => ({
+    label: t.名称,
+    value: t.编号,
+  })),
+);
 
 function handleCalculate() {
   createStore.calculateAll();
@@ -92,10 +96,15 @@ function handleSaveToList() {
   if (!rows.length)
     return;
 
-  if (isEditingProduct.value)
-    listStore.replaceRecordsByProductId(editingSourceProductId.value || createStore.productId, rows);
-  else
+  if (isEditingProduct.value) {
+    listStore.replaceRecordsByProductId(
+      editingSourceProductId.value || createStore.productId,
+      rows,
+    );
+  }
+  else {
     listStore.addRecords(rows);
+  }
 
   clearEditMode();
 }
@@ -134,7 +143,9 @@ const recordCardExpanded = ref(localStorage.getItem("recordCardExpanded") === "t
 const editingSourceProductId = ref("");
 const editingRecordUids = ref(new Set());
 
-const isEditingProduct = computed(() => !!editingSourceProductId.value || editingRecordUids.value.size > 0);
+const isEditingProduct = computed(
+  () => !!editingSourceProductId.value || editingRecordUids.value.size > 0,
+);
 const createPanelTitle = computed(() => (isEditingProduct.value ? "修改商品" : "新建商品"));
 
 watch(skuCardExpanded, v => localStorage.setItem("skuCardExpanded", String(v)));
@@ -150,9 +161,8 @@ const skuAllFields = computed(() => {
 
 const skuColDisplay = computed(() => {
   const all = skuAllFields.value;
-  const order = skuColOrder.value.length && skuColOrder.value.length === all.length
-    ? skuColOrder.value
-    : all;
+  const order
+    = skuColOrder.value.length && skuColOrder.value.length === all.length ? skuColOrder.value : all;
   const hiddenSet = new Set(skuHiddenKeys.value);
   return order.filter(k => !hiddenSet.has(k));
 });
@@ -222,11 +232,7 @@ function syncPagedRecordGroups() {
   pagedRecordGroups.value = [...(recordGroupPages.value[currentPage.value - 1] || [])];
 }
 
-watch(
-  [recordGroupPages, currentPage, pageSize],
-  syncPagedRecordGroups,
-  { immediate: true },
-);
+watch([recordGroupPages, currentPage, pageSize], syncPagedRecordGroups, { immediate: true });
 
 const skuPage = ref(1);
 const skuPageSize = ref(20);
@@ -238,7 +244,8 @@ function syncPagedSkus() {
   if (isDraggingSku.value)
     return;
   const start = skuPageOffset.value;
-  pagedSkus.value = createStore.skus.slice(start, start + skuPageSize.value)
+  pagedSkus.value = createStore.skus
+    .slice(start, start + skuPageSize.value)
     .map((sku, i) => ({ origIdx: start + i, sku }));
 }
 
@@ -503,29 +510,33 @@ async function loadRecordBack(idx) {
   createStore.productId = firstRow["商品ID"] || "";
   createStore.productName = firstRow["商品名称"] || "";
 
-  for (const k of Object.keys(createStore.productInputs))
-    delete createStore.productInputs[k];
+  for (const k of Object.keys(createStore.productInputs)) delete createStore.productInputs[k];
   for (const f of createStore.productFields)
     createStore.productInputs[f.字段键] = firstRow[f.字段键] ?? "";
 
-  const variantAttrs = inferVariantAttributes(relatedRows, configStore.getFieldsByCountry(createStore.selectedCountryId));
+  const variantAttrs = inferVariantAttributes(
+    relatedRows,
+    configStore.getFieldsByCountry(createStore.selectedCountryId),
+  );
   createStore.variantAttributes = variantAttrs;
   if (!variantAttrs.length && relatedRows.length > 1)
     buildSkuRowsWithoutVariants(relatedRows);
-  else
-    createStore.generateSkus();
+  else createStore.generateSkus();
 
-  const skuByKey = new Map(createStore.skus.map(sku => [makeVariantKeyFromAttrs(sku.attrs, variantAttrs), sku]));
+  const skuByKey = new Map(
+    createStore.skus.map(sku => [makeVariantKeyFromAttrs(sku.attrs, variantAttrs), sku]),
+  );
   relatedRows.forEach((sourceRow, rowIndex) => {
     const key = makeVariantKeyFromRow(sourceRow, variantAttrs);
-    const sku = variantAttrs.length ? skuByKey.get(key) : createStore.skus[rowIndex] || createStore.skus[0];
+    const sku = variantAttrs.length
+      ? skuByKey.get(key)
+      : createStore.skus[rowIndex] || createStore.skus[0];
     if (!sku)
       return;
 
     sku.skuCode = sourceRow["SKU码"] || "";
     sku.images = sourceRow["图片"] || "";
-    for (const f of createStore.skuInputFields)
-      sku.inputs[f.字段键] = sourceRow[f.字段键] ?? "";
+    for (const f of createStore.skuInputFields) sku.inputs[f.字段键] = sourceRow[f.字段键] ?? "";
     for (const f of createStore.skuOutputFields) {
       if (sourceRow[f.字段键] !== undefined)
         sku.results[f.字段键] = sourceRow[f.字段键];
@@ -555,7 +566,6 @@ function buildSkuRowsWithoutVariants(rows) {
   );
 }
 
-
 const jumpPage = ref("");
 const jumpSkuPage = ref("");
 
@@ -574,7 +584,6 @@ function handleJumpSkuPage() {
     jumpSkuPage.value = "";
   }
 }
-
 </script>
 
 <template>
@@ -597,7 +606,10 @@ function handleJumpSkuPage() {
           <div class="flex items-center justify-between gap-2">
             <h2 class="card-title text-lg">
               {{ createPanelTitle }}
-              <span v-if="isEditingProduct" class="badge badge-primary badge-sm">商品ID：{{ editingSourceProductId || createStore.productId }}</span>
+              <span
+                v-if="isEditingProduct"
+                class="badge badge-primary badge-sm"
+              >商品ID：{{ editingSourceProductId || createStore.productId }}</span>
             </h2>
             <button
               v-if="isEditingProduct"
@@ -667,7 +679,11 @@ function handleJumpSkuPage() {
                   >
                 </div>
                 <div class="font-semibold pt-2 text-sm">变体属性</div>
-                <div v-for="(attr, i) in createStore.variantAttributes" :key="i" class="flex gap-1 items-center">
+                <div
+                  v-for="(attr, i) in createStore.variantAttributes"
+                  :key="i"
+                  class="flex gap-1 items-center"
+                >
                   <input
                     v-model="attr.name"
                     class="input input-bordered input-sm w-16"
@@ -722,9 +738,12 @@ function handleJumpSkuPage() {
                       class="btn btn-ghost btn-xs"
                       :title="skuCardExpanded ? '收起' : '展开'"
                     >
-                      {{ skuCardExpanded ? '收起' : '展开' }}
+                      {{ skuCardExpanded ? "收起" : "展开" }}
                     </button>
-                    <span v-if="createStore.skus.length" class="mx-1 opacity-40">{{ skuPage }}/{{ skuTotalPages }}</span>
+                    <span
+                      v-if="createStore.skus.length"
+                      class="mx-1 opacity-40"
+                    >{{ skuPage }}/{{ skuTotalPages }}</span>
                     <button @click="skuColModal = true" class="btn btn-ghost btn-xs">
                       ⚙️ 编辑列
                     </button>
@@ -831,7 +850,9 @@ function handleJumpSkuPage() {
                             ></label>
                           </template>
                           <template v-else>
-                            <span v-if="item.sku.error" class="text-error text-xs">{{ item.sku.error }}</span>
+                            <span v-if="item.sku.error" class="text-error text-xs">{{
+                              item.sku.error
+                            }}</span>
                             <template v-else-if="item.sku.results[fk] !== undefined">
                               {{
                                 isPercentCol(fk)
@@ -857,7 +878,10 @@ function handleJumpSkuPage() {
                 </template>
 
                 <template v-else-if="skuViewMode === 'card' && createStore.skus.length">
-                  <div v-draggable="[pagedSkus, skuDragOpts]" class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  <div
+                    v-draggable="[pagedSkus, skuDragOpts]"
+                    class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+                  >
                     <div
                       v-for="(item, pIdx) in pagedSkus"
                       :key="item.sku.key"
@@ -865,8 +889,13 @@ function handleJumpSkuPage() {
                       :data-drag-key="item.sku.key"
                     >
                       <div class="flex gap-1 items-center">
-                        <span class="sku-drag-handle cursor-grab select-none text-base-content/30" title="拖动排序">☰</span>
-                        <span class="font-semibold text-xs truncate">{{ item.sku.skuCode || '-' }}</span>
+                        <span
+                          class="sku-drag-handle cursor-grab select-none text-base-content/30"
+                          title="拖动排序"
+                        >☰</span>
+                        <span class="font-semibold text-xs truncate">{{
+                          item.sku.skuCode || "-"
+                        }}</span>
                         <button
                           @click="openCalcModal(item.origIdx)"
                           class="btn btn-ghost btn-xs ml-auto"
@@ -875,13 +904,24 @@ function handleJumpSkuPage() {
                           🧮
                         </button>
                       </div>
-                      <div v-if="createStore.variantAttributes.filter(a => a.name.trim()).length" class="flex flex-wrap gap-1">
-                        <span v-for="a in createStore.variantAttributes.filter(a => a.name.trim())" :key="a.name" class="badge badge-xs badge-outline">
+                      <div
+                        v-if="createStore.variantAttributes.filter((a) => a.name.trim()).length"
+                        class="flex flex-wrap gap-1"
+                      >
+                        <span
+                          v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
+                          :key="a.name"
+                          class="badge badge-xs badge-outline"
+                        >
                           {{ a.name.trim() }}: {{ item.sku.attrs[a.name.trim()] }}
                         </span>
                       </div>
                       <template v-if="skuCardExpanded">
-                        <div v-for="fk in skuColDisplay" :key="fk" class="border-t border-base-300 pt-0.5">
+                        <div
+                          v-for="fk in skuColDisplay"
+                          :key="fk"
+                          class="border-t border-base-300 pt-0.5"
+                        >
                           <template v-if="isSkuInputCol(fk)">
                             <div class="flex gap-1 items-center justify-between">
                               <span class="shrink-0 w-[40%] opacity-60 truncate">{{ fk }}</span>
@@ -897,10 +937,23 @@ function handleJumpSkuPage() {
                           </template>
                           <template v-else-if="fk === '图片'">
                             <div v-if="item.sku.images" class="group h-10 relative w-10">
-                              <img @click="openImagePreview(item.sku.images)" class="border cursor-pointer h-10 object-contain bg-base-100 w-10" :src="item.sku.images">
-                              <button @click="clearImage(item.sku)" class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4">✕</button>
+                              <img
+                                @click="openImagePreview(item.sku.images)"
+                                class="border cursor-pointer h-10 object-contain bg-base-100 w-10"
+                                :src="item.sku.images"
+                              >
+                              <button
+                                @click="clearImage(item.sku)"
+                                class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4"
+                              >
+                                ✕
+                              </button>
                             </div>
-                            <label v-else class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-8 p-0 text-base-content/30 text-lg w-8" title="上传图片">＋<input
+                            <label
+                              v-else
+                              class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-8 p-0 text-base-content/30 text-lg w-8"
+                              title="上传图片"
+                            >＋<input
                               @change="handleImageUpload(item.sku, $event)"
                               accept="image/*"
                               class="hidden"
@@ -910,10 +963,24 @@ function handleJumpSkuPage() {
                           <template v-else>
                             <div class="flex justify-between">
                               <span class="opacity-60">{{ fk }}</span>
-                              <span v-if="item.sku.error" class="text-error">{{ item.sku.error }}</span>
+                              <span v-if="item.sku.error" class="text-error">{{
+                                item.sku.error
+                              }}</span>
                               <span v-else-if="item.sku.results[fk] !== undefined">
-                                {{ isPercentCol(fk) ? `${(item.sku.results[fk] * 100).toFixed(2)}%` : typeof item.sku.results[fk] === 'number' ? item.sku.results[fk].toFixed(2) : item.sku.results[fk] }}
-                                <button v-if="item.sku.traces?.[fk]" @click="openTrace(item.sku, fk)" class="btn btn-ghost btn-xs ml-1 text-base-content/40">?</button>
+                                {{
+                                  isPercentCol(fk)
+                                    ? `${(item.sku.results[fk] * 100).toFixed(2)}%`
+                                    : typeof item.sku.results[fk] === "number"
+                                      ? item.sku.results[fk].toFixed(2)
+                                      : item.sku.results[fk]
+                                }}
+                                <button
+                                  v-if="item.sku.traces?.[fk]"
+                                  @click="openTrace(item.sku, fk)"
+                                  class="btn btn-ghost btn-xs ml-1 text-base-content/40"
+                                >
+                                  ?
+                                </button>
                               </span>
                               <span v-else class="text-base-content/30">—</span>
                             </div>
@@ -927,12 +994,27 @@ function handleJumpSkuPage() {
                 <div v-if="!createStore.skus.length" class="mt-2 text-base-content/40 text-sm">
                   选择模板后自动生成 SKU，或点击「生成SKU」手动刷新
                 </div>
-                <div v-if="createStore.skus.length" class="flex items-center justify-end gap-1 mt-2 text-xs">
-                  <input v-model.number="skuPageSize" class="input input-bordered input-xs w-12" min="1">
+                <div
+                  v-if="createStore.skus.length"
+                  class="flex items-center justify-end gap-1 mt-2 text-xs"
+                >
+                  <input
+                    v-model.number="skuPageSize"
+                    class="input input-bordered input-xs w-12"
+                    min="1"
+                  >
                   <span class="opacity-50">条/页</span>
-                  <button @click="skuPage--" class="btn btn-ghost btn-xs" :disabled="skuPage <= 1">◀</button>
+                  <button @click="skuPage--" class="btn btn-ghost btn-xs" :disabled="skuPage <= 1">
+                    ◀
+                  </button>
                   <span>{{ skuPage }}/{{ skuTotalPages }}</span>
-                  <button @click="skuPage++" class="btn btn-ghost btn-xs" :disabled="skuPage >= skuTotalPages">▶</button>
+                  <button
+                    @click="skuPage++"
+                    class="btn btn-ghost btn-xs"
+                    :disabled="skuPage >= skuTotalPages"
+                  >
+                    ▶
+                  </button>
                   <input
                     v-model="jumpSkuPage"
                     @keyup.enter="handleJumpSkuPage"
@@ -967,16 +1049,22 @@ function handleJumpSkuPage() {
                 class="btn btn-ghost btn-xs"
                 :title="recordCardExpanded ? '收起' : '展开'"
               >
-                {{ recordCardExpanded ? '收起' : '展开' }}
+                {{ recordCardExpanded ? "收起" : "展开" }}
               </button>
-              <span v-if="listStore.records.length" class="mx-1 opacity-40">{{ currentPage }}/{{ totalPages }}</span>
+              <span
+                v-if="listStore.records.length"
+                class="mx-1 opacity-40"
+              >{{ currentPage }}/{{ totalPages }}</span>
               <button @click="showColModal = true" class="btn btn-ghost btn-xs">⚙️ 编辑列</button>
             </div>
           </div>
           <div v-if="!listStore.records.length" class="text-base-content/40 text-sm">暂无</div>
           <template v-else>
             <div v-if="recordViewMode === 'table'" class="overflow-x-auto">
-              <table v-draggable="[pagedRecordGroups, recordGroupDragOpts]" class="table table-sm product-record-table">
+              <table
+                v-draggable="[pagedRecordGroups, recordGroupDragOpts]"
+                class="table table-sm product-record-table"
+              >
                 <thead>
                   <tr>
                     <th class="bg-base-100 left-0 sticky w-10 z-10" />
@@ -1040,7 +1128,11 @@ function handleJumpSkuPage() {
               </table>
             </div>
 
-            <div v-else v-draggable="[pagedRecordGroups, recordGroupDragOpts]" class="gap-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div
+              v-else
+              v-draggable="[pagedRecordGroups, recordGroupDragOpts]"
+              class="gap-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+            >
               <div
                 v-for="group in pagedRecordGroups"
                 :key="group.key"
@@ -1049,8 +1141,13 @@ function handleJumpSkuPage() {
                 :data-drag-key="group.key"
               >
                 <div class="flex gap-2 items-center border-b border-base-300 pb-1">
-                  <span class="record-group-drag-handle cursor-grab select-none text-base-content/30" title="拖动整个商品ID分组">☰</span>
-                  <span class="font-semibold truncate">{{ group.rows[0]?.['商品ID'] || group.rows[0]?.['商品名称'] || '-' }}</span>
+                  <span
+                    class="record-group-drag-handle cursor-grab select-none text-base-content/30"
+                    title="拖动整个商品ID分组"
+                  >☰</span>
+                  <span class="font-semibold truncate">{{
+                    group.rows[0]?.["商品ID"] || group.rows[0]?.["商品名称"] || "-"
+                  }}</span>
                   <span class="badge badge-xs badge-outline ml-auto">{{ group.rows.length }} SKU</span>
                 </div>
                 <div
@@ -1060,8 +1157,12 @@ function handleJumpSkuPage() {
                 >
                   <div class="flex gap-2 items-start">
                     <div class="min-w-0 flex-1">
-                      <div v-if="row['商品名称']" class="text-base-content/60 truncate">{{ row['商品名称'] }}</div>
-                      <div v-if="row['SKU码']" class="badge badge-xs badge-outline">{{ row['SKU码'] }}</div>
+                      <div v-if="row['商品名称']" class="text-base-content/60 truncate">
+                        {{ row["商品名称"] }}
+                      </div>
+                      <div v-if="row['SKU码']" class="badge badge-xs badge-outline">
+                        {{ row["SKU码"] }}
+                      </div>
                     </div>
                     <img
                       v-if="isImage(row['图片'])"
@@ -1069,15 +1170,24 @@ function handleJumpSkuPage() {
                       class="border cursor-pointer h-14 object-contain bg-base-100 w-14"
                       :src="row['图片']"
                     >
-                    <div v-else-if="isDispimg(row['图片'])" class="border flex h-14 items-center justify-center text-base-content/40 w-14">📷</div>
+                    <div
+                      v-else-if="isDispimg(row['图片'])"
+                      class="border flex h-14 items-center justify-center text-base-content/40 w-14"
+                    >
+                      📷
+                    </div>
                   </div>
                   <template v-if="recordCardExpanded">
-                    <div v-for="col in listColumns" :key="col" class="border-t border-base-300 flex justify-between pt-0.5">
+                    <div
+                      v-for="col in listColumns"
+                      :key="col"
+                      class="border-t border-base-300 flex justify-between pt-0.5"
+                    >
                       <span class="opacity-60 truncate mr-1">{{ col }}</span>
                       <span class="text-right truncate">
                         <template v-if="isImage(row[col])">📷</template>
                         <template v-else-if="isDispimg(row[col])">📷</template>
-                        <template v-else>{{ row[col] || '—' }}</template>
+                        <template v-else>{{ row[col] || "—" }}</template>
                       </span>
                     </div>
                   </template>
@@ -1089,10 +1199,7 @@ function handleJumpSkuPage() {
                     >
                       📋
                     </button>
-                    <button
-                      @click="removeRecordByRow(row)"
-                      class="btn btn-ghost btn-xs text-error"
-                    >
+                    <button @click="removeRecordByRow(row)" class="btn btn-ghost btn-xs text-error">
                       ✕
                     </button>
                   </div>
@@ -1100,12 +1207,27 @@ function handleJumpSkuPage() {
               </div>
             </div>
 
-            <div v-if="listStore.records.length" class="flex items-center justify-end gap-1 mt-2 text-xs">
+            <div
+              v-if="listStore.records.length"
+              class="flex items-center justify-end gap-1 mt-2 text-xs"
+            >
               <input v-model.number="pageSize" class="input input-bordered input-xs w-12" min="1">
               <span class="opacity-50">条/页</span>
-              <button @click="currentPage--" class="btn btn-ghost btn-xs" :disabled="currentPage <= 1">◀</button>
+              <button
+                @click="currentPage--"
+                class="btn btn-ghost btn-xs"
+                :disabled="currentPage <= 1"
+              >
+                ◀
+              </button>
               <span>{{ currentPage }}/{{ totalPages }}</span>
-              <button @click="currentPage++" class="btn btn-ghost btn-xs" :disabled="currentPage >= totalPages">▶</button>
+              <button
+                @click="currentPage++"
+                class="btn btn-ghost btn-xs"
+                :disabled="currentPage >= totalPages"
+              >
+                ▶
+              </button>
               <input
                 v-model="jumpPage"
                 @keyup.enter="handleJumpPage"

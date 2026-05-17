@@ -10,8 +10,8 @@ const props = defineProps({
     type: String,
   },
   hiddenKeys: {
-    default: () => [],
     type: Array,
+    default: () => [],
   },
   items: {
     required: true,
@@ -24,7 +24,10 @@ const props = defineProps({
   },
 });
 const emit = defineEmits(["close", "update", "update-hidden"]);
-useModalEsc(() => props.open, () => emit("close"));
+useModalEsc(
+  () => props.open,
+  () => emit("close"),
+);
 
 const localOrder = ref([]);
 const localHidden = ref(new Set());
@@ -53,8 +56,7 @@ function toggleCol(key) {
   const next = new Set(localHidden.value);
   if (next.has(key))
     next.delete(key);
-  else
-    next.add(key);
+  else next.add(key);
   localHidden.value = next;
 }
 
@@ -67,15 +69,20 @@ function saveOrder() {
 
 <template>
   <div v-if="open" class="modal modal-open">
-    <div class="max-h-[80vh] modal-box" style="width: min(48rem, calc(100vw - 1rem));">
+    <div class="max-h-[80vh] modal-box" style="width: min(48rem, calc(100vw - 1rem))">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
           {{ title }}
         </h3>
         <button @click="emit('close')" class="btn btn-circle btn-ghost btn-sm">✕</button>
       </div>
-      <div class="mb-2 text-base-content/50 text-xs">拖拽左侧三条杠调整列顺序，点击右侧开关控制显示/隐藏</div>
-      <div v-draggable="[localOrder, options]" class="grid max-h-[10.25rem] grid-cols-3 gap-2 overflow-y-auto drag-list">
+      <div class="mb-2 text-base-content/50 text-xs">
+        拖拽左侧三条杠调整列顺序，点击右侧开关控制显示/隐藏
+      </div>
+      <div
+        v-draggable="[localOrder, options]"
+        class="grid max-h-[10.25rem] grid-cols-3 gap-2 overflow-y-auto drag-list"
+      >
         <div
           v-for="col in localOrder"
           :key="col"
@@ -87,8 +94,8 @@ function saveOrder() {
           >☰</span>
           <span class="flex-1 text-xs truncate" :title="col">{{ col }}</span>
           <input
-            :checked="!localHidden.has(col)"
             @change="toggleCol(col)"
+            :checked="!localHidden.has(col)"
             class="toggle toggle-sm"
             type="checkbox"
           >
@@ -96,12 +103,7 @@ function saveOrder() {
       </div>
       <div class="modal-action mt-4">
         <button @click="emit('close')" class="btn btn-ghost btn-sm">取消</button>
-        <button
-          @click="saveOrder"
-          class="btn btn-primary btn-sm"
-        >
-          完成
-        </button>
+        <button @click="saveOrder" class="btn btn-primary btn-sm">完成</button>
       </div>
     </div>
     <form @click="emit('close')" class="modal-backdrop" method="dialog">

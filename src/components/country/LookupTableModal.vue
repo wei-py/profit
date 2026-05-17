@@ -2,17 +2,20 @@
 import { driver } from "driver.js";
 import { ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
-import { useConfigStore } from "@/stores/config";
-import "driver.js/dist/driver.css";
-
 import { useModalEsc } from "@/composables/useModalEsc";
+import { useConfigStore } from "@/stores/config";
+
+import "driver.js/dist/driver.css";
 
 const props = defineProps({
   open: Boolean,
   tableName: String,
 });
 const emit = defineEmits(["close"]);
-useModalEsc(() => props.open, () => emit("close"));
+useModalEsc(
+  () => props.open,
+  () => emit("close"),
+);
 
 const store = useConfigStore();
 const newName = ref("");
@@ -59,7 +62,9 @@ watch(
       return;
     newName.value = props.tableName;
     rowUid = 0;
-    rowsLocal.value = JSON.parse(JSON.stringify(store.lookupTables[props.tableName] || [])).map(row => ({ ...row, _uid: ++rowUid }));
+    rowsLocal.value = JSON.parse(JSON.stringify(store.lookupTables[props.tableName] || [])).map(
+      row => ({ ...row, _uid: ++rowUid }),
+    );
   },
 );
 
@@ -124,7 +129,7 @@ function save() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open" @cancel.prevent>
+  <dialog @cancel.prevent class="modal" :open="open">
     <div class="modal-box max-h-[85vh] w-[min(52rem,calc(100vw-1rem))] max-w-none overflow-y-auto">
       <div class="flex gap-2 items-center mb-4">
         <h3 class="font-bold text-lg">查表：</h3>
@@ -148,7 +153,11 @@ function save() {
           <thead>
             <tr>
               <th class="w-8" />
-              <th v-for="k in Object.keys(rowsLocal[0] || {}).filter(k => k !== '_uid')" :key="k" class="group relative">
+              <th
+                v-for="k in Object.keys(rowsLocal[0] || {}).filter((k) => k !== '_uid')"
+                :key="k"
+                class="group relative"
+              >
                 {{ k }}
                 <button
                   @click="delCol(k)"
@@ -167,7 +176,7 @@ function save() {
                   class="drag-handle flex hover:text-base-content items-center justify-center select-none text-base-content/30 text-xs"
                 >☰</span>
               </td>
-              <td v-for="k in Object.keys(rowsLocal[0] || {}).filter(k => k !== '_uid')" :key="k">
+              <td v-for="k in Object.keys(rowsLocal[0] || {}).filter((k) => k !== '_uid')" :key="k">
                 <input v-model="row[k]" class="input input-bordered input-xs w-full">
               </td>
               <td>

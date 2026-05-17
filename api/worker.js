@@ -393,11 +393,15 @@ async function handleAdminTemplate(request, env) {
   const { action, value } = await request.json();
 
   if (action === "get") {
-    const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'remark_template'").first();
+    const row = await env.DB.prepare(
+      "SELECT value FROM settings WHERE key = 'remark_template'",
+    ).first();
     return json({ success: true, value: row?.value || "" });
   }
   if (action === "save") {
-    await env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('remark_template', ?)")
+    await env.DB.prepare(
+      "INSERT OR REPLACE INTO settings (key, value) VALUES ('remark_template', ?)",
+    )
       .bind(value || "")
       .run();
     return json({ success: true });
@@ -427,7 +431,9 @@ async function handleFilesList(request, env) {
     params = [];
   }
 
-  const { results } = await env.DB.prepare(query).bind(...params).all();
+  const { results } = await env.DB.prepare(query)
+    .bind(...params)
+    .all();
   return json({ items: results, success: true });
 }
 
@@ -441,15 +447,24 @@ async function handleFilesFolder(request, env) {
     return json({ error: "文件夹名不能为空" }, 400);
 
   const existing = parent_id
-    ? await env.DB.prepare("SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = 'folder'").bind(parent_id, trimmed).first()
-    : await env.DB.prepare("SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = 'folder'").bind(trimmed).first();
+    ? await env.DB.prepare(
+        "SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = 'folder'",
+      )
+        .bind(parent_id, trimmed)
+        .first()
+    : await env.DB.prepare(
+        "SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = 'folder'",
+      )
+        .bind(trimmed)
+        .first();
 
   if (existing)
     return json({ error: "同名文件夹已存在", success: false }, 409);
 
   const id = uuid();
   await env.DB.prepare("INSERT INTO files (id, name, parent_id, type) VALUES (?, ?, ?, 'folder')")
-    .bind(id, trimmed, parent_id || null).run();
+    .bind(id, trimmed, parent_id || null)
+    .run();
 
   return json({ id, name: trimmed, success: true });
 }
@@ -468,18 +483,29 @@ async function handleFilesUpload(request, env) {
 
   // 检查同名文件
   const existing = parentId
-    ? await env.DB.prepare("SELECT id, r2_key FROM files WHERE parent_id = ? AND name = ? AND type = 'file'").bind(parentId, file.name).first()
-    : await env.DB.prepare("SELECT id, r2_key FROM files WHERE parent_id IS NULL AND name = ? AND type = 'file'").bind(file.name).first();
+    ? await env.DB.prepare(
+        "SELECT id, r2_key FROM files WHERE parent_id = ? AND name = ? AND type = 'file'",
+      )
+        .bind(parentId, file.name)
+        .first()
+    : await env.DB.prepare(
+        "SELECT id, r2_key FROM files WHERE parent_id IS NULL AND name = ? AND type = 'file'",
+      )
+        .bind(file.name)
+        .first();
 
   if (existing && !overwrite) {
-    return json({
-      conflict: true,
-      existing: { id: existing.id, name: file.name },
-      success: false,
-    }, 409);
+    return json(
+      {
+        conflict: true,
+        existing: { id: existing.id, name: file.name },
+        success: false,
+      },
+      409,
+    );
   }
 
-  const sanitizedName = file.name.replace(/[^a-zA-Z0-9._\-\u4e00-\u9fff]/g, "_");
+  const sanitizedName = file.name.replace(/[^\w.\-\u4E00-\u9FFF]/g, "_");
   const r2Key = `${uuid()}-${sanitizedName}`;
   const mimeType = file.type || "application/octet-stream";
 
@@ -495,21 +521,31 @@ async function handleFilesUpload(request, env) {
     });
     await env.DB.prepare(
       "UPDATE files SET size = ?, mime_type = ?, updated_at = datetime('now') WHERE id = ?",
-    ).bind(file.size, mimeType, existing.id).run();
+    )
+      .bind(file.size, mimeType, existing.id)
+      .run();
     return json({
+      file: {
+        id: existing.id,
+        mime_type: mimeType,
+        name: file.name,
+        r2_key: r2Key,
+        size: file.size,
+      },
       success: true,
-      file: { id: existing.id, name: file.name, size: file.size, mime_type: mimeType, r2_key: r2Key },
     });
   }
 
   const fileId = uuid();
   await env.DB.prepare(
     "INSERT INTO files (id, name, parent_id, type, size, mime_type, r2_key) VALUES (?, ?, ?, 'file', ?, ?, ?)",
-  ).bind(fileId, file.name, parentId, file.size, mimeType, r2Key).run();
+  )
+    .bind(fileId, file.name, parentId, file.size, mimeType, r2Key)
+    .run();
 
   return json({
+    file: { id: fileId, mime_type: mimeType, name: file.name, r2_key: r2Key, size: file.size },
     success: true,
-    file: { id: fileId, name: file.name, size: file.size, mime_type: mimeType, r2_key: r2Key },
   });
 }
 
@@ -522,21 +558,32 @@ async function handleFilesRename(request, env) {
   if (!id || !trimmed)
     return json({ error: "参数无效" }, 400);
 
-  const item = await env.DB.prepare("SELECT id, parent_id, type FROM files WHERE id = ?").bind(id).first();
+  const item = await env.DB.prepare("SELECT id, parent_id, type FROM files WHERE id = ?")
+    .bind(id)
+    .first();
   if (!item)
     return json({ error: "文件不存在" }, 404);
 
   const existing = item.parent_id
-    ? await env.DB.prepare("SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = ? AND id != ?").bind(item.parent_id, trimmed, item.type, id).first()
-    : await env.DB.prepare("SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = ? AND id != ?").bind(trimmed, item.type, id).first();
+    ? await env.DB.prepare(
+        "SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = ? AND id != ?",
+      )
+        .bind(item.parent_id, trimmed, item.type, id)
+        .first()
+    : await env.DB.prepare(
+        "SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = ? AND id != ?",
+      )
+        .bind(trimmed, item.type, id)
+        .first();
 
   if (existing)
     return json({ error: "同名已存在", success: false }, 409);
 
   await env.DB.prepare("UPDATE files SET name = ?, updated_at = datetime('now') WHERE id = ?")
-    .bind(trimmed, id).run();
+    .bind(trimmed, id)
+    .run();
 
-  return json({ success: true, name: trimmed });
+  return json({ name: trimmed, success: true });
 }
 
 async function handleFilesTogglePublic(request, env) {
@@ -544,7 +591,9 @@ async function handleFilesTogglePublic(request, env) {
     return json({ error: "未授权" }, 401);
   const { id } = await request.json();
 
-  const item = await env.DB.prepare("SELECT id, type, is_public, r2_key FROM files WHERE id = ?").bind(id).first();
+  const item = await env.DB.prepare("SELECT id, type, is_public, r2_key FROM files WHERE id = ?")
+    .bind(id)
+    .first();
   if (!item)
     return json({ error: "文件不存在" }, 404);
   if (item.type !== "file")
@@ -555,7 +604,7 @@ async function handleFilesTogglePublic(request, env) {
 
   const publicUrl = newState ? `${new URL(request.url).origin}/api/files/${item.r2_key}` : null;
 
-  return json({ success: true, is_public: newState === 1, url: publicUrl });
+  return json({ is_public: newState === 1, success: true, url: publicUrl });
 }
 
 async function handleFilesDelete(request, env) {
@@ -574,7 +623,9 @@ async function handleFilesDelete(request, env) {
       SELECT f.id, f.type, f.r2_key FROM files f JOIN children c ON f.parent_id = c.id
     )
     SELECT * FROM children
-  `).bind(id).all();
+  `)
+    .bind(id)
+    .all();
 
   for (const node of descendants) {
     if (node.type === "file" && node.r2_key) {
@@ -586,7 +637,7 @@ async function handleFilesDelete(request, env) {
     await env.DB.prepare("DELETE FROM files WHERE id = ?").bind(node.id).run();
   }
 
-  return json({ success: true, deleted: descendants.length });
+  return json({ deleted: descendants.length, success: true });
 }
 
 async function handleFileDownload(request, env) {
@@ -594,7 +645,9 @@ async function handleFileDownload(request, env) {
   if (!r2Key)
     return new Response("Not Found", { status: 404 });
 
-  const item = await env.DB.prepare("SELECT is_public, name, mime_type FROM files WHERE r2_key = ?").bind(r2Key).first();
+  const item = await env.DB.prepare("SELECT is_public, name, mime_type FROM files WHERE r2_key = ?")
+    .bind(r2Key)
+    .first();
   if (!item || !item.is_public)
     return new Response("Forbidden", { status: 403 });
 
@@ -617,7 +670,11 @@ async function handleFilesDownload(request, env) {
   if (!id)
     return json({ error: "缺少 id" }, 400);
 
-  const item = await env.DB.prepare("SELECT name, r2_key, mime_type FROM files WHERE id = ? AND type = 'file'").bind(id).first();
+  const item = await env.DB.prepare(
+    "SELECT name, r2_key, mime_type FROM files WHERE id = ? AND type = 'file'",
+  )
+    .bind(id)
+    .first();
   if (!item)
     return new Response("Not Found", { status: 404 });
 
@@ -738,27 +795,45 @@ export default {
       // 文件管理
       if (url.pathname === "/api/admin/files/list" && request.method === "POST") {
         const res = await handleFilesList(request, env);
-        return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors }, status: res.status });
+        return new Response(res.body, {
+          headers: { ...Object.fromEntries(res.headers), ...cors },
+          status: res.status,
+        });
       }
       if (url.pathname === "/api/admin/files/folder" && request.method === "POST") {
         const res = await handleFilesFolder(request, env);
-        return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors }, status: res.status });
+        return new Response(res.body, {
+          headers: { ...Object.fromEntries(res.headers), ...cors },
+          status: res.status,
+        });
       }
       if (url.pathname === "/api/admin/files/upload" && request.method === "POST") {
         const res = await handleFilesUpload(request, env);
-        return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors }, status: res.status });
+        return new Response(res.body, {
+          headers: { ...Object.fromEntries(res.headers), ...cors },
+          status: res.status,
+        });
       }
       if (url.pathname === "/api/admin/files/rename" && request.method === "POST") {
         const res = await handleFilesRename(request, env);
-        return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors }, status: res.status });
+        return new Response(res.body, {
+          headers: { ...Object.fromEntries(res.headers), ...cors },
+          status: res.status,
+        });
       }
       if (url.pathname === "/api/admin/files/toggle-public" && request.method === "POST") {
         const res = await handleFilesTogglePublic(request, env);
-        return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors }, status: res.status });
+        return new Response(res.body, {
+          headers: { ...Object.fromEntries(res.headers), ...cors },
+          status: res.status,
+        });
       }
       if (url.pathname === "/api/admin/files/delete" && request.method === "POST") {
         const res = await handleFilesDelete(request, env);
-        return new Response(res.body, { headers: { ...Object.fromEntries(res.headers), ...cors }, status: res.status });
+        return new Response(res.body, {
+          headers: { ...Object.fromEntries(res.headers), ...cors },
+          status: res.status,
+        });
       }
       if (url.pathname.startsWith("/api/files/") && request.method === "GET") {
         return handleFileDownload(request, env);

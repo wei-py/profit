@@ -2,10 +2,10 @@
 import { driver } from "driver.js";
 import { reactive, watch } from "vue";
 import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
-import { useConfigStore } from "@/stores/config";
-import "driver.js/dist/driver.css";
-
 import { useModalEsc } from "@/composables/useModalEsc";
+import { useConfigStore } from "@/stores/config";
+
+import "driver.js/dist/driver.css";
 
 const props = defineProps({
   allKeys: Array,
@@ -13,7 +13,10 @@ const props = defineProps({
   open: Boolean,
 });
 const emit = defineEmits(["close"]);
-useModalEsc(() => props.open, () => emit("close"));
+useModalEsc(
+  () => props.open,
+  () => emit("close"),
+);
 
 const store = useConfigStore();
 const form = reactive({});
@@ -62,7 +65,7 @@ function save() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open" @cancel.prevent>
+  <dialog @cancel.prevent class="modal" :open="open">
     <div class="max-w-lg modal-box">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">编辑国家</h3>
@@ -78,7 +81,13 @@ function save() {
             v-model="form[k]"
             class="input input-bordered input-sm w-full"
           >
-          <OptionTreeSelect v-else v-model="form.启用" :options="yesNoOptions" placeholder="—" size="sm" />
+          <OptionTreeSelect
+            v-else
+            v-model="form.启用"
+            :options="yesNoOptions"
+            placeholder="—"
+            size="sm"
+          />
         </div>
       </div>
       <div class="modal-action">

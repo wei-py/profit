@@ -32,17 +32,26 @@ function statusBadge(status) {
       <div v-else class="mt-4">
         <!-- 基本信息 -->
         <div class="grid grid-cols-2 gap-2 text-sm">
-          <div>激活码: <span class="font-mono">{{ store.detail.code }}</span></div>
-          <div>状态: <span class="badge badge-sm" :class="statusBadge(store.detail.status)">{{ store.detail.status }}</span></div>
+          <div>
+            激活码: <span class="font-mono">{{ store.detail.code }}</span>
+          </div>
+          <div>
+            状态:
+            <span class="badge badge-sm" :class="statusBadge(store.detail.status)">{{
+              store.detail.status
+            }}</span>
+          </div>
           <div>最大设备: {{ store.detail.max_devices }}</div>
           <div>已用: {{ store.detail.used_cnt }} / 剩余: {{ store.detail.remaining }}</div>
           <div>创建: {{ formatTime(store.detail.created_at) }}</div>
-          <div>过期: {{ store.detail.expires_at ? formatTime(store.detail.expires_at) : "永久" }}</div>
+          <div>
+            过期: {{ store.detail.expires_at ? formatTime(store.detail.expires_at) : "永久" }}
+          </div>
           <div class="flex items-start">
-            <span>
-              备注:
-            </span>
-            <span class="whitespace-pre-wrap ml-4 inline-block">{{ store.detail.remark || "-" }}</span>
+            <span> 备注: </span>
+            <span class="whitespace-pre-wrap ml-4 inline-block">{{
+              store.detail.remark || "-"
+            }}</span>
           </div>
         </div>
 
@@ -67,9 +76,7 @@ function statusBadge(status) {
           </table>
         </div>
 
-        <div v-else class="mt-4 text-base-content/60 text-sm">
-          尚无设备绑定
-        </div>
+        <div v-else class="mt-4 text-base-content/60 text-sm">尚无设备绑定</div>
       </div>
 
       <div class="modal-action">

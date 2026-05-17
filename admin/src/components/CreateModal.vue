@@ -115,11 +115,7 @@ function copyAll() {
 
         <div class="modal-action">
           <button @click="emit('close')" class="btn btn-sm">取消</button>
-          <button
-            @click="handleCreate"
-            class="btn btn-sm btn-primary"
-            :disabled="creating"
-          >
+          <button @click="handleCreate" class="btn btn-sm btn-primary" :disabled="creating">
             <span v-if="creating" class="loading loading-spinner loading-xs" />
             创建
           </button>

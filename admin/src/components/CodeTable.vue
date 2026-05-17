@@ -35,8 +35,9 @@ function confirmDelete() {
 }
 
 function remarkPreview(text) {
-  if (!text) return "";
-  return text.length > 8 ? text.slice(0, 8) + "..." : text;
+  if (!text)
+    return "";
+  return text.length > 8 ? `${text.slice(0, 8)}...` : text;
 }
 </script>
 
@@ -65,7 +66,10 @@ function remarkPreview(text) {
               {{ c.status }}
             </span>
           </td>
-          <td @click="emit('remark', { code: c.code, remark: c.remark })" class="cursor-pointer text-base-content/60 text-xs hover:underline">
+          <td
+            @click="emit('remark', { code: c.code, remark: c.remark })"
+            class="cursor-pointer text-base-content/60 text-xs hover:underline"
+          >
             {{ remarkPreview(c.remark) }}
           </td>
           <td>{{ c.max_devices }}</td>
@@ -75,9 +79,7 @@ function remarkPreview(text) {
           <td class="text-xs">{{ formatTime(c.expires_at) }}</td>
           <td>
             <div class="flex gap-1">
-              <button @click="emit('detail', c.code)" class="btn btn-xs btn-ghost">
-                详情
-              </button>
+              <button @click="emit('detail', c.code)" class="btn btn-xs btn-ghost">详情</button>
               <button @click="handleDelete(c.code)" class="btn btn-xs btn-ghost text-error">
                 删除
               </button>
@@ -96,7 +98,11 @@ function remarkPreview(text) {
           <span class="font-mono font-semibold text-sm">{{ c.code }}</span>
           <span class="badge badge-sm" :class="statusBadge(c.status)">{{ c.status }}</span>
         </div>
-        <div v-if="c.remark" @click="emit('remark', { code: c.code, remark: c.remark })" class="text-xs text-base-content/50 truncate cursor-pointer hover:underline">
+        <div
+          v-if="c.remark"
+          @click="emit('remark', { code: c.code, remark: c.remark })"
+          class="text-xs text-base-content/50 truncate cursor-pointer hover:underline"
+        >
           {{ c.remark }}
         </div>
         <div class="flex gap-3 text-xs">
@@ -110,8 +116,12 @@ function remarkPreview(text) {
           <span>过期 {{ formatTime(c.expires_at) }}</span>
         </div>
         <div class="flex gap-1 mt-1">
-          <button @click="emit('detail', c.code)" class="btn btn-xs btn-outline flex-1">详情</button>
-          <button @click="handleDelete(c.code)" class="btn btn-xs btn-outline text-error flex-1">删除</button>
+          <button @click="emit('detail', c.code)" class="btn btn-xs btn-outline flex-1">
+            详情
+          </button>
+          <button @click="handleDelete(c.code)" class="btn btn-xs btn-outline text-error flex-1">
+            删除
+          </button>
         </div>
       </div>
     </div>
@@ -121,7 +131,9 @@ function remarkPreview(text) {
   <dialog v-if="confirmCode" class="modal">
     <div class="modal-box max-w-full sm:max-w-md">
       <h3 class="font-bold text-lg">确认删除</h3>
-      <p class="py-2">确定要删除/撤销激活码 <span class="font-mono break-all">{{ confirmCode }}</span> 吗？</p>
+      <p class="py-2">
+        确定要删除/撤销激活码 <span class="font-mono break-all">{{ confirmCode }}</span> 吗？
+      </p>
       <div class="modal-action">
         <button @click="confirmCode = ''" class="btn btn-sm">取消</button>
         <button @click="confirmDelete" class="btn btn-sm btn-error">确认</button>
@@ -130,4 +142,5 @@ function remarkPreview(text) {
     <form class="modal-backdrop" method="dialog">
       <button @click="confirmCode = ''" />
     </form>
-  </dialog></template>
+  </dialog>
+</template>

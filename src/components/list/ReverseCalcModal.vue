@@ -1,17 +1,20 @@
 <script setup>
 import { ref, watch } from "vue";
+import { useModalEsc } from "@/composables/useModalEsc";
 import { execute } from "@/services/rule-engine";
 import { useConfigStore } from "@/stores/config";
-import { useCreateStore } from "@/stores/create";
 
-import { useModalEsc } from "@/composables/useModalEsc";
+import { useCreateStore } from "@/stores/create";
 
 const props = defineProps({
   open: Boolean,
   skuIndex: Number,
 });
 const emit = defineEmits(["apply", "close"]);
-useModalEsc(() => props.open, () => emit("close"));
+useModalEsc(
+  () => props.open,
+  () => emit("close"),
+);
 
 const configStore = useConfigStore();
 const createStore = useCreateStore();
@@ -139,7 +142,7 @@ function applyCalc() {
 </script>
 
 <template>
-  <dialog class="modal" :open="open" @cancel.prevent>
+  <dialog @cancel.prevent class="modal" :open="open">
     <div class="modal-box w-[min(24rem,calc(100vw-1rem))] max-w-none">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">反推计算</h3>

@@ -13,9 +13,11 @@ export function parseCascadePath(value) {
 }
 
 export function formatCascadePath(values) {
-  return values.map(v => String(v || "").trim()).filter(Boolean).join(CASCADE_SEPARATOR);
+  return values
+    .map(v => String(v || "").trim())
+    .filter(Boolean)
+    .join(CASCADE_SEPARATOR);
 }
-
 
 export function getParentTriggerValue(group) {
   for (const key of TRIGGER_KEYS) {
@@ -28,11 +30,11 @@ export function getParentTriggerValue(group) {
 
 export function normalizeOptionGroup(row = {}) {
   const group = {
-    编号: "",
     名称: "",
     所属国家平台: "",
     父级编号: "",
     父级选项值: "",
+    编号: "",
     说明: "",
     ...row,
   };
@@ -61,7 +63,9 @@ export function groupLooksBoundToOption(group, parentValue) {
   const candidates = [
     group?.名称,
     group?.编号,
-    String(group?.编号 || "").split(/[\s_\-./\\]+/).pop(),
+    String(group?.编号 || "")
+      .split(/[\s_\-./\\]+/)
+      .pop(),
   ]
     .map(normalizeId)
     .filter(Boolean);
@@ -121,7 +125,9 @@ export function getAnyChildGroups(optionGroups, parentGroupId) {
   const pid = normalizeId(parentGroupId);
   if (!pid)
     return [];
-  return sortOptionGroups((optionGroups || []).filter(group => normalizeId(group.父级编号) === pid));
+  return sortOptionGroups(
+    (optionGroups || []).filter(group => normalizeId(group.父级编号) === pid),
+  );
 }
 
 export function groupHasDescendants(optionGroups, rootGroupId) {
@@ -133,7 +139,9 @@ export function groupHasDescendants(optionGroups, rootGroupId) {
   const queue = [rootId];
   while (queue.length) {
     const parentId = queue.shift();
-    const children = getAnyChildGroups(optionGroups, parentId).filter(child => !seen.has(child.编号));
+    const children = getAnyChildGroups(optionGroups, parentId).filter(
+      child => !seen.has(child.编号),
+    );
     if (children.length)
       return true;
     for (const child of children) {
@@ -150,13 +158,19 @@ export function getGroupName(optionGroups, groupId) {
   return group ? group.名称 || group.编号 : gid;
 }
 
-
-
 function makeTreeKey(pathValues) {
   return pathValues.join("\u001F");
 }
 
-function buildOptionValueTreeForGroup({ optionGroups, optionItems, groupId, pathValues = [], pathLabels = [], depth = 0, visited = new Set() }) {
+function buildOptionValueTreeForGroup({
+  depth = 0,
+  groupId,
+  optionGroups,
+  optionItems,
+  pathLabels = [],
+  pathValues = [],
+  visited = new Set(),
+}) {
   const gid = normalizeId(groupId);
   if (!gid || depth > 20 || visited.has(gid))
     return [];
@@ -235,12 +249,16 @@ export function flattenOptionValueTree(nodes = [], expandedKeys = new Set(), lev
 export function getOptionTreeAncestorKeys(pathValues = []) {
   const parts = pathValues.map(normalizeId).filter(Boolean);
   const keys = [];
-  for (let i = 1; i < parts.length; i += 1)
-    keys.push(makeTreeKey(parts.slice(0, i)));
+  for (let i = 1; i < parts.length; i += 1) keys.push(makeTreeKey(parts.slice(0, i)));
   return keys;
 }
 
-export function buildCascadeSteps({ optionGroups = [], optionItems = [], pathValues = [], rootGroupId }) {
+export function buildCascadeSteps({
+  optionGroups = [],
+  optionItems = [],
+  pathValues = [],
+  rootGroupId,
+}) {
   const rootId = normalizeId(rootGroupId);
   if (!rootId)
     return [];

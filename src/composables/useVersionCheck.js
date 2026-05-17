@@ -4,7 +4,8 @@ import { ref } from "vue";
 const CURRENT_VERSION = "0.1.0";
 
 /** 远程 version.json 公开链接 */
-const VERSION_URL = "https://profit-admin.xu-wei.space/api/files/8b6b9353-6f1a-4996-9803-8ff67f56b774-version.json";
+const VERSION_URL
+  = "https://profit-admin.xu-wei.space/api/files/8b6b9353-6f1a-4996-9803-8ff67f56b774-version.json";
 
 /**
  * 解析 semver 版本号。

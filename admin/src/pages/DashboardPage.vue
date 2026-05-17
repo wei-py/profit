@@ -67,18 +67,12 @@ function openRemark({ code, remark }) {
         </button>
       </div>
       <div class="flex gap-1 items-center flex-wrap">
-        <button @click="openCreate" class="btn btn-xs sm:btn-sm btn-primary">
-          批量创建
-        </button>
+        <button @click="openCreate" class="btn btn-xs sm:btn-sm btn-primary">批量创建</button>
         <button @click="showTemplate = true" class="btn btn-xs sm:btn-sm btn-ghost">
           备注模板
         </button>
-        <button @click="store.fetchCodes()" class="btn btn-xs sm:btn-sm btn-ghost">
-          刷新
-        </button>
-        <button @click="handleLogout" class="btn btn-xs sm:btn-sm btn-ghost">
-          退出
-        </button>
+        <button @click="store.fetchCodes()" class="btn btn-xs sm:btn-sm btn-ghost">刷新</button>
+        <button @click="handleLogout" class="btn btn-xs sm:btn-sm btn-ghost">退出</button>
       </div>
     </div>
 
@@ -107,7 +101,10 @@ function openRemark({ code, remark }) {
       :loading="store.loading"
     />
 
-    <div v-if="!store.loading && store.codes.length === 0 && !store.error" class="text-center py-10 text-base-content/60">
+    <div
+      v-if="!store.loading && store.codes.length === 0 && !store.error"
+      class="text-center py-10 text-base-content/60"
+    >
       暂无激活码
     </div>
 
@@ -120,9 +117,9 @@ function openRemark({ code, remark }) {
     <!-- 备注弹窗 -->
     <RemarkModal
       v-if="showRemark"
+      @close="showRemark = false"
       :code="remarkTarget.code"
       :remark="remarkTarget.remark"
-      @close="showRemark = false"
     />
 
     <!-- 模板弹窗 -->

@@ -37,8 +37,8 @@ const fdesc = computed(() => props.field.description || props.field.说明 || ""
 
 const isDropdown = computed(() => ftype.value === "select" || ftype.value === "下拉");
 const groupId = computed(() => props.field.optionGroupId || props.field.选项组编号);
-const hasOptionTreeData = computed(() =>
-  !!groupId.value && props.optionGroupsData.length > 0 && props.optionItems.length > 0,
+const hasOptionTreeData = computed(
+  () => !!groupId.value && props.optionGroupsData.length > 0 && props.optionItems.length > 0,
 );
 
 const options = computed(() => getItems(groupId.value));
@@ -71,22 +71,22 @@ function onInput(e) {
 
     <OptionTreeSelect
       v-if="isDropdown && hasOptionTreeData"
+      @update:model-value="emit('update:modelValue', $event)"
       :modelValue="modelValue"
       :optionGroupsData="optionGroupsData"
       :optionItems="optionItems"
       :placeholder="`请选择${fname || ''}`"
       :rootGroupId="groupId"
       size="xs"
-      @update:modelValue="emit('update:modelValue', $event)"
     />
 
     <OptionTreeSelect
       v-else-if="isDropdown"
+      @update:model-value="emit('update:modelValue', $event)"
       :modelValue="modelValue"
       :options="options"
       :placeholder="`请选择${fname || ''}`"
       size="xs"
-      @update:modelValue="emit('update:modelValue', $event)"
     />
 
     <div v-else-if="ftype === 'boolean' || ftype === '布尔'" class="flex gap-2 items-center">
@@ -126,22 +126,22 @@ function onInput(e) {
   <template v-else>
     <OptionTreeSelect
       v-if="isDropdown && hasOptionTreeData"
+      @update:model-value="emit('update:modelValue', $event)"
       :modelValue="modelValue"
       :optionGroupsData="optionGroupsData"
       :optionItems="optionItems"
-      :placeholder="'请选择'"
+      placeholder="请选择"
       :rootGroupId="groupId"
       size="xs"
-      @update:modelValue="emit('update:modelValue', $event)"
     />
 
     <OptionTreeSelect
       v-else-if="isDropdown"
+      @update:model-value="emit('update:modelValue', $event)"
       :modelValue="modelValue"
       :options="options"
       placeholder="请选择"
       size="xs"
-      @update:modelValue="emit('update:modelValue', $event)"
     />
 
     <div v-else-if="ftype === 'boolean' || ftype === '布尔'" class="flex items-center">

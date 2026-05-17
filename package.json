@@ -12,6 +12,7 @@
     "tdev": "tauri dev",
     "tbuild": "tauri build",
     "lint": "eslint .",
+    "format": "eslint . --fix",
     "code": "node scripts/code.cjs"
   },
   "dependencies": {

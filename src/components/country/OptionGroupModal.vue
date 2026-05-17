@@ -23,7 +23,10 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["close"]);
-useModalEsc(() => props.open, () => emit("close"));
+useModalEsc(
+  () => props.open,
+  () => emit("close"),
+);
 
 const store = useConfigStore();
 const draftRoots = ref([]);
@@ -100,12 +103,12 @@ function makeItemNode(item) {
   return {
     childGroup: null,
     item: {
-      所属分组: item?.所属分组 || "",
-      选项值: value,
-      显示名: item?.显示名 || value,
-      排序: item?.排序 || "",
       启用: item?.启用 || "是",
       备注: item?.备注 || "",
+      所属分组: item?.所属分组 || "",
+      排序: item?.排序 || "",
+      显示名: item?.显示名 || value,
+      选项值: value,
     },
     key: `item:${item?.所属分组 || ""}:${value}:${newKey()}`,
   };
@@ -118,12 +121,10 @@ function toNumber(value, fallback) {
 
 function loadDraft() {
   localUid = 0;
-  const groups = store
-    .getOptionGroupsByCountry(props.cpId)
-    .map((group, index) => ({
-      ...normalizeOptionGroup(JSON.parse(JSON.stringify(group))),
-      __sourceIndex: index,
-    }));
+  const groups = store.getOptionGroupsByCountry(props.cpId).map((group, index) => ({
+    ...normalizeOptionGroup(JSON.parse(JSON.stringify(group))),
+    __sourceIndex: index,
+  }));
   const groupNodes = new Map(groups.map(group => [group.编号, makeGroupNode(group)]));
   const itemsByGroup = new Map();
 
@@ -162,7 +163,10 @@ function loadDraft() {
       const ob = toNumber(b.排序, Number.MAX_SAFE_INTEGER);
       if (oa !== ob)
         return oa - ob;
-      return String(a.显示名 || a.选项值 || "").localeCompare(String(b.显示名 || b.选项值 || ""), "zh-Hans-CN");
+      return String(a.显示名 || a.选项值 || "").localeCompare(
+        String(b.显示名 || b.选项值 || ""),
+        "zh-Hans-CN",
+      );
     });
 
     node.items = rows.map((item) => {
@@ -172,9 +176,15 @@ function loadDraft() {
         const ob = toNumber(b.排序, b.__sourceIndex + 1);
         if (oa !== ob)
           return oa - ob;
-        return String(a.名称 || a.编号 || "").localeCompare(String(b.名称 || b.编号 || ""), "zh-Hans-CN");
+        return String(a.名称 || a.编号 || "").localeCompare(
+          String(b.名称 || b.编号 || ""),
+          "zh-Hans-CN",
+        );
       });
-      const child = children.find(childGroup => !attached.has(childGroup.编号) && childGroupMatchesItem(childGroup, itemNode.item));
+      const child = children.find(
+        childGroup =>
+          !attached.has(childGroup.编号) && childGroupMatchesItem(childGroup, itemNode.item),
+      );
       if (child) {
         attached.add(child.编号);
         itemNode.childGroup = hydrateGroup(child.编号, new Set(guard));
@@ -192,7 +202,10 @@ function loadDraft() {
       const ob = toNumber(b.排序, b.__sourceIndex + 1);
       if (oa !== ob)
         return oa - ob;
-      return String(a.名称 || a.编号 || "").localeCompare(String(b.名称 || b.编号 || ""), "zh-Hans-CN");
+      return String(a.名称 || a.编号 || "").localeCompare(
+        String(b.名称 || b.编号 || ""),
+        "zh-Hans-CN",
+      );
     })
     .map(group => hydrateGroup(group.编号))
     .filter(Boolean);
@@ -210,8 +223,7 @@ function walkDraftGroups(fn) {
         walk(itemNode.childGroup, groupNode, itemNode);
     }
   }
-  for (const root of draftRoots.value)
-    walk(root);
+  for (const root of draftRoots.value) walk(root);
 }
 
 function usedGroupIds() {
@@ -240,20 +252,22 @@ function uniqueOptionValue(groupNode, base = "新选项") {
 }
 
 function childGroupDisplayName(parentGroupNode, optionValue) {
-  const parentName = String(parentGroupNode?.group?.名称 || parentGroupNode?.group?.编号 || "选项").trim();
+  const parentName = String(
+    parentGroupNode?.group?.名称 || parentGroupNode?.group?.编号 || "选项",
+  ).trim();
   const value = String(optionValue || "子选项").trim();
   return `${parentName} / ${value}`;
 }
 
 function addRootGroup() {
   const group = normalizeOptionGroup({
-    编号: uniqueGroupId(`${countryPrefix()}_新选项`),
     名称: "新选项",
     所属国家平台: props.cpId || "",
+    排序: draftRoots.value.length + 1,
     父级编号: "",
     父级选项值: "",
+    编号: uniqueGroupId(`${countryPrefix()}_新选项`),
     说明: "",
-    排序: draftRoots.value.length + 1,
   });
   const groupNode = makeGroupNode(group);
   draftRoots.value.push(groupNode);
@@ -262,14 +276,16 @@ function addRootGroup() {
 
 function addItem(groupNode) {
   const value = uniqueOptionValue(groupNode);
-  groupNode.items.push(makeItemNode({
-    所属分组: groupNode.group.编号,
-    选项值: value,
-    显示名: value,
-    排序: groupNode.items.length + 1,
-    启用: "是",
-    备注: "",
-  }));
+  groupNode.items.push(
+    makeItemNode({
+      启用: "是",
+      备注: "",
+      所属分组: groupNode.group.编号,
+      排序: groupNode.items.length + 1,
+      显示名: value,
+      选项值: value,
+    }),
+  );
   expandedIds.value = new Set([...expandedIds.value, groupNode.key]);
 }
 
@@ -279,13 +295,13 @@ function addChildItem(parentGroupNode, itemNode) {
   const value = String(itemNode.item.选项值 || itemNode.item.显示名 || "子选项").trim();
   if (!itemNode.childGroup) {
     const childGroup = normalizeOptionGroup({
-      编号: uniqueGroupId(`${parentGroupNode.group.编号}_${value}_children`),
       名称: childGroupDisplayName(parentGroupNode, value),
       所属国家平台: props.cpId || parentGroupNode.group.所属国家平台 || "",
+      排序: parentGroupNode.items.indexOf(itemNode) + 1,
       父级编号: parentGroupNode.group.编号,
       父级选项值: value,
+      编号: uniqueGroupId(`${parentGroupNode.group.编号}_${value}_children`),
       说明: "",
-      排序: parentGroupNode.items.indexOf(itemNode) + 1,
     });
     itemNode.childGroup = makeGroupNode(childGroup);
   }
@@ -295,7 +311,12 @@ function addChildItem(parentGroupNode, itemNode) {
     itemNode.childGroup.group.名称 = childGroupDisplayName(parentGroupNode, value);
   }
   addItem(itemNode.childGroup);
-  expandedIds.value = new Set([...expandedIds.value, parentGroupNode.key, itemNode.key, itemNode.childGroup.key]);
+  expandedIds.value = new Set([
+    ...expandedIds.value,
+    parentGroupNode.key,
+    itemNode.key,
+    itemNode.childGroup.key,
+  ]);
 }
 
 function updateItemLabel(parentGroupNode, itemNode, value) {
@@ -350,20 +371,30 @@ function toggleExpand(key) {
 }
 
 function cleanItemValue(itemNode, fallbackIndex) {
-  const raw = String(itemNode.item.选项值 || itemNode.item.显示名 || `选项${fallbackIndex + 1}`).trim();
+  const raw = String(
+    itemNode.item.选项值 || itemNode.item.显示名 || `选项${fallbackIndex + 1}`,
+  ).trim();
   itemNode.item.选项值 = raw;
   itemNode.item.显示名 = String(itemNode.item.显示名 || raw).trim() || raw;
   return raw;
 }
 
 function saveDraft() {
-  const oldCountryGroupIds = new Set(store.getOptionGroupsByCountry(props.cpId).map(group => group.编号));
+  const oldCountryGroupIds = new Set(
+    store.getOptionGroupsByCountry(props.cpId).map(group => group.编号),
+  );
   const groupsKeep = store["选项组"].filter(group => !oldCountryGroupIds.has(group.编号));
   const itemsKeep = store["选项值"].filter(item => !oldCountryGroupIds.has(item.所属分组));
   const cleanGroups = [];
   const cleanItems = [];
 
-  function walkSave(groupNode, parentGroupId = "", parentOptionValue = "", groupOrder = 1, parentGroupName = "") {
+  function walkSave(
+    groupNode,
+    parentGroupId = "",
+    parentOptionValue = "",
+    groupOrder = 1,
+    parentGroupName = "",
+  ) {
     if (parentGroupId && !groupNode.items.length)
       return;
 
@@ -373,12 +404,12 @@ function saveDraft() {
     const groupName = String(rawGroupName).trim();
     const group = normalizeOptionGroup({
       ...groupNode.group,
-      编号: groupNode.group.编号 || uniqueGroupId(`${countryPrefix()}_${groupName}`),
       名称: groupName,
       所属国家平台: props.cpId || groupNode.group.所属国家平台 || "",
+      排序: groupOrder,
       父级编号: parentGroupId,
       父级选项值: parentGroupId ? parentOptionValue : "",
-      排序: groupOrder,
+      编号: groupNode.group.编号 || uniqueGroupId(`${countryPrefix()}_${groupName}`),
     });
     groupNode.group = group;
     cleanGroups.push(group);
@@ -387,12 +418,12 @@ function saveDraft() {
       const value = cleanItemValue(itemNode, itemIndex);
       cleanItems.push({
         ...itemNode.item,
-        所属分组: group.编号,
-        选项值: value,
-        显示名: itemNode.item.显示名 || value,
-        排序: itemIndex + 1,
         启用: itemNode.item.启用 || "是",
         备注: itemNode.item.备注 || "",
+        所属分组: group.编号,
+        排序: itemIndex + 1,
+        显示名: itemNode.item.显示名 || value,
+        选项值: value,
       });
       if (itemNode.childGroup?.items?.length)
         walkSave(itemNode.childGroup, group.编号, value, itemIndex + 1, group.名称);
@@ -418,8 +449,8 @@ function startTour() {
     {
       element: "[data-tour='option-tree-list']",
       popover: {
-        title: "选项树",
         description: "拖动三条杠排序；点击底部保存后写入配置 Excel。",
+        title: "选项树",
       },
     },
   ]);
@@ -429,36 +460,43 @@ function startTour() {
 
 <template>
   <dialog @cancel.prevent class="modal" :open="open">
-    <div class="modal-box flex max-h-[88vh] w-[min(34rem,calc(100vw-1rem))] max-w-none flex-col overflow-hidden">
+    <div
+      class="modal-box flex max-h-[88vh] w-[min(34rem,calc(100vw-1rem))] max-w-none flex-col overflow-hidden"
+    >
       <div class="mb-3 flex shrink-0 items-center justify-between gap-3">
         <div class="min-w-0">
           <h3 class="text-lg font-bold">选项树管理</h3>
-          <p class="mt-1 text-xs opacity-60">{{ draftRoots.length }} 个来源 / {{ totalOptionCount }} 个选项。拖动三条杠排序，保存后写入配置。</p>
+          <p class="mt-1 text-xs opacity-60">
+            {{ draftRoots.length }} 个来源 /
+            {{ totalOptionCount }} 个选项。拖动三条杠排序，保存后写入配置。
+          </p>
         </div>
         <button @click="startTour" class="btn btn-circle btn-ghost btn-sm shrink-0">?</button>
       </div>
 
       <div class="min-h-0 flex-1 overflow-auto border border-base-300" data-tour="option-tree-list">
-        <div class="sticky top-0 z-10 flex h-10 items-center justify-between border-b border-base-300 bg-base-100 px-3">
+        <div
+          class="sticky top-0 z-10 flex h-10 items-center justify-between border-b border-base-300 bg-base-100 px-3"
+        >
           <div class="font-semibold text-sm">选项树</div>
           <button @click="addRootGroup" class="btn btn-ghost btn-xs">＋顶级</button>
         </div>
 
         <ul v-if="draftRoots.length" v-draggable="[draftRoots, rootDragOpts]">
           <OptionTreeEditorNode
+            @add-child-item="addChildItem"
+            @add-item="addItem"
+            @delete-group="deleteGroup"
+            @delete-item="deleteItem"
             v-for="groupNode in draftRoots"
+            @toggle="toggleExpand"
             :key="groupNode.key"
+            @update-item-label="updateItemLabel"
             :dragOpts="itemDragOpts"
             :expandedIds="expandedIds"
             :groupNode="groupNode"
             :level="0"
             :yesNoOptions="yesNoOptions"
-            @add-child-item="addChildItem"
-            @add-item="addItem"
-            @delete-group="deleteGroup"
-            @delete-item="deleteItem"
-            @toggle="toggleExpand"
-            @update-item-label="updateItemLabel"
           />
         </ul>
 

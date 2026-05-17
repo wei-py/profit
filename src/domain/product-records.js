@@ -1,5 +1,5 @@
 import { SYSTEM_ROW_KEYS } from "@/constants/schema";
-import { nowText, normalizeId, parseDelimited } from "@/utils/value";
+import { normalizeId, nowText, parseDelimited } from "@/utils/value";
 
 export function normalizeProductId(value) {
   return normalizeId(value);
@@ -18,8 +18,7 @@ export function groupRecordsByProductId(records, productId, fallbackRow) {
 
 export function inferVariantAttributes(rows, fields = []) {
   const knownKeys = new Set(SYSTEM_ROW_KEYS);
-  for (const field of fields || [])
-    knownKeys.add(field.字段键);
+  for (const field of fields || []) knownKeys.add(field.字段键);
 
   const candidateKeys = [];
   for (const row of rows || []) {
@@ -61,7 +60,15 @@ export function parseVariantValues(value) {
   return parseDelimited(value);
 }
 
-export function buildProductRows({ productId, productName, selectedCountryId, selectedTemplateId, productInputs, skus, calculatedAt }) {
+export function buildProductRows({
+  calculatedAt,
+  productId,
+  productInputs,
+  productName,
+  selectedCountryId,
+  selectedTemplateId,
+  skus,
+}) {
   const time = calculatedAt || nowText();
   return (skus || []).map(sku => ({
     SKU码: sku.skuCode || "",

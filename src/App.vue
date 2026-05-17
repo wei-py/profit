@@ -11,7 +11,8 @@ const route = useRoute();
 const { restoreLastPath } = useFileIO();
 const { init: initTheme } = useTheme();
 const activationStore = useActivationStore();
-const { checkVersion, currentVersion, forceUpdate, updateAvailable, updateInfo } = useVersionCheck();
+const { checkVersion, currentVersion, forceUpdate, updateAvailable, updateInfo }
+  = useVersionCheck();
 
 const showUpdateModal = ref(false);
 const showForceModal = ref(false);
@@ -71,8 +72,9 @@ onMounted(async () => {
       <h3 class="font-bold text-lg">发现新版本</h3>
       <div class="py-3 space-y-2 text-sm">
         <p>
-          当前版本：<span class="font-mono">{{ currentVersion }}</span>
-          → 最新版本：<span class="font-mono font-bold text-primary">{{ updateInfo.version }}</span>
+          当前版本：<span class="font-mono">{{ currentVersion }}</span> → 最新版本：<span
+            class="font-mono font-bold text-primary"
+          >{{ updateInfo.version }}</span>
         </p>
         <p v-if="updateInfo.release_notes" class="text-base-content/60">
           {{ updateInfo.release_notes }}
@@ -82,18 +84,8 @@ onMounted(async () => {
         </p>
       </div>
       <div class="modal-action">
-        <button
-          @click="handleDismissUpdate"
-          class="btn btn-sm btn-ghost"
-        >
-          稍后提醒
-        </button>
-        <button
-          @click="handleOpenDownload"
-          class="btn btn-sm btn-primary"
-        >
-          立即更新
-        </button>
+        <button @click="handleDismissUpdate" class="btn btn-sm btn-ghost">稍后提醒</button>
+        <button @click="handleOpenDownload" class="btn btn-sm btn-primary">立即更新</button>
       </div>
     </div>
     <form class="modal-backdrop" method="dialog">
@@ -111,16 +103,12 @@ onMounted(async () => {
           {{ updateInfo.release_notes }}
         </p>
         <p class="font-mono text-sm">
-          {{ currentVersion }} → <span class="text-primary font-bold">{{ updateInfo.version }}</span>
+          {{ currentVersion }} →
+          <span class="text-primary font-bold">{{ updateInfo.version }}</span>
         </p>
       </div>
       <div class="modal-action">
-        <button
-          @click="handleOpenDownload"
-          class="btn btn-sm btn-primary"
-        >
-          下载更新
-        </button>
+        <button @click="handleOpenDownload" class="btn btn-sm btn-primary">下载更新</button>
       </div>
     </div>
   </dialog>

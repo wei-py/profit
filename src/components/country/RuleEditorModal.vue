@@ -1,11 +1,22 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
-import { BUILTIN_FORMULA_HELPERS, CALC_METHOD_OPTIONS, CONDITION_OPERATOR_OPTIONS, MATCH_MODE_OPTIONS, YES_NO_OPTIONS } from "@/constants/schema";
-import { createEmptyCondition, createEmptyRule, createInitialConditionTree, serializeConditionState } from "@/domain/rule-form";
 import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
-import { useConfigStore } from "@/stores/config";
-
 import { useModalEsc } from "@/composables/useModalEsc";
+import {
+  BUILTIN_FORMULA_HELPERS,
+  CALC_METHOD_OPTIONS,
+  CONDITION_OPERATOR_OPTIONS,
+  MATCH_MODE_OPTIONS,
+  YES_NO_OPTIONS,
+} from "@/constants/schema";
+import {
+  createEmptyCondition,
+  createEmptyRule,
+  createInitialConditionTree,
+  serializeConditionState,
+} from "@/domain/rule-form";
+
+import { useConfigStore } from "@/stores/config";
 
 const props = defineProps({
   cpId: String,
@@ -14,7 +25,10 @@ const props = defineProps({
   templateId: String,
 });
 const emit = defineEmits(["save", "delete", "close"]);
-useModalEsc(() => props.open, () => emit("close"));
+useModalEsc(
+  () => props.open,
+  () => emit("close"),
+);
 
 const store = useConfigStore();
 const form = reactive({});
@@ -37,7 +51,14 @@ const outputKeys = computed(() =>
 );
 const allLookupNames = computed(() => Object.keys(store.lookupTables));
 const flatTree = computed(() => (condTree.value ? flattenTree(condTree.value) : []));
-const fieldSelectOptions = computed(() => store.getFieldsByCountry(props.cpId).map(f => ({ label: f.字段名称 ? `${f.字段名称}（${f.字段键}）` : f.字段键, value: f.字段键 })));
+const fieldSelectOptions = computed(() =>
+  store
+    .getFieldsByCountry(props.cpId)
+    .map(f => ({
+      label: f.字段名称 ? `${f.字段名称}（${f.字段键}）` : f.字段键,
+      value: f.字段键,
+    })),
+);
 
 const yesNoOptions = YES_NO_OPTIONS;
 const operatorOptions = CONDITION_OPERATOR_OPTIONS;
@@ -57,8 +78,7 @@ function ensureCond(idx) {
     return null;
   if (!Array.isArray(condPool.value))
     condPool.value = [];
-  while (condPool.value.length <= n)
-    condPool.value.push(emptyCond());
+  while (condPool.value.length <= n) condPool.value.push(emptyCond());
   condPool.value[n] = {
     ...emptyCond(),
     ...(condPool.value[n] || {}),
@@ -83,9 +103,7 @@ function normalizeCondState() {
 
   function normalizeNode(node, isRoot = false) {
     if (!node || typeof node !== "object") {
-      return isRoot
-        ? { children: [], linkOp: "", op: "AND", type: "group" }
-        : null;
+      return isRoot ? { children: [], linkOp: "", op: "AND", type: "group" } : null;
     }
 
     if (node.type === "cond") {
@@ -113,9 +131,8 @@ function normalizeCondState() {
   }
 
   const root = normalizeNode(condTree.value, true);
-  condTree.value = root && root.type === "group"
-    ? root
-    : { children: [], linkOp: "", op: "AND", type: "group" };
+  condTree.value
+    = root && root.type === "group" ? root : { children: [], linkOp: "", op: "AND", type: "group" };
 
   if (!condTree.value.children.length) {
     ensureCond(0);
@@ -326,7 +343,7 @@ defineExpose({
 </script>
 
 <template>
-  <dialog class="modal" :open="open" @cancel.prevent>
+  <dialog @cancel.prevent class="modal" :open="open">
     <div class="modal-box max-h-[85vh] w-[min(44rem,calc(100vw-1rem))] max-w-none overflow-y-auto">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
@@ -349,7 +366,12 @@ defineExpose({
         </div>
         <div>
           <label class="label py-0 text-xs">启用</label>
-          <OptionTreeSelect v-model="form.启用" :options="yesNoOptions" placeholder="—" size="sm" />
+          <OptionTreeSelect
+            v-model="form.启用"
+            :options="yesNoOptions"
+            placeholder="—"
+            size="sm"
+          />
         </div>
       </div>
       <div class="mb-3">
@@ -399,18 +421,18 @@ defineExpose({
             <span v-else class="w-8" />
             <div class="min-w-32 flex-1">
               <OptionTreeSelect
+                @update:model-value="setCondValue(item.node.idx, '字段', $event)"
                 :modelValue="getCondValue(item.node.idx, '字段')"
                 :options="fieldSelectOptions"
-                @update:modelValue="setCondValue(item.node.idx, '字段', $event)"
                 placeholder="字段"
                 size="xs"
               />
             </div>
             <div class="w-28">
               <OptionTreeSelect
+                @update:model-value="setCondValue(item.node.idx, '运算符', $event)"
                 :modelValue="getCondValue(item.node.idx, '运算符')"
                 :options="operatorOptions"
-                @update:modelValue="setCondValue(item.node.idx, '运算符', $event)"
                 placeholder="—"
                 size="xs"
               />
@@ -418,28 +440,28 @@ defineExpose({
             <div class="w-32">
               <OptionTreeSelect
                 v-if="getFieldOptionRootId(getCondValue(item.node.idx, '字段'))"
+                @update:model-value="setCondValue(item.node.idx, '值', $event)"
                 :modelValue="getCondValue(item.node.idx, '值')"
                 :optionGroupsData="store['选项组']"
                 :optionItems="store['选项值']"
                 placeholder="值"
                 :rootGroupId="getFieldOptionRootId(getCondValue(item.node.idx, '字段'))"
                 size="xs"
-                @update:modelValue="setCondValue(item.node.idx, '值', $event)"
               />
               <input
                 v-else
-                :value="getCondValue(item.node.idx, '值')"
-                class="input input-bordered input-xs w-full"
                 @input="setCondValue(item.node.idx, '值', $event.target.value)"
+                class="input input-bordered input-xs w-full"
                 placeholder="值"
+                :value="getCondValue(item.node.idx, '值')"
               >
             </div>
             <div v-if="conditionNeedsSecondValue(item.node.idx)" class="w-28">
               <input
-                :value="getCondValue(item.node.idx, '值2')"
+                @input="setCondValue(item.node.idx, '值2', $event.target.value)"
                 class="input input-bordered input-xs w-full"
                 placeholder="值2"
-                @input="setCondValue(item.node.idx, '值2', $event.target.value)"
+                :value="getCondValue(item.node.idx, '值2')"
               >
             </div>
             <button @click="delNode(item.parent, item.idx)" class="btn btn-ghost btn-xs text-error">
@@ -451,17 +473,32 @@ defineExpose({
       <fieldset class="fieldset mb-3">
         <legend class="font-semibold text-sm">计算配置</legend>
         <div class="mb-2 w-40">
-          <OptionTreeSelect v-model="form.计算方式" :options="calcMethodOptions" placeholder="— 选择 —" size="sm" />
+          <OptionTreeSelect
+            v-model="form.计算方式"
+            :options="calcMethodOptions"
+            placeholder="— 选择 —"
+            size="sm"
+          />
         </div>
         <template v-if="form.计算方式 === '查表'">
           <div class="gap-2 grid grid-cols-1 sm:grid-cols-2">
             <div>
               <label class="label py-0 text-xs">查表名称</label>
-              <OptionTreeSelect v-model="form.查表名称" :options="allLookupNames" placeholder="—" size="sm" />
+              <OptionTreeSelect
+                v-model="form.查表名称"
+                :options="allLookupNames"
+                placeholder="—"
+                size="sm"
+              />
             </div>
             <div>
               <label class="label py-0 text-xs">匹配方式</label>
-              <OptionTreeSelect v-model="form.匹配方式" :options="matchModeOptions" placeholder="—" size="sm" />
+              <OptionTreeSelect
+                v-model="form.匹配方式"
+                :options="matchModeOptions"
+                placeholder="—"
+                size="sm"
+              />
             </div>
             <div>
               <label class="label py-0 text-xs">输入映射</label><input v-model="form.输入映射" class="input input-bordered input-sm w-full">
@@ -475,14 +512,24 @@ defineExpose({
           <div class="gap-2 grid grid-cols-1 sm:grid-cols-3">
             <div>
               <label class="label py-0 text-xs">基数</label>
-              <OptionTreeSelect v-model="form.百分比基数" :options="fieldSelectOptions" placeholder="选择基数字段" size="sm" />
+              <OptionTreeSelect
+                v-model="form.百分比基数"
+                :options="fieldSelectOptions"
+                placeholder="选择基数字段"
+                size="sm"
+              />
             </div>
             <div>
               <label class="label py-0 text-xs">固定%值</label><input v-model="form.百分比值" class="input input-bordered input-sm w-full">
             </div>
             <div>
               <label class="label py-0 text-xs">动态来源</label>
-              <OptionTreeSelect v-model="form.百分比来源字段" :options="fieldSelectOptions" placeholder="选择来源字段" size="sm" />
+              <OptionTreeSelect
+                v-model="form.百分比来源字段"
+                :options="fieldSelectOptions"
+                placeholder="选择来源字段"
+                size="sm"
+              />
             </div>
           </div>
         </template>
@@ -506,7 +553,9 @@ defineExpose({
                 placeholder="选择字段追加"
                 size="xs"
               />
-              <button class="btn btn-ghost btn-xs" @click="appendFieldToSum(sumFieldToAdd)">追加</button>
+              <button @click="appendFieldToSum(sumFieldToAdd)" class="btn btn-ghost btn-xs">
+                追加
+              </button>
             </div>
           </div>
         </template>
@@ -525,12 +574,14 @@ defineExpose({
                 placeholder="选择字段插入"
                 size="xs"
               />
-              <button class="btn btn-ghost btn-xs" @click="appendFieldToFormula(formulaFieldToAdd)">插入字段</button>
+              <button @click="appendFieldToFormula(formulaFieldToAdd)" class="btn btn-ghost btn-xs">
+                插入字段
+              </button>
               <button
+                @click="appendHelperToFormula(helper.value)"
                 v-for="helper in formulaHelpers"
                 :key="helper.value"
                 class="btn btn-ghost btn-xs"
-                @click="appendHelperToFormula(helper.value)"
               >
                 {{ helper.label }}
               </button>

@@ -8,8 +8,8 @@ export function createEmptyRule(templateId = "") {
     启用: "是",
     固定金额: "",
     所属模板: templateId,
-    条件结构: "",
     条件数据: "",
+    条件结构: "",
     查表名称: "",
     百分比值: "",
     百分比基数: "",
@@ -66,8 +66,7 @@ export function collectConditionIndexes(node = {}, out = []) {
       out.push(idx);
     return out;
   }
-  for (const child of node.children || [])
-    collectConditionIndexes(child, out);
+  for (const child of node.children || []) collectConditionIndexes(child, out);
   return out;
 }
 

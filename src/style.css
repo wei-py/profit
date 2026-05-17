@@ -143,7 +143,6 @@ body {
   cursor: grabbing;
 }
 
-
 /* Keep the custom square UI style even if a component accidentally uses Tailwind rounded utilities. */
 .rounded,
 .rounded-sm,
