@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import CodeTable from "@/components/CodeTable.vue";
 import CreateModal from "@/components/CreateModal.vue";
 import DetailModal from "@/components/DetailModal.vue";
+import EditModal from "@/components/EditModal.vue";
 import RemarkModal from "@/components/RemarkModal.vue";
 import TemplateModal from "@/components/TemplateModal.vue";
 import { useAdminStore } from "@/stores/admin";
@@ -12,6 +13,8 @@ const router = useRouter();
 const store = useAdminStore();
 const showCreate = ref(false);
 const showDetail = ref(false);
+const showEdit = ref(false);
+const editingCode = ref(null);
 const showRemark = ref(false);
 const showTemplate = ref(false);
 const remarkTarget = ref({ code: "", remark: "" });
@@ -48,6 +51,11 @@ function openDetail(code) {
 function openRemark({ code, remark }) {
   remarkTarget.value = { code, remark };
   showRemark.value = true;
+}
+
+function openEdit(c) {
+  editingCode.value = c;
+  showEdit.value = true;
 }
 </script>
 
@@ -96,6 +104,7 @@ function openRemark({ code, remark }) {
       v-if="store.codes.length > 0"
       @delete="store.doDelete"
       @detail="openDetail"
+      @edit="openEdit"
       @remark="openRemark"
       :codes="store.codes"
       :loading="store.loading"
@@ -113,6 +122,9 @@ function openRemark({ code, remark }) {
 
     <!-- 详情弹窗 -->
     <DetailModal v-if="showDetail" @close="showDetail = false" />
+
+    <!-- 编辑弹窗 -->
+    <EditModal v-if="showEdit" @close="showEdit = false" :code="editingCode" />
 
     <!-- 备注弹窗 -->
     <RemarkModal

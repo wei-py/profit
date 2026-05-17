@@ -23,6 +23,7 @@ const form = reactive({});
 
 const fieldEditSteps = [
   {
+    element: "[data-tour=\"field-edit-modal\"]",
     popover: {
       description:
         "定义计算字段。字段键是唯一标识（中文），用于规则中的条件、公式引用。层级决定该字段在新建商品时的显示位置。",
@@ -178,7 +179,7 @@ function deleteField() {
 
 <template>
   <dialog @cancel.prevent class="modal" :open="open">
-    <div class="modal-box w-[min(32rem,calc(100vw-1rem))] max-w-none">
+    <div class="modal-box w-[min(32rem,calc(100vw-1rem))] max-w-none" data-tour="field-edit-modal">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
           {{ fieldIdx >= 0 ? "编辑字段" : "新建字段" }}

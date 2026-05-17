@@ -8,11 +8,41 @@ import OptionGroupModal from "@/components/country/OptionGroupModal.vue";
 import RemoteUrlModal from "@/components/country/RemoteUrlModal.vue";
 import TemplateModal from "@/components/country/TemplateModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
+import { useTour } from "@/composables/useTour";
 import { useConfigStore } from "@/stores/config";
 
 const store = useConfigStore();
 const { openConfigExcel, restoreRemoteUrl, saveConfigExcel } = useFileIO();
+const { startTour } = useTour();
 const CORE_KEYS = ["编号", "国家", "平台", "货币", "货币符号", "汇率", "启用"];
+
+const countryFieldHelpSteps = [
+  {
+    element: "[data-tour=\"country-fields\"]",
+    popover: {
+      description: "字段决定商品页的输入项、输出项和下拉来源。拖动三条杠排序，点击字段键编辑字段。",
+      title: "字段配置",
+    },
+  },
+];
+const countryOptionHelpSteps = [
+  {
+    element: "[data-tour=\"country-options\"]",
+    popover: {
+      description: "选项来源用于树形下拉。拖拽可排序，点击名称进入选项树管理，支持继续添加子级。",
+      title: "选项来源",
+    },
+  },
+];
+const countryTemplateHelpSteps = [
+  {
+    element: "[data-tour=\"country-templates\"]",
+    popover: {
+      description: "模板包含费用规则和查表数据。商品页选择模板后，会按模板生成 SKU 并执行计算。",
+      title: "模板配置",
+    },
+  },
+];
 
 const dragOpts = {
   animation: 150,
@@ -369,7 +399,14 @@ onMounted(() => {
         <h1 class="font-bold text-2xl">配置</h1>
         <span v-if="store.isRemote" class="badge badge-warning badge-sm">远程</span>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2" data-tour="country-toolbar">
+        <button
+          @click="startTour('country')"
+          class="btn btn-circle btn-ghost btn-sm"
+          title="配置页引导"
+        >
+          ?
+        </button>
         <div class="flex">
           <button @click="openConfigExcel" class="btn btn-outline btn-sm rounded-r-none">
             打开配置
@@ -418,7 +455,7 @@ onMounted(() => {
     <div class="flex-1 space-y-4">
       <div class="bg-base-100 border border-base-300 card card-sm">
         <div class="card-body p-3">
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto" data-tour="country-table">
             <table class="table table-sm">
               <thead>
                 <tr>
@@ -452,6 +489,7 @@ onMounted(() => {
                     <td>
                       <span
                         class="country-row-drag-handle flex hover:text-base-content cursor-grab items-center justify-center px-1 py-0.5 select-none text-base-content/30"
+                        data-tour="country-row-drag"
                       >☰</span>
                     </td>
                     <td>
@@ -482,14 +520,23 @@ onMounted(() => {
                   </tr>
                   <tr v-if="expandedId === row.编号 && !isDraggingCp" class="country-expand-row">
                     <td class="bg-base-200/50 p-4" :colspan="configColumns.length + 3">
-                      <div class="gap-4 grid grid-cols-3">
-                        <div class="bg-base-100 card card-sm">
+                      <div class="gap-4 grid grid-cols-3" data-tour="country-expand-panels">
+                        <div class="bg-base-100 card card-sm" data-tour="country-fields">
                           <div class="card-body p-3">
                             <div class="flex items-center justify-between mb-2">
                               <span class="font-semibold text-sm">字段（{{ localFields.length }}）</span>
-                              <button @click="openNewField" class="btn btn-primary btn-xs">
-                                ＋
-                              </button>
+                              <div class="flex gap-1">
+                                <button
+                                  @click="startTour(countryFieldHelpSteps)"
+                                  class="btn btn-circle btn-ghost btn-xs"
+                                  title="字段帮助"
+                                >
+                                  ?
+                                </button>
+                                <button @click="openNewField" class="btn btn-primary btn-xs">
+                                  ＋
+                                </button>
+                              </div>
                             </div>
                             <div v-if="!localFields.length" class="text-base-content/40 text-xs">
                               暂无
@@ -523,11 +570,22 @@ onMounted(() => {
                             </div>
                           </div>
                         </div>
-                        <div class="bg-base-100 card card-sm">
+                        <div class="bg-base-100 card card-sm" data-tour="country-options">
                           <div class="card-body p-3">
                             <div class="flex items-center justify-between mb-2">
                               <span class="font-semibold text-sm">选项来源（{{ localOptGroups.length }}）</span>
-                              <button @click="openNewOpt" class="btn btn-primary btn-xs">＋</button>
+                              <div class="flex gap-1">
+                                <button
+                                  @click="startTour(countryOptionHelpSteps)"
+                                  class="btn btn-circle btn-ghost btn-xs"
+                                  title="选项来源帮助"
+                                >
+                                  ?
+                                </button>
+                                <button @click="openNewOpt" class="btn btn-primary btn-xs">
+                                  ＋
+                                </button>
+                              </div>
                             </div>
                             <div v-if="!localOptGroups.length" class="text-base-content/40 text-xs">
                               暂无
@@ -576,11 +634,22 @@ onMounted(() => {
                             </div>
                           </div>
                         </div>
-                        <div class="bg-base-100 card card-sm">
+                        <div class="bg-base-100 card card-sm" data-tour="country-templates">
                           <div class="card-body p-3">
                             <div class="flex items-center justify-between mb-2">
                               <span class="font-semibold text-sm">模板（{{ localTemplates.length }}）</span>
-                              <button @click="openNewTpl" class="btn btn-primary btn-xs">＋</button>
+                              <div class="flex gap-1">
+                                <button
+                                  @click="startTour(countryTemplateHelpSteps)"
+                                  class="btn btn-circle btn-ghost btn-xs"
+                                  title="模板帮助"
+                                >
+                                  ?
+                                </button>
+                                <button @click="openNewTpl" class="btn btn-primary btn-xs">
+                                  ＋
+                                </button>
+                              </div>
                             </div>
                             <div v-if="!localTemplates.length" class="text-base-content/40 text-xs">
                               暂无

@@ -7,7 +7,7 @@ const store = useActivationStore();
 const code = ref("");
 const fingerprint = ref("");
 const loading = ref(false);
-const response = ref < any > (null);
+const response = ref<any>(null);
 
 onMounted(async () => {
   fingerprint.value = await getFingerprint();
@@ -15,8 +15,7 @@ onMounted(async () => {
 
 async function handleActivate() {
   const trimmed = code.value.trim();
-  if (!trimmed)
-    return;
+  if (!trimmed) return;
   loading.value = true;
   const res = await store.activate(trimmed);
   response.value = res;
@@ -25,8 +24,7 @@ async function handleActivate() {
 
 async function handleValidate() {
   const trimmed = code.value.trim();
-  if (!trimmed)
-    return;
+  if (!trimmed) return;
   loading.value = true;
   const res = await validateCode(trimmed);
   response.value = res;
@@ -38,11 +36,9 @@ async function handleClear() {
   response.value = null;
 }
 
-function statusBadge(s) {
-  if (s === "activated")
-    return "badge-success";
-  if (s === "checking")
-    return "badge-info";
+function statusBadge(s: string) {
+  if (s === "activated") return "badge-success";
+  if (s === "checking") return "badge-info";
   return "badge-warning";
 }
 </script>
@@ -71,7 +67,7 @@ function statusBadge(s) {
             :disabled="loading"
             placeholder="PFT-XXXX-XXXX"
             type="text"
-          >
+          />
         </label>
 
         <div class="flex gap-2">

@@ -1,9 +1,10 @@
 <script setup>
 import { ref, watch } from "vue";
 import { useModalEsc } from "@/composables/useModalEsc";
+import { useTour } from "@/composables/useTour";
 import { execute } from "@/services/rule-engine";
-import { useConfigStore } from "@/stores/config";
 
+import { useConfigStore } from "@/stores/config";
 import { useCreateStore } from "@/stores/create";
 
 const props = defineProps({
@@ -15,6 +16,17 @@ useModalEsc(
   () => props.open,
   () => emit("close"),
 );
+const { startTour } = useTour();
+const reverseCalcHelpSteps = [
+  {
+    element: "[data-tour=\"reverse-calc-modal\"]",
+    popover: {
+      description:
+        "输入目标售价、净利润或利润率中的任意一项，系统会用当前规则估算另外两项。应用后会写回 SKU 售价。",
+      title: "反推计算",
+    },
+  },
+];
 
 const configStore = useConfigStore();
 const createStore = useCreateStore();
@@ -143,10 +155,22 @@ function applyCalc() {
 
 <template>
   <dialog @cancel.prevent class="modal" :open="open">
-    <div class="modal-box w-[min(24rem,calc(100vw-1rem))] max-w-none">
+    <div
+      class="modal-box w-[min(24rem,calc(100vw-1rem))] max-w-none"
+      data-tour="reverse-calc-modal"
+    >
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">反推计算</h3>
-        <button @click="emit('close')" class="btn btn-circle btn-ghost btn-sm">✕</button>
+        <div class="flex gap-1">
+          <button
+            @click="startTour(reverseCalcHelpSteps)"
+            class="btn btn-circle btn-ghost btn-sm"
+            title="反推计算帮助"
+          >
+            ?
+          </button>
+          <button @click="emit('close')" class="btn btn-circle btn-ghost btn-sm">✕</button>
+        </div>
       </div>
       <div class="mb-3 text-base-content/50 text-xs">
         修改任意一个目标值，用当前费用率估算另两个（保存后点"计算"得精确值）

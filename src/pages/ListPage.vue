@@ -8,6 +8,7 @@ import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
 import ReverseCalcModal from "@/components/list/ReverseCalcModal.vue";
 import TraceModal from "@/components/list/TraceModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
+import { useTour } from "@/composables/useTour";
 import {
   groupRecordsByProductId,
   inferVariantAttributes,
@@ -26,6 +27,76 @@ const configStore = useConfigStore();
 const createStore = useCreateStore();
 const listStore = useListStore();
 const { openListExcel, saveListExcel } = useFileIO();
+const { startTour } = useTour();
+
+const productHelpSteps = [
+  {
+    element: "[data-tour=\"product-editor\"]",
+    popover: {
+      description:
+        "先选择国家平台和模板，再填写商品 ID、商品名称、商品级字段和变体属性。读取商品记录后这里会切换为修改商品。",
+      title: "商品编辑区",
+    },
+  },
+  {
+    element: "[data-tour=\"product-actions\"]",
+    popover: {
+      description: "生成 SKU、计算、保存到列表/保存修改都在这里。",
+      title: "商品操作",
+    },
+  },
+];
+const productFieldHelpSteps = [
+  {
+    element: "[data-tour=\"product-fields\"]",
+    popover: {
+      description: "商品级字段会写入当前商品的所有 SKU。下拉字段会自动使用配置里的选项树。",
+      title: "商品级字段",
+    },
+  },
+];
+const variantHelpSteps = [
+  {
+    element: "[data-tour=\"product-variants\"]",
+    popover: {
+      description: "每个变体属性一行，例如颜色=红|蓝，尺码=S|M。点击生成 SKU 后会生成组合。",
+      title: "变体属性",
+    },
+  },
+];
+const skuHelpSteps = [
+  {
+    element: "[data-tour=\"sku-toolbar\"]",
+    popover: {
+      description: "SKU 列表支持表格/卡片、编辑列、分页和拖拽排序。",
+      title: "SKU 列表操作区",
+    },
+  },
+  {
+    element: "[data-tour=\"sku-table\"]",
+    popover: {
+      description: "输入每个 SKU 的字段，点击计算得到输出结果。拖动左侧三条杠调整 SKU 顺序。",
+      title: "SKU 明细",
+    },
+  },
+];
+const recordsHelpSteps = [
+  {
+    element: "[data-tour=\"records-toolbar\"]",
+    popover: {
+      description: "商品记录默认表格显示。可以切换卡片、编辑列和分页查看。",
+      title: "商品记录操作区",
+    },
+  },
+  {
+    element: "[data-tour=\"records-table\"]",
+    popover: {
+      description:
+        "同商品 ID 的 SKU 会作为一整块显示和拖拽。点击操作列的复制图标可读取整组数据到上方修改。",
+      title: "商品记录列表",
+    },
+  },
+];
 
 const baseDragOpts = {
   animation: 150,
@@ -590,7 +661,14 @@ function handleJumpSkuPage() {
   <div class="flex flex-col h-full">
     <div class="flex items-center justify-between mb-4">
       <h1 class="font-bold text-2xl">商品列表</h1>
-      <div class="flex gap-2">
+      <div class="flex gap-2" data-tour="list-toolbar">
+        <button
+          @click="startTour('list')"
+          class="btn btn-circle btn-ghost btn-sm"
+          title="商品页引导"
+        >
+          ?
+        </button>
         <button @click="openListExcel" class="btn btn-outline btn-sm">打开列表</button>
         <button @click="saveListExcel" class="btn btn-outline btn-sm">保存列表</button>
         <button @click="showCreatePanel = !showCreatePanel" class="btn btn-primary btn-sm">
@@ -601,7 +679,11 @@ function handleJumpSkuPage() {
 
     <div class="flex-1 space-y-4">
       <!-- 新建面板 -->
-      <div v-if="showCreatePanel" class="bg-base-100 border border-base-300 card card-sm">
+      <div
+        v-if="showCreatePanel"
+        class="bg-base-100 border border-base-300 card card-sm"
+        data-tour="product-editor"
+      >
         <div class="card-body">
           <div class="flex items-center justify-between gap-2">
             <h2 class="card-title text-lg">
@@ -611,16 +693,25 @@ function handleJumpSkuPage() {
                 class="badge badge-primary badge-sm"
               >商品ID：{{ editingSourceProductId || createStore.productId }}</span>
             </h2>
-            <button
-              v-if="isEditingProduct"
-              @click="clearEditMode"
-              class="btn btn-ghost btn-xs"
-              title="退出修改状态"
-            >
-              退出修改
-            </button>
+            <div class="flex gap-1 items-center">
+              <button
+                @click="startTour(productHelpSteps)"
+                class="btn btn-circle btn-ghost btn-xs"
+                title="商品编辑帮助"
+              >
+                ?
+              </button>
+              <button
+                v-if="isEditingProduct"
+                @click="clearEditMode"
+                class="btn btn-ghost btn-xs"
+                title="退出修改状态"
+              >
+                退出修改
+              </button>
+            </div>
           </div>
-          <div class="flex flex-wrap gap-4 items-start">
+          <div class="flex flex-wrap gap-4 items-start" data-tour="product-preset">
             <div class="flex flex-col gap-1">
               <label class="label py-1"><span class="label-text">国家平台</span></label>
               <OptionTreeSelect
@@ -660,7 +751,16 @@ function handleJumpSkuPage() {
           <template v-if="createStore.selectedTemplateId">
             <div class="flex flex-col gap-4 mt-4 lg:flex-row">
               <div class="w-full shrink-0 space-y-2 lg:w-60">
-                <div class="font-semibold text-sm">商品级字段</div>
+                <div class="flex items-center justify-between" data-tour="product-fields">
+                  <div class="font-semibold text-sm">商品级字段</div>
+                  <button
+                    @click="startTour(productFieldHelpSteps)"
+                    class="btn btn-circle btn-ghost btn-xs"
+                    title="商品级字段帮助"
+                  >
+                    ?
+                  </button>
+                </div>
                 <FieldInput
                   @update:model-value="createStore.productInputs[f.字段键] = $event"
                   v-for="f in createStore.productFields"
@@ -678,7 +778,16 @@ function handleJumpSkuPage() {
                     placeholder="如: RS"
                   >
                 </div>
-                <div class="font-semibold pt-2 text-sm">变体属性</div>
+                <div class="flex items-center justify-between pt-2" data-tour="product-variants">
+                  <div class="font-semibold text-sm">变体属性</div>
+                  <button
+                    @click="startTour(variantHelpSteps)"
+                    class="btn btn-circle btn-ghost btn-xs"
+                    title="变体帮助"
+                  >
+                    ?
+                  </button>
+                </div>
                 <div
                   v-for="(attr, i) in createStore.variantAttributes"
                   :key="i"
@@ -705,7 +814,7 @@ function handleJumpSkuPage() {
                 <button @click="createStore.addVariantAttribute" class="btn btn-ghost btn-xs">
                   ＋ 变体属性
                 </button>
-                <div class="flex gap-2 pt-3">
+                <div class="flex gap-2 pt-3" data-tour="product-actions">
                   <button @click="createStore.generateSkus()" class="btn btn-sm">生成SKU</button>
                   <button
                     @click="handleCalculate"
@@ -721,9 +830,16 @@ function handleJumpSkuPage() {
               </div>
 
               <div class="min-w-0 flex-1 overflow-x-auto">
-                <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center justify-between mb-1" data-tour="sku-toolbar">
                   <span class="font-semibold text-sm">SKU 列表</span>
                   <div class="flex gap-1 items-center text-xs">
+                    <button
+                      @click="startTour(skuHelpSteps)"
+                      class="btn btn-circle btn-ghost btn-xs"
+                      title="SKU 帮助"
+                    >
+                      ?
+                    </button>
                     <span>表格</span>
                     <input
                       @change="skuViewMode = $event.target.checked ? 'card' : 'table'"
@@ -750,7 +866,7 @@ function handleJumpSkuPage() {
                   </div>
                 </div>
                 <template v-if="skuViewMode === 'table' && createStore.skus.length">
-                  <table class="table table-xs">
+                  <table class="table table-xs" data-tour="sku-table">
                     <thead>
                       <tr>
                         <th class="bg-base-100 left-0 sticky w-10 z-10" />
@@ -881,6 +997,7 @@ function handleJumpSkuPage() {
                   <div
                     v-draggable="[pagedSkus, skuDragOpts]"
                     class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+                    data-tour="sku-table"
                   >
                     <div
                       v-for="(item, pIdx) in pagedSkus"
@@ -1032,9 +1149,16 @@ function handleJumpSkuPage() {
       <!-- 商品列表 -->
       <div class="bg-base-100 border border-base-300 card card-sm">
         <div class="card-body">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between" data-tour="records-toolbar">
             <h2 class="card-title text-lg">商品记录（{{ listStore.records.length }} 行）</h2>
             <div class="flex gap-1 items-center text-xs">
+              <button
+                @click="startTour(recordsHelpSteps)"
+                class="btn btn-circle btn-ghost btn-xs"
+                title="商品记录帮助"
+              >
+                ?
+              </button>
               <span>表格</span>
               <input
                 @change="recordViewMode = $event.target.checked ? 'card' : 'table'"
@@ -1064,6 +1188,7 @@ function handleJumpSkuPage() {
               <table
                 v-draggable="[pagedRecordGroups, recordGroupDragOpts]"
                 class="table table-sm product-record-table"
+                data-tour="records-table"
               >
                 <thead>
                   <tr>
@@ -1090,6 +1215,7 @@ function handleJumpSkuPage() {
                       <span
                         v-if="rowIdx === 0"
                         class="record-group-drag-handle flex hover:text-base-content cursor-grab items-center justify-center px-1 py-0.5 select-none text-base-content/30"
+                        data-tour="record-group-drag"
                         title="拖动整个商品ID分组"
                       >☰</span>
                     </td>
@@ -1107,7 +1233,7 @@ function handleJumpSkuPage() {
                       </template>
                     </td>
                     <td class="record-action-cell">
-                      <div class="flex justify-center gap-1">
+                      <div class="flex justify-center gap-1" data-tour="record-actions">
                         <button
                           @click="loadRecordBackByRow(row)"
                           class="btn btn-ghost btn-xs"
@@ -1143,6 +1269,7 @@ function handleJumpSkuPage() {
                 <div class="flex gap-2 items-center border-b border-base-300 pb-1">
                   <span
                     class="record-group-drag-handle cursor-grab select-none text-base-content/30"
+                    data-tour="record-group-drag"
                     title="拖动整个商品ID分组"
                   >☰</span>
                   <span class="font-semibold truncate">{{
@@ -1191,7 +1318,7 @@ function handleJumpSkuPage() {
                       </span>
                     </div>
                   </template>
-                  <div class="flex gap-1 mt-1">
+                  <div class="flex gap-1 mt-1" data-tour="record-actions">
                     <button
                       @click="loadRecordBackByRow(row)"
                       class="btn btn-ghost btn-xs flex-1"

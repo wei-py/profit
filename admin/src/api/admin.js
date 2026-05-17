@@ -35,6 +35,10 @@ export function deleteCode(code) {
   return request("/api/admin/delete", { code });
 }
 
+export function updateCode(code, updates) {
+  return request("/api/admin/update", { code, ...updates });
+}
+
 export function checkCode(code) {
   return request("/api/admin/check", { code });
 }

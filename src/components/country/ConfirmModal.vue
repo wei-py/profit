@@ -1,5 +1,6 @@
 <script setup>
 import { useModalEsc } from "@/composables/useModalEsc";
+import { useTour } from "@/composables/useTour";
 
 const props = defineProps({
   message: String,
@@ -10,12 +11,31 @@ useModalEsc(
   () => props.open,
   () => emit("close"),
 );
+const { startTour } = useTour();
+const confirmHelpSteps = [
+  {
+    element: "[data-tour=\"confirm-modal\"]",
+    popover: {
+      description: "这是高风险操作确认。确认前请检查提示内容，确定后才会执行删除或覆盖。",
+      title: "确认操作",
+    },
+  },
+];
 </script>
 
 <template>
   <dialog @cancel.prevent class="modal" :open="open">
-    <div class="max-w-sm modal-box">
-      <h3 class="font-bold mb-4 text-lg">确认操作</h3>
+    <div class="max-w-sm modal-box" data-tour="confirm-modal">
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="font-bold text-lg">确认操作</h3>
+        <button
+          @click="startTour(confirmHelpSteps)"
+          class="btn btn-circle btn-ghost btn-sm"
+          title="确认操作帮助"
+        >
+          ?
+        </button>
+      </div>
       <p class="text-sm">
         {{ message }}
       </p>

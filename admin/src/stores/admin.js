@@ -7,6 +7,7 @@ import {
   getTemplate,
   listCodes,
   saveTemplate,
+  updateCode,
   updateRemark,
 } from "@/api/admin";
 
@@ -124,6 +125,27 @@ export const useAdminStore = defineStore("admin", () => {
     }
   }
 
+  async function doUpdate(code, updates) {
+    loading.value = true;
+    error.value = "";
+    try {
+      const resp = await updateCode(code, updates);
+      if (resp.success) {
+        await fetchCodes();
+        return resp;
+      }
+      error.value = resp.error || "更新失败";
+      return resp;
+    }
+    catch (e) {
+      error.value = e.message || "网络错误";
+      return { error: e.message, success: false };
+    }
+    finally {
+      loading.value = false;
+    }
+  }
+
   async function doUpdateRemark(code, remark) {
     try {
       const resp = await updateRemark(code, remark);
@@ -173,6 +195,7 @@ export const useAdminStore = defineStore("admin", () => {
     doDelete,
     doGetTemplate,
     doSaveTemplate,
+    doUpdate,
     doUpdateRemark,
     error,
     fetchCodes,

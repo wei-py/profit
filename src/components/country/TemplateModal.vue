@@ -69,6 +69,7 @@ const previewFields = computed(() =>
 
 const templateEditSteps = [
   {
+    element: "[data-tour=\"template-modal\"]",
     popover: {
       description:
         "计算模板定义一套费用计算方案，包含多条费用规则和查表数据。一个模板归属一个国家平台。",
@@ -330,7 +331,10 @@ function onConfirmOk() {
 
 <template>
   <dialog @cancel.prevent class="modal" :open="open">
-    <div class="modal-box max-h-[90vh] w-[min(54rem,calc(100vw-1rem))] max-w-none overflow-y-auto">
+    <div
+      class="modal-box max-h-[90vh] w-[min(54rem,calc(100vw-1rem))] max-w-none overflow-y-auto"
+      data-tour="template-modal"
+    >
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
           {{ templateIdx >= 0 ? "编辑模板" : "新建模板" }}
@@ -365,6 +369,13 @@ function onConfirmOk() {
         <div class="flex items-center justify-between mb-2">
           <span class="font-semibold text-sm">费用规则（{{ rules.length }} 条）</span>
           <div class="flex gap-1">
+            <button
+              @click="startTour(templateEditSteps)"
+              class="btn btn-circle btn-ghost btn-xs"
+              title="费用规则帮助"
+            >
+              ?
+            </button>
             <button @click="toggleRulePreview" class="btn btn-outline btn-xs">
               {{ showRulePreview ? "收起" : "试算" }}
             </button>
@@ -478,6 +489,13 @@ function onConfirmOk() {
             data-tour="tpl-lookups"
           >查表数据（{{ allLookupNames.length }} 个）</span>
           <div class="flex gap-1 items-center">
+            <button
+              @click="startTour(templateEditSteps)"
+              class="btn btn-circle btn-ghost btn-xs"
+              title="查表数据帮助"
+            >
+              ?
+            </button>
             <input
               v-if="showNewLookupInput"
               v-model="newLookupName"

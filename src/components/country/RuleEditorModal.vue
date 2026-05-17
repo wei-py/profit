@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
 import { useModalEsc } from "@/composables/useModalEsc";
+import { useTour } from "@/composables/useTour";
 import {
   BUILTIN_FORMULA_HELPERS,
   CALC_METHOD_OPTIONS,
@@ -9,13 +10,13 @@ import {
   MATCH_MODE_OPTIONS,
   YES_NO_OPTIONS,
 } from "@/constants/schema";
+
 import {
   createEmptyCondition,
   createEmptyRule,
   createInitialConditionTree,
   serializeConditionState,
 } from "@/domain/rule-form";
-
 import { useConfigStore } from "@/stores/config";
 
 const props = defineProps({
@@ -29,6 +30,7 @@ useModalEsc(
   () => props.open,
   () => emit("close"),
 );
+const { startTour } = useTour();
 
 const store = useConfigStore();
 const form = reactive({});
@@ -39,6 +41,31 @@ const condTree = ref({
   op: "AND",
   type: "group",
 });
+
+const ruleEditorHelpSteps = [
+  {
+    element: "[data-tour=\"rule-basic\"]",
+    popover: {
+      description: "先填写规则编号、费用名称、顺序和输出字段。顺序越小越先执行。",
+      title: "规则基础信息",
+    },
+  },
+  {
+    element: "[data-tour=\"rule-conditions\"]",
+    popover: {
+      description:
+        "条件支持 AND/OR 组合、子组嵌套，以及等于、大于、介于、属于、为空等灵活运算。字段和值优先使用树形选择器。",
+      title: "触发条件",
+    },
+  },
+  {
+    element: "[data-tour=\"rule-calc\"]",
+    popover: {
+      description: "计算方式支持查表、百分比、固定值、加总和公式。公式可插入字段和内置函数。",
+      title: "计算配置",
+    },
+  },
+];
 
 const outputKeys = computed(() =>
   store
@@ -349,8 +376,15 @@ defineExpose({
         <h3 class="font-bold text-lg">
           {{ ruleIdx >= 0 ? "编辑规则" : "新建规则" }}
         </h3>
+        <button
+          @click="startTour(ruleEditorHelpSteps)"
+          class="btn btn-circle btn-ghost btn-sm"
+          title="规则帮助"
+        >
+          ?
+        </button>
       </div>
-      <div class="gap-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-4">
+      <div class="gap-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-4" data-tour="rule-basic">
         <div>
           <label class="label py-0 text-xs">编号</label><input v-model="form.编号" class="input input-bordered input-sm w-full">
         </div>
@@ -384,7 +418,7 @@ defineExpose({
         />
       </div>
 
-      <fieldset class="bg-base-200 fieldset mb-3 p-3">
+      <fieldset class="bg-base-200 fieldset mb-3 p-3" data-tour="rule-conditions">
         <legend class="font-semibold text-sm">条件</legend>
         <template v-for="(item, i) in flatTree" :key="i">
           <div
@@ -470,7 +504,7 @@ defineExpose({
           </div>
         </template>
       </fieldset>
-      <fieldset class="fieldset mb-3">
+      <fieldset class="fieldset mb-3" data-tour="rule-calc">
         <legend class="font-semibold text-sm">计算配置</legend>
         <div class="mb-2 w-40">
           <OptionTreeSelect

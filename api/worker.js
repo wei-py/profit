@@ -302,6 +302,57 @@ async function handleAdminDelete(request, env) {
   });
 }
 
+async function handleAdminUpdate(request, env) {
+  if (!checkAdmin(request, env))
+    return json({ error: "未授权" }, 401);
+  const { code, expires_at, max_devices, new_code, status } = await request.json();
+
+  const act = await env.DB.prepare("SELECT id FROM activations WHERE code = ?").bind(code).first();
+  if (!act) {
+    return json({ error: "激活码不存在", success: false });
+  }
+
+  if (new_code && new_code !== code) {
+    const existing = await env.DB.prepare("SELECT id FROM activations WHERE code = ?")
+      .bind(new_code)
+      .first();
+    if (existing) {
+      return json({ error: "新激活码已存在", success: false });
+    }
+  }
+
+  const sets = [];
+  const params = [];
+
+  if (new_code !== undefined) {
+    sets.push("code = ?");
+    params.push(new_code);
+  }
+  if (status !== undefined) {
+    sets.push("status = ?");
+    params.push(status);
+  }
+  if (max_devices !== undefined) {
+    sets.push("max_devices = ?");
+    params.push(max_devices);
+  }
+  if (expires_at !== undefined) {
+    sets.push("expires_at = ?");
+    params.push(expires_at || null);
+  }
+
+  if (sets.length === 0) {
+    return json({ error: "没有需要更新的字段", success: false });
+  }
+
+  params.push(act.id);
+  await env.DB.prepare(`UPDATE activations SET ${sets.join(", ")} WHERE id = ?`)
+    .bind(...params)
+    .run();
+
+  return json({ success: true });
+}
+
 async function handleAdminList(request, env) {
   if (!checkAdmin(request, env))
     return json({ error: "未授权" }, 401);
@@ -749,6 +800,13 @@ export default {
             ...Object.fromEntries(res.headers),
             ...cors,
           },
+          status: res.status,
+        });
+      }
+      if (url.pathname === "/api/admin/update" && request.method === "POST") {
+        const res = await handleAdminUpdate(request, env);
+        return new Response(res.body, {
+          headers: { ...Object.fromEntries(res.headers), ...cors },
           status: res.status,
         });
       }

@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
 
 import { useModalEsc } from "@/composables/useModalEsc";
+import { useTour } from "@/composables/useTour";
 
 const props = defineProps({
   filterKey: {
@@ -28,6 +29,16 @@ useModalEsc(
   () => props.open,
   () => emit("close"),
 );
+const { startTour } = useTour();
+const colEditorHelpSteps = [
+  {
+    element: "[data-tour=\"col-editor-modal\"]",
+    popover: {
+      description: "拖拽左侧三条杠调整列顺序，关闭右侧开关即可隐藏列。完成后只影响当前列表显示。",
+      title: "编辑列",
+    },
+  },
+];
 
 const localOrder = ref([]);
 const localHidden = ref(new Set());
@@ -69,12 +80,25 @@ function saveOrder() {
 
 <template>
   <div v-if="open" class="modal modal-open">
-    <div class="max-h-[80vh] modal-box" style="width: min(48rem, calc(100vw - 1rem))">
+    <div
+      class="max-h-[80vh] modal-box"
+      data-tour="col-editor-modal"
+      style="width: min(48rem, calc(100vw - 1rem))"
+    >
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">
           {{ title }}
         </h3>
-        <button @click="emit('close')" class="btn btn-circle btn-ghost btn-sm">✕</button>
+        <div class="flex gap-1">
+          <button
+            @click="startTour(colEditorHelpSteps)"
+            class="btn btn-circle btn-ghost btn-sm"
+            title="编辑列帮助"
+          >
+            ?
+          </button>
+          <button @click="emit('close')" class="btn btn-circle btn-ghost btn-sm">✕</button>
+        </div>
       </div>
       <div class="mb-2 text-base-content/50 text-xs">
         拖拽左侧三条杠调整列顺序，点击右侧开关控制显示/隐藏

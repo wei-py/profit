@@ -24,6 +24,7 @@ const yesNoOptions = ["是", "否"];
 
 const countryEditSteps = [
   {
+    element: "[data-tour=\"country-edit-modal\"]",
     popover: {
       description:
         "修改国家平台的基本信息。编号、国家、平台、货币等核心字段。自定义列也可以在这里编辑。",
@@ -66,7 +67,7 @@ function save() {
 
 <template>
   <dialog @cancel.prevent class="modal" :open="open">
-    <div class="max-w-lg modal-box">
+    <div class="max-w-lg modal-box" data-tour="country-edit-modal">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">编辑国家</h3>
         <button @click="startTour(countryEditSteps)" class="btn btn-circle btn-ghost btn-sm">

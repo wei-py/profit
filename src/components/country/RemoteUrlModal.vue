@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import { useFileIO } from "@/composables/useFileIO";
 import { useModalEsc } from "@/composables/useModalEsc";
+import { useTour } from "@/composables/useTour";
 
 import { useConfigStore } from "@/stores/config";
 
@@ -16,6 +17,17 @@ useModalEsc(
 
 const store = useConfigStore();
 const { openRemoteConfigExcel } = useFileIO();
+const { startTour } = useTour();
+const remoteHelpSteps = [
+  {
+    element: "[data-tour=\"remote-url-modal\"]",
+    popover: {
+      description:
+        "粘贴可直接访问的 Excel 配置链接后点击加载。远程配置用于查看和临时使用，保存请使用本地文件。",
+      title: "远程配置",
+    },
+  },
+];
 
 const url = ref("");
 const loading = ref(false);
@@ -50,9 +62,16 @@ async function load() {
 
 <template>
   <dialog @cancel.prevent class="modal" :open="open">
-    <div class="max-w-md modal-box">
+    <div class="max-w-md modal-box" data-tour="remote-url-modal">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg">远程配置</h3>
+        <button
+          @click="startTour(remoteHelpSteps)"
+          class="btn btn-circle btn-ghost btn-sm"
+          title="远程配置帮助"
+        >
+          ?
+        </button>
       </div>
       <div class="space-y-3">
         <div>

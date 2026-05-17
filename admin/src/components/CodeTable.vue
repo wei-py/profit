@@ -7,7 +7,7 @@ const props = defineProps({
   loading: { default: false, type: Boolean },
 });
 
-const emit = defineEmits(["detail", "delete", "remark"]);
+const emit = defineEmits(["detail", "delete", "remark", "edit"]);
 
 const confirmCode = ref("");
 
@@ -80,6 +80,7 @@ function remarkPreview(text) {
           <td>
             <div class="flex gap-1">
               <button @click="emit('detail', c.code)" class="btn btn-xs btn-ghost">详情</button>
+              <button @click="emit('edit', c)" class="btn btn-xs btn-ghost">编辑</button>
               <button @click="handleDelete(c.code)" class="btn btn-xs btn-ghost text-error">
                 删除
               </button>
@@ -119,6 +120,7 @@ function remarkPreview(text) {
           <button @click="emit('detail', c.code)" class="btn btn-xs btn-outline flex-1">
             详情
           </button>
+          <button @click="emit('edit', c)" class="btn btn-xs btn-outline flex-1">编辑</button>
           <button @click="handleDelete(c.code)" class="btn btn-xs btn-outline text-error flex-1">
             删除
           </button>
@@ -128,7 +130,7 @@ function remarkPreview(text) {
   </div>
 
   <!-- 删除确认 -->
-  <dialog v-if="confirmCode" class="modal">
+  <dialog v-if="confirmCode" class="modal modal-open">
     <div class="modal-box max-w-full sm:max-w-md">
       <h3 class="font-bold text-lg">确认删除</h3>
       <p class="py-2">

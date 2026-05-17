@@ -34,10 +34,24 @@ const dragOpts = {
 
 const lookupEditSteps = [
   {
+    element: "[data-tour=\"lookup-modal\"]",
     popover: {
-      description:
-        "编辑费率表数据。表名可修改（同步更新所有规则中的引用）。＋行列增删行列。列头✕可删除整列。",
+      description: "编辑费率表数据。表名可修改，并会同步更新所有规则中的引用。",
       title: "查表编辑",
+    },
+  },
+  {
+    element: "[data-tour=\"lookup-actions\"]",
+    popover: {
+      description: "这里可以新增行和列。新增列需要先填写列名再点击＋列。",
+      title: "行列操作",
+    },
+  },
+  {
+    element: "[data-tour=\"lookup-table\"]",
+    popover: {
+      description: "表格内容可直接编辑。拖动左侧三条杠调整行顺序，列头的✕可删除整列。",
+      title: "查表数据",
     },
   },
 ];
@@ -130,7 +144,10 @@ function save() {
 
 <template>
   <dialog @cancel.prevent class="modal" :open="open">
-    <div class="modal-box max-h-[85vh] w-[min(52rem,calc(100vw-1rem))] max-w-none overflow-y-auto">
+    <div
+      class="modal-box max-h-[85vh] w-[min(52rem,calc(100vw-1rem))] max-w-none overflow-y-auto"
+      data-tour="lookup-modal"
+    >
       <div class="flex gap-2 items-center mb-4">
         <h3 class="font-bold text-lg">查表：</h3>
         <input v-model="newName" class="font-mono input input-bordered input-sm w-48">
@@ -138,7 +155,7 @@ function save() {
           ?
         </button>
       </div>
-      <div class="flex gap-2 mb-3">
+      <div class="flex gap-2 mb-3" data-tour="lookup-actions">
         <button @click="addRow" class="btn btn-ghost btn-xs">＋ 行</button>
         <button @click="addCol" class="btn btn-ghost btn-xs">＋ 列</button>
         <input
@@ -148,7 +165,7 @@ function save() {
           placeholder="列名"
         >
       </div>
-      <div v-if="rowsLocal.length" class="overflow-x-auto">
+      <div v-if="rowsLocal.length" class="overflow-x-auto" data-tour="lookup-table">
         <table class="table table-xs">
           <thead>
             <tr>

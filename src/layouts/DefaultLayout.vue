@@ -18,15 +18,17 @@ const tabs = [
     label: "商品",
     path: "/list",
   },
-  // {
-  //   label: "测试",
-  //   path: "/test",
-  // },
+  {
+    label: "测试",
+    path: "/test",
+  },
 ];
 
 const activeTab = computed(() => {
-  return tabs.find(tab => route.path.startsWith(tab.path)).path;
+  return tabs.find(tab => route.path.startsWith(tab.path))?.path || tabs[0].path;
 });
+
+const activeTourType = computed(() => (activeTab.value === "/country" ? "country" : "list"));
 
 function goTab(path) {
   if (!path.length) {
@@ -44,20 +46,23 @@ function goTab(path) {
     >
       <div class="flex gap-1 items-center">
         <span class="font-bold mr-4 text-lg">利润工具</span>
-        <button
-          @click="goTab(t.path)"
-          v-for="t in tabs"
-          :key="t.path"
-          class="btn btn-sm"
-          :class="activeTab === t.path ? 'btn-primary' : 'btn-ghost'"
-        >
-          {{ t.label }}
-        </button>
+        <div class="flex gap-1 items-center" data-tour="app-tabs">
+          <button
+            @click="goTab(t.path)"
+            v-for="t in tabs"
+            :key="t.path"
+            class="btn btn-sm"
+            :class="activeTab === t.path ? 'btn-primary' : 'btn-ghost'"
+          >
+            {{ t.label }}
+          </button>
+        </div>
       </div>
       <div class="flex gap-1 items-center">
         <button
           @click="toggleTheme()"
           class="btn btn-circle btn-ghost btn-sm"
+          data-tour="theme-toggle"
           :title="isDark ? '浅色' : '深色'"
         >
           <svg
@@ -91,14 +96,23 @@ function goTab(path) {
             />
           </svg>
         </button>
-        <div class="dropdown dropdown-end">
-          <button class="btn btn-circle btn-ghost btn-sm" tabindex="0">?</button>
+        <div class="dropdown dropdown-end" data-tour="app-help">
+          <button class="btn btn-circle btn-ghost btn-sm" tabindex="0" title="帮助">?</button>
           <ul
             class="bg-base-100 border dropdown-content menu mt-1 p-2 rounded-box shadow w-52 z-50"
             tabindex="0"
           >
             <li>
+              <button @click="startTour(activeTourType)">当前页面引导</button>
+            </li>
+            <li>
               <button @click="startTour('overview')">应用概览</button>
+            </li>
+            <li>
+              <button @click="startTour('country')">配置页引导</button>
+            </li>
+            <li>
+              <button @click="startTour('list')">商品页引导</button>
             </li>
           </ul>
         </div>
