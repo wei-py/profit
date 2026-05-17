@@ -8,6 +8,48 @@ const VERSION_URL
   = "https://profit-admin.xu-wei.space/api/files/8b6b9353-6f1a-4996-9803-8ff67f56b774-version.json";
 
 /**
+ * 检测当前运行平台，返回 Tauri updater 格式的平台 key。
+ * @returns {"windows-x86_64" | "darwin-x86_64" | "darwin-aarch64" | null}
+ */
+async function getPlatformKey() {
+  const ua = navigator.userAgent;
+
+  // Windows
+  if (/windows/i.test(ua)) {
+    return "windows-x86_64";
+  }
+
+  // macOS — 尝试检测 Apple Silicon
+  if (/mac/i.test(ua)) {
+    try {
+      const highEntropy = await navigator.userAgentData?.getHighEntropyValues(["architecture"]);
+      if (highEntropy?.architecture === "arm") {
+        return "darwin-aarch64";
+      }
+    }
+    catch { /* fallback to x86_64 */ }
+    return "darwin-x86_64";
+  }
+
+  return null;
+}
+
+/**
+ * 从 version.json 数据中解析当前平台对应的下载链接。
+ * 优先使用 platforms 中的链接，fallback 到 download_url。
+ * @param {object} data - 远程 version.json 解析结果
+ * @returns {Promise<string | null>}
+ */
+async function resolveDownloadUrl(data) {
+  if (!data) return null;
+  const key = await getPlatformKey();
+  if (key && data.platforms?.[key]) {
+    return data.platforms[key];
+  }
+  return data.download_url || null;
+}
+
+/**
  * 解析 semver 版本号。
  * @param {string} v - 版本字符串如 "1.2.0"
  * @returns {{ major: number, minor: number, patch: number }} 解析后的版本对象
@@ -96,5 +138,6 @@ export function useVersionCheck() {
     updateAvailable,
     updateInfo,
     versionUrl: VERSION_URL,
+    resolveDownloadUrl,
   };
 }

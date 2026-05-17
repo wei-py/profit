@@ -11,7 +11,7 @@ const route = useRoute();
 const { restoreLastPath } = useFileIO();
 const { init: initTheme } = useTheme();
 const activationStore = useActivationStore();
-const { checkVersion, currentVersion, forceUpdate, updateAvailable, updateInfo }
+const { checkVersion, currentVersion, forceUpdate, updateAvailable, updateInfo, resolveDownloadUrl }
   = useVersionCheck();
 
 const showUpdateModal = ref(false);
@@ -27,9 +27,10 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function handleOpenDownload() {
-  if (updateInfo.value?.download_url) {
-    window.open(updateInfo.value.download_url, "_blank");
+async function handleOpenDownload() {
+  const url = await resolveDownloadUrl(updateInfo.value);
+  if (url) {
+    window.open(url, "_blank");
   }
 }
 
