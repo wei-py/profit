@@ -8,7 +8,8 @@ const store = useAdminStore();
 function formatTime(t) {
   if (!t)
     return "-";
-  return dayjs(t).format("YYYY-MM-DD HH:mm");
+  const s = String(t).replace(" ", "T") + (String(t).includes("Z") ? "" : "Z");
+  return dayjs(s).format("YYYY-MM-DD HH:mm");
 }
 
 function statusBadge(status) {

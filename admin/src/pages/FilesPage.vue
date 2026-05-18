@@ -94,7 +94,10 @@ function typeLabel(item) {
 
 function timeLabel(t) {
   if (!t) return "-";
-  return t.replace("T", " ").slice(0, 16);
+  const normalized = t.includes("T") ? t : t.replace(" ", "T");
+  const d = normalized.endsWith("Z") ? new Date(normalized) : new Date(normalized + "Z");
+  const local = new Date(d.getTime() + 8 * 3600 * 1000);
+  return local.toISOString().replace("T", " ").slice(0, 16);
 }
 
 function startNewFolder() {

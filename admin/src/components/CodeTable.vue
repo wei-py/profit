@@ -22,7 +22,8 @@ function statusBadge(status) {
 function formatTime(t) {
   if (!t)
     return "永久";
-  return dayjs(t).format("YYYY-MM-DD HH:mm");
+  const s = String(t).replace(" ", "T") + (String(t).includes("Z") ? "" : "Z");
+  return dayjs(s).format("YYYY-MM-DD HH:mm");
 }
 
 function handleDelete(code) {
