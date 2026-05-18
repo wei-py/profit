@@ -40,12 +40,13 @@ async function apiPost(apiBase, secret, urlPath, body) {
   return resp.json();
 }
 
-async function uploadFile(apiBase, secret, filePath, remotePath, overwrite) {
+async function uploadFile(apiBase, secret, filePath, remotePath, overwrite, makePublic) {
   const form = new FormData();
   const buf = fs.readFileSync(filePath);
   form.append("file", new Blob([buf]), path.basename(filePath));
   form.append("path", remotePath);
   if (overwrite) form.append("overwrite", "true");
+  if (makePublic) form.append("public", "true");
 
   const resp = await fetch(`${apiBase}/api/admin/files/upload`, {
     method: "POST",
@@ -62,20 +63,20 @@ async function uploadPlatform(apiBase, secret, label, latestPath, archivePath, m
 
   if (manualFile) {
     console.log(`  uploading manual: ${path.basename(manualFile)} → ${latestPath}`);
-    await uploadFile(apiBase, secret, manualFile, latestPath, true);
+    await uploadFile(apiBase, secret, manualFile, latestPath, true, true);
   }
   if (updaterFile) {
     console.log(`  uploading updater: ${path.basename(updaterFile)} → ${latestPath}`);
-    await uploadFile(apiBase, secret, updaterFile, latestPath, true);
+    await uploadFile(apiBase, secret, updaterFile, latestPath, true, true);
   }
 
   if (manualFile) {
     console.log(`  archiving manual: ${archivePath}`);
-    await uploadFile(apiBase, secret, manualFile, archivePath, false);
+    await uploadFile(apiBase, secret, manualFile, archivePath, false, true);
   }
   if (updaterFile) {
     console.log(`  archiving updater: ${archivePath}`);
-    await uploadFile(apiBase, secret, updaterFile, archivePath, false);
+    await uploadFile(apiBase, secret, updaterFile, archivePath, false, true);
   }
 
   const manualName = manualFile ? path.basename(manualFile) : null;
@@ -168,6 +169,7 @@ async function main() {
   versionForm.append("file", new Blob([JSON.stringify(versionJson, null, 2)]), "version.json");
   versionForm.append("path", "releases");
   versionForm.append("overwrite", "true");
+  versionForm.append("public", "true");
   const versionResp = await fetch(`${apiBase}/api/admin/files/upload`, {
     method: "POST",
     headers: { Authorization: `Bearer ${secret}` },

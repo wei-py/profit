@@ -662,6 +662,7 @@ async function handleFilesUpload(request, env) {
 
   const mimeType = file.type || "application/octet-stream";
   const r2Key = pathStr ? `${pathStr}/${fileName}` : fileName;
+  const isPublic = formData.get("public") === "true" ? 1 : 0;
 
   if (existing && overwrite) {
     // 覆盖时复用已有 r2_key，保证公开链接不变
@@ -670,9 +671,9 @@ async function handleFilesUpload(request, env) {
       httpMetadata: { contentType: mimeType },
     });
     await env.DB.prepare(
-      "UPDATE files SET size = ?, mime_type = ?, updated_at = datetime('now') WHERE id = ?",
+      "UPDATE files SET size = ?, mime_type = ?, is_public = ?, updated_at = datetime('now') WHERE id = ?",
     )
-      .bind(file.size, mimeType, existing.id)
+      .bind(file.size, mimeType, isPublic, existing.id)
       .run();
     return json({
       file: {
@@ -681,6 +682,7 @@ async function handleFilesUpload(request, env) {
         name: fileName,
         r2_key: r2Key,
         size: file.size,
+        is_public: isPublic,
       },
       success: true,
     });
@@ -692,13 +694,13 @@ async function handleFilesUpload(request, env) {
 
   const fileId = uuid();
   await env.DB.prepare(
-    "INSERT INTO files (id, name, parent_id, type, size, mime_type, r2_key) VALUES (?, ?, ?, 'file', ?, ?, ?)",
+    "INSERT INTO files (id, name, parent_id, type, size, mime_type, r2_key, is_public) VALUES (?, ?, ?, 'file', ?, ?, ?, ?)",
   )
-    .bind(fileId, fileName, pid, file.size, mimeType, r2Key)
+    .bind(fileId, fileName, pid, file.size, mimeType, r2Key, isPublic)
     .run();
 
   return json({
-    file: { id: fileId, mime_type: mimeType, name: fileName, r2_key: r2Key, size: file.size },
+    file: { id: fileId, mime_type: mimeType, name: fileName, r2_key: r2Key, size: file.size, is_public: isPublic },
     success: true,
   });
 }
