@@ -23,6 +23,17 @@ async fn activate(code: String) -> Result<activation::ActivateResponse, String> 
 }
 
 #[tauri::command]
+fn get_platform() -> String {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("macos", "aarch64") => "darwin-aarch64".into(),
+        ("macos", _) => "darwin-x86_64".into(),
+        ("windows", _) => "windows-x86_64".into(),
+        ("linux", _) => "linux-x86_64".into(),
+        (os, arch) => format!("{}-{}", os, arch),
+    }
+}
+
+#[tauri::command]
 async fn validate(code: String) -> Result<activation::ActivateResponse, String> {
     let fp = device_fingerprint();
     activation::validate(code, fp).await
@@ -34,7 +45,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .invoke_handler(tauri::generate_handler![read_xlsx_images, get_fingerprint, activate, validate])
+        .plugin(tauri_plugin_shell::init())
+        .invoke_handler(tauri::generate_handler![read_xlsx_images, get_fingerprint, activate, validate, get_platform])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(

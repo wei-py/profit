@@ -1,59 +1,29 @@
+import { invoke } from "@tauri-apps/api/core";
 import { ref } from "vue";
 
-/** 当前应用版本，构建时从 package.json 注入 */
-const CURRENT_VERSION = "0.1.0";
+const CURRENT_VERSION = __APP_VERSION__;
 
-/** 远程 version.json 公开链接 */
 const VERSION_URL
   = "https://profit-admin.xu-wei.space/api/files/8b6b9353-6f1a-4996-9803-8ff67f56b774-version.json";
 
-/**
- * 检测当前运行平台，返回 Tauri updater 格式的平台 key。
- * @returns {"windows-x86_64" | "darwin-x86_64" | "darwin-aarch64" | null}
- */
 async function getPlatformKey() {
-  const ua = navigator.userAgent;
-
-  // Windows
-  if (/windows/i.test(ua)) {
-    return "windows-x86_64";
+  try {
+    return await invoke("get_platform");
   }
-
-  // macOS — 尝试检测 Apple Silicon
-  if (/mac/i.test(ua)) {
-    try {
-      const highEntropy = await navigator.userAgentData?.getHighEntropyValues(["architecture"]);
-      if (highEntropy?.architecture === "arm") {
-        return "darwin-aarch64";
-      }
-    }
-    catch { /* fallback to x86_64 */ }
-    return "darwin-x86_64";
+  catch {
+    return null;
   }
-
-  return null;
 }
 
-/**
- * 从 version.json 数据中解析当前平台对应的下载链接。
- * 优先使用 platforms 中的链接，fallback 到 download_url。
- * @param {object} data - 远程 version.json 解析结果
- * @returns {Promise<string | null>}
- */
 async function resolveDownloadUrl(data) {
-  if (!data) return null;
+  if (!data?.platforms)
+    return null;
   const key = await getPlatformKey();
-  if (key && data.platforms?.[key]) {
-    return data.platforms[key];
-  }
-  return data.download_url || null;
+  if (!key)
+    return null;
+  return data.platforms[key] || null;
 }
 
-/**
- * 解析 semver 版本号。
- * @param {string} v - 版本字符串如 "1.2.0"
- * @returns {{ major: number, minor: number, patch: number }} 解析后的版本对象
- */
 function parseVersion(v) {
   const parts = String(v).trim().split(".");
   return {
@@ -63,12 +33,6 @@ function parseVersion(v) {
   };
 }
 
-/**
- * 比较版本号。
- * @param {string} a - 版本 A
- * @param {string} b - 版本 B
- * @returns {number} a > b 返回 1，a < b 返回 -1，相等返回 0
- */
 function compareVersion(a, b) {
   const pa = parseVersion(a);
   const pb = parseVersion(b);
@@ -91,7 +55,6 @@ export function useVersionCheck() {
   const forceUpdate = ref(false);
   const error = ref("");
 
-  /** 请求远程 version.json 并比对版本。 */
   async function checkVersion() {
     loading.value = true;
     error.value = "";
@@ -102,7 +65,6 @@ export function useVersionCheck() {
     try {
       const resp = await fetch(VERSION_URL);
       if (!resp.ok) {
-        // version.json 不存在或未公开，视为无更新
         loading.value = false;
         return;
       }
@@ -135,9 +97,9 @@ export function useVersionCheck() {
     error,
     forceUpdate,
     loading,
+    resolveDownloadUrl,
     updateAvailable,
     updateInfo,
     versionUrl: VERSION_URL,
-    resolveDownloadUrl,
   };
 }

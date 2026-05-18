@@ -1,4 +1,5 @@
 <script setup>
+import { open } from "@tauri-apps/plugin-shell";
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useFileIO } from "@/composables/useFileIO";
@@ -11,8 +12,14 @@ const route = useRoute();
 const { restoreLastPath } = useFileIO();
 const { init: initTheme } = useTheme();
 const activationStore = useActivationStore();
-const { checkVersion, currentVersion, forceUpdate, updateAvailable, updateInfo, resolveDownloadUrl }
-  = useVersionCheck();
+const {
+  checkVersion,
+  currentVersion,
+  forceUpdate,
+  resolveDownloadUrl,
+  updateAvailable,
+  updateInfo,
+} = useVersionCheck();
 
 const showUpdateModal = ref(false);
 const showForceModal = ref(false);
@@ -30,7 +37,7 @@ function formatSize(bytes) {
 async function handleOpenDownload() {
   const url = await resolveDownloadUrl(updateInfo.value);
   if (url) {
-    window.open(url, "_blank");
+    await open(url);
   }
 }
 

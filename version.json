@@ -1,11 +1,10 @@
 {
-  "version": "1.0.0",
   "force": false,
-  "release_notes": "修复了, 测试更新， 测试更新",
-  "download_url": "https://profit-admin.xu-wei.space/api/files/xxx-profit_1.2.0_x64-setup.exe",
   "platforms": {
-    "windows-x86_64": "https://profit-admin.xu-wei.space/api/files/xxx-profit_x64-setup.nsis",
+    "darwin-aarch64": "https://profit-admin.xu-wei.space/api/files/63f8890b-4ce9-4286-8a68-420949a1300b-profit_1.0.0_aarch64.dmg",
     "darwin-x86_64": "https://profit-admin.xu-wei.space/api/files/xxx-profit_x64.dmg",
-    "darwin-aarch64": "https://profit-admin.xu-wei.space/api/files/xxx-profit_aarch64.dmg"
-  }
+    "windows-x86_64": "https://profit-admin.xu-wei.space/api/files/xxx-profit_x64-setup.nsis"
+  },
+  "release_notes": "修复了, 测试更新， 测试更新",
+  "version": "1.0.0"
 }

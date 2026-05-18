@@ -79,12 +79,10 @@ const outputKeys = computed(() =>
 const allLookupNames = computed(() => Object.keys(store.lookupTables));
 const flatTree = computed(() => (condTree.value ? flattenTree(condTree.value) : []));
 const fieldSelectOptions = computed(() =>
-  store
-    .getFieldsByCountry(props.cpId)
-    .map(f => ({
-      label: f.字段名称 ? `${f.字段名称}（${f.字段键}）` : f.字段键,
-      value: f.字段键,
-    })),
+  store.getFieldsByCountry(props.cpId).map(f => ({
+    label: f.字段名称 ? `${f.字段名称}（${f.字段键}）` : f.字段键,
+    value: f.字段键,
+  })),
 );
 
 const yesNoOptions = YES_NO_OPTIONS;

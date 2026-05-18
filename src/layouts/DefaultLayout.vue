@@ -8,6 +8,7 @@ const router = useRouter();
 const route = useRoute();
 const { isDark, toggleTheme } = useTheme();
 const { startTour } = useTour();
+const appVersion = __APP_VERSION__;
 
 const tabs = [
   {
@@ -114,6 +115,7 @@ function goTab(path) {
             <li>
               <button @click="startTour('list')">商品页引导</button>
             </li>
+            <li class="menu-title text-xs opacity-50">v{{ appVersion }}</li>
           </ul>
         </div>
       </div>

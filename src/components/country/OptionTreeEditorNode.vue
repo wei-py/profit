@@ -135,8 +135,8 @@ function itemHasChild(itemNode) {
           @delete-group="(...args) => emit('delete-group', ...args)"
           @delete-item="(...args) => emit('delete-item', ...args)"
           @toggle="(...args) => emit('toggle', ...args)"
-          :dragOpts="dragOpts"
           @update-item-label="(...args) => emit('update-item-label', ...args)"
+          :dragOpts="dragOpts"
           :expandedIds="expandedIds"
           :groupNode="itemNode.childGroup"
           inlineGroup
@@ -206,8 +206,8 @@ function itemHasChild(itemNode) {
         @delete-group="(...args) => emit('delete-group', ...args)"
         @delete-item="(...args) => emit('delete-item', ...args)"
         @toggle="(...args) => emit('toggle', ...args)"
-        :dragOpts="dragOpts"
         @update-item-label="(...args) => emit('update-item-label', ...args)"
+        :dragOpts="dragOpts"
         :expandedIds="expandedIds"
         :groupNode="itemNode.childGroup"
         inlineGroup

@@ -12,7 +12,7 @@
     "tdev": "tauri dev",
     "tbuild": "tauri build",
     "lint": "eslint .",
-    "format": "eslint . --fix",
+    "format": "npx oxfmt@latest && eslint . --fix",
     "code": "node scripts/code.cjs"
   },
   "dependencies": {
@@ -21,6 +21,7 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-fs": "^2",
+    "@tauri-apps/plugin-shell": "^2",
     "@tauri-apps/plugin-store": "^2",
     "dayjs": "^1",
     "driver.js": "^1.4.0",
