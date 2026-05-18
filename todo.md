@@ -144,11 +144,20 @@ Phase 2（后续按需）：
 <!--20. 为什么点击立即更新没有反应呢，最外层的问号可以查看版本号-->
 <!--pnpm tauri build --bundles dmg-->
 
+
+
+<!--22. CI/CD-->
+
+
+<!--ADMIN_API_BASE=https://profit-admin.xu-wei.space
+ADMIN_SECRET=你的 admin secret
+TAURI_SIGNING_PRIVATE_KEY=src-tauri/profit-updater.key 的完整内容
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD=-->
+
+
 15. admin 移动端能够预览 json excel
 17. 右上角多一些问号，引导用户使用，在每一个弹窗中，也在每一块操作的区域， 旧的引导也跟进一下
 18. 美客多
 20. 最后支持远程数据库
 19. 能不能把这个 dasui 给到用户自己配呢
-
-
-给一下这个项目的描述给我，我要给其他的 ai 生成 logo
+21. 给一下这个项目的描述给我，我要给其他的 ai 生成 logo

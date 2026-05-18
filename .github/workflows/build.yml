@@ -1,24 +1,68 @@
-name: Build EXE
+name: Release App
 
 on:
   push:
     branches: [master, main]
-  workflow_dispatch:
 
 jobs:
-  build-exe:
-    runs-on: windows-latest
+  build-mac:
+    runs-on: macos-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
-        with: {version: 9}
+        with: { version: 9 }
       - uses: actions/setup-node@v6
-        with: {node-version: 22, cache: pnpm}
+        with: { node-version: 22, cache: pnpm }
       - uses: dtolnay/rust-toolchain@stable
-      - run: pnpm install && pnpm tauri build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tbuild
       - uses: actions/upload-artifact@v7
         with:
-          name: profit-windows
+          name: mac-artifacts
           path: |
-            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+
+  build-windows:
+    runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with: { version: 9 }
+      - uses: actions/setup-node@v6
+        with: { node-version: 22, cache: pnpm }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tbuild
+      - uses: actions/upload-artifact@v7
+        with:
+          name: win-artifacts
+          path: |
             src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.nsis.zip
+            src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
+
+  upload-release:
+    needs: [build-mac, build-windows]
+    runs-on: ubuntu-latest
+    env:
+      ADMIN_API_BASE: ${{ secrets.ADMIN_API_BASE }}
+      ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 22 }
+      - uses: actions/download-artifact@v7
+        with:
+          name: mac-artifacts
+      - uses: actions/download-artifact@v7
+        with:
+          name: win-artifacts
+      - run: node scripts/release-upload.cjs
