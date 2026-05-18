@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
   createFolder,
   deleteFile,
@@ -11,7 +12,9 @@ import {
   uploadFile,
 } from "@/api/admin";
 
-const breadcrumb = ref([]);
+const route = useRoute();
+const router = useRouter();
+
 const items = ref([]);
 const loading = ref(false);
 const error = ref("");
@@ -28,22 +31,25 @@ const conflictFile = ref(null);
 const deleteTarget = ref(null);
 const toast = ref("");
 
-const currentParentId = computed(() => {
-  if (breadcrumb.value.length === 0) {
-    return null;
-  }
-  return breadcrumb.value[breadcrumb.value.length - 1].id;
+const currentPath = computed(() => {
+  const m = route.params.pathMatch;
+  if (Array.isArray(m)) return m.join("/");
+  return m || "";
 });
 
-onMounted(() => {
-  fetchItems();
+const breadcrumb = computed(() => {
+  if (!currentPath.value) return [];
+  return currentPath.value.split("/").map((name, i, arr) => ({
+    name,
+    path: arr.slice(0, i + 1).join("/"),
+  }));
 });
 
 async function fetchItems() {
   loading.value = true;
   error.value = "";
   try {
-    const resp = await listFiles(currentParentId.value);
+    const resp = await listFiles(currentPath.value);
     if (resp.success) {
       items.value = resp.items;
     }
@@ -57,54 +63,37 @@ async function fetchItems() {
   loading.value = false;
 }
 
+onMounted(fetchItems);
+watch(() => route.fullPath, fetchItems);
+
 function enterFolder(item) {
-  breadcrumb.value.push({ id: item.id, name: item.name });
-  fetchItems();
+  router.push(`/files/${currentPath.value ? `${currentPath.value}/` : ""}${item.name}`);
 }
 
-function navigateToBreadcrumb(index) {
-  breadcrumb.value = breadcrumb.value.slice(0, index + 1);
-  fetchItems();
+function navigateToBreadcrumb(breadPath) {
+  router.push(`/files/${breadPath}`);
 }
 
 function formatSize(bytes) {
-  if (!bytes) {
-    return "-";
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
+  if (!bytes) return "-";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function typeLabel(item) {
-  if (item.type === "folder") {
-    return "文件夹";
-  }
+  if (item.type === "folder") return "文件夹";
   if (item.mime_type) {
-    if (item.mime_type.startsWith("image/")) {
-      return "图片";
-    }
-    if (item.mime_type.includes("pdf")) {
-      return "PDF";
-    }
-    if (item.mime_type.includes("spreadsheet") || item.mime_type.includes("excel")) {
-      return "Excel";
-    }
-    if (item.mime_type.startsWith("text/")) {
-      return "文本";
-    }
+    if (item.mime_type.startsWith("image/")) return "图片";
+    if (item.mime_type.includes("pdf")) return "PDF";
+    if (item.mime_type.includes("spreadsheet") || item.mime_type.includes("excel")) return "Excel";
+    if (item.mime_type.startsWith("text/")) return "文本";
   }
   return "文件";
 }
 
 function timeLabel(t) {
-  if (!t) {
-    return "-";
-  }
+  if (!t) return "-";
   return t.replace("T", " ").slice(0, 16);
 }
 
@@ -112,21 +101,15 @@ function startNewFolder() {
   showNewFolder.value = true;
   newFolderName.value = "";
   setTimeout(() => {
-    const el = document.getElementById("new-folder-input");
-    if (el) {
-      el.focus();
-    }
+    document.getElementById("new-folder-input")?.focus();
   }, 50);
 }
 
 async function confirmNewFolder() {
   const name = newFolderName.value.trim();
-  if (!name) {
-    showNewFolder.value = false;
-    return;
-  }
+  if (!name) { showNewFolder.value = false; return; }
   try {
-    const resp = await createFolder(name, currentParentId.value);
+    const resp = await createFolder(name, currentPath.value);
     if (resp.success) {
       showNewFolder.value = false;
       await fetchItems();
@@ -145,15 +128,11 @@ function cancelNewFolder() {
   newFolderName.value = "";
 }
 
-function triggerUpload() {
-  uploadInput.value?.click();
-}
+function triggerUpload() { uploadInput.value?.click(); }
 
 async function handleFileSelect(e) {
   const file = e.target.files?.[0];
-  if (!file) {
-    return;
-  }
+  if (!file) return;
   await doUpload(file);
   e.target.value = "";
 }
@@ -162,7 +141,7 @@ async function doUpload(file, overwrite = false) {
   loading.value = true;
   error.value = "";
   try {
-    const resp = await uploadFile(file, currentParentId.value, overwrite);
+    const resp = await uploadFile(file, currentPath.value, overwrite);
     if (resp.success) {
       await fetchItems();
     }
@@ -182,38 +161,23 @@ async function doUpload(file, overwrite = false) {
 async function confirmOverwrite() {
   const file = conflictFile.value;
   conflictFile.value = null;
-  if (file) {
-    await doUpload(file, true);
-  }
+  if (file) await doUpload(file, true);
 }
 
-function onDragOver(e) {
-  e.preventDefault();
-  dropActive.value = true;
-}
-
-function onDragLeave() {
-  dropActive.value = false;
-}
-
+function onDragOver(e) { e.preventDefault(); dropActive.value = true; }
+function onDragLeave() { dropActive.value = false; }
 async function onDrop(e) {
   e.preventDefault();
   dropActive.value = false;
   const file = e.dataTransfer?.files?.[0];
-  if (file) {
-    await doUpload(file);
-  }
+  if (file) await doUpload(file);
 }
 
 function startRename(item) {
   editingId.value = item.id;
   editName.value = item.name;
   setTimeout(() => {
-    const el = document.getElementById(`rename-input-${item.id}`);
-    if (el) {
-      el.focus();
-      el.select();
-    }
+    document.getElementById(`rename-input-${item.id}`)?.focus();
   }, 50);
 }
 
@@ -221,35 +185,19 @@ async function confirmRename() {
   const id = editingId.value;
   const name = editName.value.trim();
   editingId.value = null;
-  if (!id || !name) {
-    return;
-  }
+  if (!id || !name) return;
   try {
     const resp = await renameFile(id, name);
-    if (resp.success) {
-      await fetchItems();
-    }
-    else {
-      error.value = resp.error || "重命名失败";
-    }
+    if (resp.success) await fetchItems();
+    else error.value = resp.error || "重命名失败";
   }
-  catch (e) {
-    error.value = e.message || "网络错误";
-  }
+  catch (e) { error.value = e.message || "网络错误"; }
 }
 
-function cancelRename() {
-  editingId.value = null;
-  editName.value = "";
-}
-
+function cancelRename() { editingId.value = null; editName.value = ""; }
 function handleRenameKey(e) {
-  if (e.key === "Enter") {
-    confirmRename();
-  }
-  if (e.key === "Escape") {
-    cancelRename();
-  }
+  if (e.key === "Enter") confirmRename();
+  if (e.key === "Escape") cancelRename();
 }
 
 async function handleTogglePublic(item) {
@@ -259,63 +207,31 @@ async function handleTogglePublic(item) {
       item.is_public = resp.is_public ? 1 : 0;
       item._publicUrl = resp.url;
     }
-    else {
-      error.value = resp.error || "操作失败";
-    }
+    else { error.value = resp.error || "操作失败"; }
   }
-  catch (e) {
-    error.value = e.message || "网络错误";
-  }
+  catch (e) { error.value = e.message || "网络错误"; }
 }
 
 function copyLink(item) {
   const url = item._publicUrl || getFileDownloadUrl(item.r2_key);
-  navigator.clipboard
-    .writeText(url)
-    .then(() => {
-      toast.value = "链接已复制";
-      setTimeout(() => {
-        toast.value = "";
-      }, 2000);
-    })
-    .catch(() => {
-      error.value = "复制失败";
-    });
+  navigator.clipboard.writeText(url).then(() => {
+    toast.value = "链接已复制";
+    setTimeout(() => { toast.value = ""; }, 2000);
+  }).catch(() => { error.value = "复制失败"; });
 }
 
-async function handleDownload(item) {
-  if (item.is_public && item.r2_key) {
-    window.open(getFileDownloadUrl(item.r2_key), "_blank");
-    return;
-  }
-  const resp = await downloadFile(item.id, item.name);
-  if (!resp.success) {
-    error.value = resp.error || "下载失败";
-  }
-}
-
-function handleDelete(item) {
-  deleteTarget.value = item;
-}
+function handleDelete(item) { deleteTarget.value = item; }
 
 async function confirmDelete() {
   const item = deleteTarget.value;
   deleteTarget.value = null;
-  if (!item) {
-    return;
-  }
+  if (!item) return;
   try {
     const resp = await deleteFile(item.id);
-    if (resp.success) {
-      await fetchItems();
-    }
-    else {
-      error.value = resp.error || "删除失败";
-    }
+    if (resp.success) await fetchItems();
+    else error.value = resp.error || "删除失败";
   }
-  catch (e) {
-    error.value = e.message || "网络错误";
-  }
+  catch (e) { error.value = e.message || "网络错误"; }
 }
 </script>
 
@@ -328,20 +244,28 @@ async function confirmDelete() {
   >
     <!-- 面包屑 -->
     <div class="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto">
-      <button @click="navigateToBreadcrumb(-1)" class="btn btn-xs btn-ghost whitespace-nowrap">
+      <button
+        @click="navigateToBreadcrumb('')"
+        class="btn btn-xs btn-ghost whitespace-nowrap"
+        :class="{ 'font-bold': !currentPath }"
+      >
         📂 根目录
       </button>
-      <template v-for="(crumb, i) in breadcrumb" :key="crumb.id">
+      <template v-for="(crumb, i) in breadcrumb" :key="crumb.path">
         <span class="text-base-content/40">/</span>
         <button
-          v-if="i < breadcrumb.length - 1"
-          @click="navigateToBreadcrumb(i)"
+          @click="navigateToBreadcrumb(crumb.path)"
           class="btn btn-xs btn-ghost whitespace-nowrap"
+          :class="{ 'font-bold': i === breadcrumb.length - 1 }"
         >
           {{ crumb.name }}
         </button>
-        <span v-else class="font-bold text-xs sm:text-sm whitespace-nowrap">{{ crumb.name }}</span>
       </template>
+    </div>
+
+    <!-- 当前路径信息 -->
+    <div v-if="currentPath" class="text-xs text-base-content/50">
+      当前路径：<span class="font-mono">/{{ currentPath }}</span>
     </div>
 
     <!-- 操作栏 -->
@@ -351,12 +275,7 @@ async function confirmDelete() {
           📁 新建文件夹
         </button>
         <button @click="triggerUpload" class="btn btn-xs sm:btn-sm btn-ghost">⬆ 上传文件</button>
-        <input
-          @change="handleFileSelect"
-          ref="uploadInput"
-          class="hidden"
-          type="file"
-        >
+        <input @change="handleFileSelect" ref="uploadInput" class="hidden" type="file">
         <span class="text-xs text-base-content/50 ml-2">共 {{ items.length }} 项</span>
       </div>
       <button @click="fetchItems" class="btn btn-xs sm:btn-sm btn-ghost">刷新</button>
@@ -395,7 +314,7 @@ async function confirmDelete() {
       释放文件以上传
     </div>
 
-    <!-- 文件表格 (桌面) -->
+    <!-- 文件表格 -->
     <div v-if="!loading && items.length > 0" class="hidden sm:block overflow-auto flex-1">
       <table class="table table-sm">
         <thead>
@@ -410,13 +329,8 @@ async function confirmDelete() {
         </thead>
         <tbody>
           <tr v-for="item in items" :key="item.id">
-            <!-- 名称 -->
             <td>
-              <div
-                v-if="item.type === 'folder'"
-                @click="enterFolder(item)"
-                class="cursor-pointer hover:underline"
-              >
+              <div v-if="item.type === 'folder'" @click="enterFolder(item)" class="cursor-pointer hover:underline">
                 📁 {{ item.name }}
               </div>
               <template v-else>
@@ -432,125 +346,27 @@ async function confirmDelete() {
                 </div>
               </template>
             </td>
-            <!-- 类型 -->
             <td class="text-xs text-base-content/60">{{ typeLabel(item) }}</td>
-            <!-- 大小 -->
-            <td class="text-xs text-base-content/60">
-              {{ item.type === "folder" ? "-" : formatSize(item.size) }}
-            </td>
-            <!-- 公开 -->
+            <td class="text-xs text-base-content/60">{{ item.type === "folder" ? "-" : formatSize(item.size) }}</td>
             <td>
               <div v-if="item.type === 'folder'" class="text-base-content/30 text-xs">-</div>
               <div v-else class="flex items-center gap-1">
-                <input
-                  @change="handleTogglePublic(item)"
-                  :checked="item.is_public === 1"
-                  class="toggle toggle-sm"
-                  type="checkbox"
-                >
-                <button
-                  v-if="item.is_public === 1"
-                  @click="copyLink(item)"
-                  class="btn btn-xs btn-ghost btn-circle"
-                  title="复制链接"
-                >
-                  🔗
-                </button>
+                <input @change="handleTogglePublic(item)" :checked="item.is_public === 1" class="toggle toggle-sm" type="checkbox">
+                <button v-if="item.is_public === 1" @click="copyLink(item)" class="btn btn-xs btn-ghost btn-circle" title="复制链接">🔗</button>
               </div>
             </td>
-            <!-- 修改时间 -->
             <td class="text-xs text-base-content/50">{{ timeLabel(item.updated_at) }}</td>
-            <!-- 操作 -->
             <td>
               <div class="flex gap-1">
-                <button
-                  v-if="item.type === 'folder'"
-                  @click="enterFolder(item)"
-                  class="btn btn-xs btn-ghost"
-                >
-                  打开
-                </button>
-                <button v-else @click="handleDownload(item)" class="btn btn-xs btn-ghost">
-                  下载
-                </button>
+                <button v-if="item.type === 'folder'" @click="enterFolder(item)" class="btn btn-xs btn-ghost">打开</button>
+                <button v-else @click="downloadFile(item.id, item.name)" class="btn btn-xs btn-ghost">下载</button>
                 <button @click="startRename(item)" class="btn btn-xs btn-ghost">改名</button>
-                <button @click="handleDelete(item)" class="btn btn-xs btn-ghost text-error">
-                  删除
-                </button>
+                <button @click="handleDelete(item)" class="btn btn-xs btn-ghost text-error">删除</button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
-    </div>
-
-    <!-- 文件卡片 (移动端) -->
-    <div
-      v-if="!loading && items.length > 0"
-      class="sm:hidden flex flex-col gap-2 overflow-auto flex-1"
-    >
-      <div
-        v-for="item in items"
-        :key="item.id"
-        class="bg-base-100 border border-base-300 card card-sm"
-      >
-        <div class="card-body p-3">
-          <div class="flex items-center justify-between">
-            <span class="font-semibold text-sm truncate mr-2">{{ item.name }}</span>
-          </div>
-          <div class="flex items-center gap-2 text-xs text-base-content/50">
-            <span>{{ typeLabel(item) }}</span>
-            <span v-if="item.type !== 'folder'">· {{ formatSize(item.size) }}</span>
-          </div>
-          <div class="text-xs text-base-content/50">修改: {{ timeLabel(item.updated_at) }}</div>
-          <div class="flex gap-1 mt-1">
-            <template v-if="item.type === 'folder'">
-              <button @click="enterFolder(item)" class="btn btn-xs btn-outline flex-1">打开</button>
-            </template>
-            <template v-else>
-              <button @click="handleDownload(item)" class="btn btn-xs btn-outline flex-1">
-                下载
-              </button>
-            </template>
-            <button
-              v-if="editingId !== item.id"
-              @click="startRename(item)"
-              class="btn btn-xs btn-ghost"
-            >
-              改名
-            </button>
-            <div v-else class="flex items-center gap-1">
-              <input
-                v-model="editName"
-                @blur="confirmRename"
-                @keydown="handleRenameKey"
-                :id="`rename-input-${item.id}`"
-                class="input input-xs input-bordered w-24"
-              >
-            </div>
-            <button @click="handleDelete(item)" class="btn btn-xs btn-ghost text-error">
-              删除
-            </button>
-          </div>
-          <div v-if="item.type !== 'folder'" class="flex items-center gap-1 mt-1 text-xs">
-            <input
-              @change="handleTogglePublic(item)"
-              :checked="item.is_public === 1"
-              class="toggle toggle-xs"
-              type="checkbox"
-            >
-            <span class="text-base-content/50">公开</span>
-            <button
-              v-if="item.is_public === 1"
-              @click="copyLink(item)"
-              class="btn btn-xs btn-ghost btn-circle"
-              title="复制链接"
-            >
-              🔗
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- 空状态 -->
@@ -566,9 +382,7 @@ async function confirmDelete() {
     <dialog v-if="conflictFile" class="modal modal-open">
       <div class="modal-box">
         <h3 class="font-bold text-lg">文件已存在</h3>
-        <p class="py-2">
-          同名文件 <span class="font-mono">{{ conflictFile.name }}</span> 已存在，是否覆盖？
-        </p>
+        <p class="py-2">同名文件 <span class="font-mono">{{ conflictFile.name }}</span> 已存在，是否覆盖？</p>
         <div class="modal-action">
           <button @click="conflictFile = null" class="btn btn-sm">取消</button>
           <button @click="confirmOverwrite" class="btn btn-sm btn-warning">覆盖</button>
@@ -584,10 +398,8 @@ async function confirmDelete() {
       <div class="modal-box">
         <h3 class="font-bold text-lg">确认删除</h3>
         <p class="py-2">
-          确定要删除
-          <span class="font-mono">{{ deleteTarget.name }}</span>
-          <template v-if="deleteTarget.type === 'folder'"> 及其中的所有文件</template>
-          吗？此操作不可恢复。
+          确定要删除 <span class="font-mono">{{ deleteTarget.name }}</span>
+          <template v-if="deleteTarget.type === 'folder'"> 及其中的所有文件</template> 吗？
         </p>
         <div class="modal-action">
           <button @click="deleteTarget = null" class="btn btn-sm">取消</button>
@@ -601,9 +413,7 @@ async function confirmDelete() {
 
     <!-- Toast -->
     <div v-if="toast" class="toast toast-top toast-end">
-      <div class="alert alert-success">
-        <span>{{ toast }}</span>
-      </div>
+      <div class="alert alert-success"><span>{{ toast }}</span></div>
     </div>
   </div>
 </template>

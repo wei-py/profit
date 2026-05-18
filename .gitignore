@@ -15,6 +15,10 @@ node_modules/.vite-temp/
 
 src-tauri/target/
 
+# updater signing keys
+*.key
+!*.key.pub
+
 *.log
 
 # pnpm
@@ -22,5 +26,8 @@ src-tauri/target/
 
 # api
 api/.wrangler/
+
+# release
+.env.release
 
 .dev.vars

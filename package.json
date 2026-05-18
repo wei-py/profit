@@ -5,12 +5,13 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/sync-version.cjs && vite build",
     "preview": "vite preview",
     "deploy": "wrangler pages deploy dist --project-name=profit",
     "tauri": "tauri",
     "tdev": "tauri dev",
-    "tbuild": "tauri build",
+    "tbuild": "node scripts/build.cjs",
+    "release:upload": "node scripts/release-upload.cjs",
     "lint": "eslint .",
     "format": "npx oxfmt@latest && eslint . --fix",
     "code": "node scripts/code.cjs"
@@ -22,6 +23,7 @@
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-fs": "^2",
     "@tauri-apps/plugin-shell": "^2",
+    "@tauri-apps/plugin-updater": "^2",
     "@tauri-apps/plugin-store": "^2",
     "dayjs": "^1",
     "driver.js": "^1.4.0",

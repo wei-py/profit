@@ -46,6 +46,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::default().build())
         .invoke_handler(tauri::generate_handler![read_xlsx_images, get_fingerprint, activate, validate, get_platform])
         .setup(|app| {
             if cfg!(debug_assertions) {

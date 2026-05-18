@@ -150,3 +150,5 @@ Phase 2（后续按需）：
 
 19. 能不能把这个 dasui 给到用户自己配呢
 20. 为什么点击立即更新没有反应呢，最外层的问号可以查看版本号
+
+pnpm tauri build --bundles dmg

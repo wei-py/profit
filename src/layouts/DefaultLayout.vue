@@ -37,6 +37,10 @@ function goTab(path) {
   }
   router.push(path);
 }
+
+function checkUpdate() {
+  window.dispatchEvent(new CustomEvent("profit-check-update"));
+}
 </script>
 
 <template>
@@ -114,6 +118,9 @@ function goTab(path) {
             </li>
             <li>
               <button @click="startTour('list')">商品页引导</button>
+            </li>
+            <li>
+              <button @click="checkUpdate">检查更新</button>
             </li>
             <li class="menu-title text-xs opacity-50">v{{ appVersion }}</li>
           </ul>

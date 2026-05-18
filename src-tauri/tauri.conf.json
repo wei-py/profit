@@ -22,6 +22,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -31,7 +32,15 @@
     ],
     "targets": "all"
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://profit-admin.xu-wei.space/api/files/releases/version.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQxNDAyMjY5QzdFQjNGRUEKUldUcVArdkhhU0pBMGM2UEZ4aFl2Y3ozczBiMEdXcEhqcXNBbTIydS9ZZi9Wa04rT0RVZU9EMjYK"
+    }
+  },
   "identifier": "com.profit.app",
   "productName": "profit",
-  "version": "0.1.0"
+  "version": "1.0.0"
 }

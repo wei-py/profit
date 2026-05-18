@@ -15,7 +15,7 @@ const routes = [
   {
     meta: { requiresAuth: true },
     name: "files",
-    path: "/files",
+    path: "/files/:pathMatch(.*)*",
     component: () => import("@/pages/FilesPage.vue"),
   },
 ];

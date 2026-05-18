@@ -57,24 +57,24 @@ export function saveTemplate(value) {
 
 // ===== 文件管理 =====
 
-export async function listFiles(parentId) {
+export async function listFiles(filePath) {
   const resp = await fetch(`${getApiBase()}/api/admin/files/list`, {
-    body: JSON.stringify({ parent_id: parentId || null }),
+    body: JSON.stringify({ path: filePath || "" }),
     headers: getHeaders(),
     method: "POST",
   });
   return resp.json();
 }
 
-export function createFolder(name, parentId) {
-  return request("/api/admin/files/folder", { name, parent_id: parentId || null });
+export function createFolder(name, parentPath) {
+  return request("/api/admin/files/folder", { name, path: parentPath || "" });
 }
 
-export async function uploadFile(file, parentId, overwrite = false) {
+export async function uploadFile(file, filePath, overwrite = false) {
   const formData = new FormData();
   formData.append("file", file);
-  if (parentId) {
-    formData.append("parent_id", parentId);
+  if (filePath) {
+    formData.append("path", filePath);
   }
   if (overwrite) {
     formData.append("overwrite", "true");
@@ -101,7 +101,7 @@ export function deleteFile(id) {
 }
 
 export function getFileDownloadUrl(r2Key) {
-  return `${getApiBase()}/api/files/${r2Key}`;
+  return `${getApiBase()}/api/files/${encodeURI(r2Key)}`;
 }
 
 export async function downloadFile(id, filename) {

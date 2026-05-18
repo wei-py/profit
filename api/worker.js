@@ -466,16 +466,110 @@ function uuid() {
   return crypto.randomUUID();
 }
 
+function normalizeFileSegment(name) {
+  return String(name || "").trim().replace(/[\\/\u0000-\u001F\u007F]/g, "_");
+}
+
+async function resolveFolderId(env, pathStr) {
+  if (!pathStr) return null;
+  const segs = (pathStr || "").split("/").filter(Boolean);
+  let parentId = null;
+  for (const seg of segs) {
+    const folder = parentId
+      ? await env.DB.prepare(
+        "SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = 'folder'",
+      )
+        .bind(parentId, seg)
+        .first()
+      : await env.DB.prepare(
+        "SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = 'folder'",
+      )
+        .bind(seg)
+        .first();
+    if (!folder) return null;
+    parentId = folder.id;
+  }
+  return parentId;
+}
+
+async function ensureFolderPath(env, pathStr) {
+  if (!pathStr) return null;
+  const segs = (pathStr || "").split("/").filter(Boolean);
+  let parentId = null;
+  for (const seg of segs) {
+    const safe = normalizeFileSegment(seg);
+    const folder = parentId
+      ? await env.DB.prepare(
+        "SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = 'folder'",
+      )
+        .bind(parentId, safe)
+        .first()
+      : await env.DB.prepare(
+        "SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = 'folder'",
+      )
+        .bind(safe)
+        .first();
+    if (folder) {
+      parentId = folder.id;
+    }
+    else {
+      const id = uuid();
+      await env.DB.prepare("INSERT INTO files (id, name, parent_id, type) VALUES (?, ?, ?, 'folder')")
+        .bind(id, safe, parentId)
+        .run();
+      parentId = id;
+    }
+  }
+  return parentId;
+}
+
+async function getFolderPath(env, folderId) {
+  const parts = [];
+  let currentId = folderId || null;
+
+  while (currentId) {
+    const folder = await env.DB.prepare(
+      "SELECT id, name, parent_id FROM files WHERE id = ? AND type = 'folder'",
+    )
+      .bind(currentId)
+      .first();
+    if (!folder) break;
+    parts.unshift(normalizeFileSegment(folder.name));
+    currentId = folder.parent_id || null;
+  }
+
+  return parts.join("/");
+}
+
+async function buildR2Key(env, parentId, filename) {
+  const safeName = normalizeFileSegment(filename);
+  const folderPath = await getFolderPath(env, parentId);
+  return folderPath ? `${folderPath}/${safeName}` : safeName;
+}
+
+async function moveR2Object(env, oldKey, newKey, mimeType) {
+  if (!oldKey || oldKey === newKey) return;
+  const obj = await env.FILES.get(oldKey);
+  if (!obj) return;
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  await env.FILES.put(newKey, obj.body, {
+    httpMetadata: { contentType: headers.get("content-type") || mimeType || "application/octet-stream" },
+  });
+  await env.FILES.delete(oldKey);
+}
+
 async function handleFilesList(request, env) {
   if (!checkAdmin(request, env))
     return json({ error: "未授权" }, 401);
-  const { parent_id } = await request.json().catch(() => ({}));
+  const { path: pathStr, parent_id } = await request.json().catch(() => ({}));
+  const pid = pathStr ? await resolveFolderId(env, pathStr) : (parent_id || null);
 
   let query;
   let params;
-  if (parent_id) {
+  if (pid) {
     query = "SELECT * FROM files WHERE parent_id = ? ORDER BY type, name";
-    params = [parent_id];
+    params = [pid];
   }
   else {
     query = "SELECT * FROM files WHERE parent_id IS NULL ORDER BY type, name";
@@ -485,23 +579,25 @@ async function handleFilesList(request, env) {
   const { results } = await env.DB.prepare(query)
     .bind(...params)
     .all();
-  return json({ items: results, success: true });
+  return json({ items: results, path: pathStr || "", success: true });
 }
 
 async function handleFilesFolder(request, env) {
   if (!checkAdmin(request, env))
     return json({ error: "未授权" }, 401);
-  const { name, parent_id } = await request.json();
+  const { name, parent_id, path: parentPath } = await request.json();
 
-  const trimmed = (name || "").trim();
+  const trimmed = normalizeFileSegment(name);
   if (!trimmed)
     return json({ error: "文件夹名不能为空" }, 400);
 
-  const existing = parent_id
+  const pid = parentPath ? await resolveFolderId(env, parentPath) : (parent_id || null);
+
+  const existing = pid
     ? await env.DB.prepare(
         "SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = 'folder'",
       )
-        .bind(parent_id, trimmed)
+        .bind(pid, trimmed)
         .first()
     : await env.DB.prepare(
         "SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = 'folder'",
@@ -514,7 +610,7 @@ async function handleFilesFolder(request, env) {
 
   const id = uuid();
   await env.DB.prepare("INSERT INTO files (id, name, parent_id, type) VALUES (?, ?, ?, 'folder')")
-    .bind(id, trimmed, parent_id || null)
+    .bind(id, trimmed, pid)
     .run();
 
   return json({ id, name: trimmed, success: true });
@@ -526,43 +622,46 @@ async function handleFilesUpload(request, env) {
 
   const formData = await request.formData();
   const file = formData.get("file");
+  const pathStr = formData.get("path") || "";
   const parentId = formData.get("parent_id") || null;
   const overwrite = formData.get("overwrite") === "true";
 
   if (!file || !file.name)
     return json({ error: "未选择文件" }, 400);
 
+  const fileName = normalizeFileSegment(file.name);
+  if (!fileName)
+    return json({ error: "文件名不能为空" }, 400);
+
+  // resolve parent folder from path, create intermediate folders if needed
+  const pid = pathStr ? await ensureFolderPath(env, pathStr) : parentId;
+
   // 检查同名文件
-  const existing = parentId
+  const existing = pid
     ? await env.DB.prepare(
         "SELECT id, r2_key FROM files WHERE parent_id = ? AND name = ? AND type = 'file'",
       )
-        .bind(parentId, file.name)
+        .bind(pid, fileName)
         .first()
     : await env.DB.prepare(
         "SELECT id, r2_key FROM files WHERE parent_id IS NULL AND name = ? AND type = 'file'",
       )
-        .bind(file.name)
+        .bind(fileName)
         .first();
 
   if (existing && !overwrite) {
     return json(
       {
         conflict: true,
-        existing: { id: existing.id, name: file.name },
+        existing: { id: existing.id, name: fileName },
         success: false,
       },
       409,
     );
   }
 
-  const sanitizedName = file.name.replace(/[^\w.\-\u4E00-\u9FFF]/g, "_");
-  const r2Key = `${uuid()}-${sanitizedName}`;
   const mimeType = file.type || "application/octet-stream";
-
-  await env.FILES.put(r2Key, file.stream(), {
-    httpMetadata: { contentType: mimeType },
-  });
+  const r2Key = pathStr ? `${pathStr}/${fileName}` : fileName;
 
   if (existing && overwrite) {
     // 覆盖时复用已有 r2_key，保证公开链接不变
@@ -579,7 +678,7 @@ async function handleFilesUpload(request, env) {
       file: {
         id: existing.id,
         mime_type: mimeType,
-        name: file.name,
+        name: fileName,
         r2_key: r2Key,
         size: file.size,
       },
@@ -587,15 +686,19 @@ async function handleFilesUpload(request, env) {
     });
   }
 
+  await env.FILES.put(r2Key, file.stream(), {
+    httpMetadata: { contentType: mimeType },
+  });
+
   const fileId = uuid();
   await env.DB.prepare(
     "INSERT INTO files (id, name, parent_id, type, size, mime_type, r2_key) VALUES (?, ?, ?, 'file', ?, ?, ?)",
   )
-    .bind(fileId, file.name, parentId, file.size, mimeType, r2Key)
+    .bind(fileId, fileName, pid, file.size, mimeType, r2Key)
     .run();
 
   return json({
-    file: { id: fileId, mime_type: mimeType, name: file.name, r2_key: r2Key, size: file.size },
+    file: { id: fileId, mime_type: mimeType, name: fileName, r2_key: r2Key, size: file.size },
     success: true,
   });
 }
@@ -605,11 +708,11 @@ async function handleFilesRename(request, env) {
     return json({ error: "未授权" }, 401);
   const { id, name } = await request.json();
 
-  const trimmed = (name || "").trim();
+  const trimmed = normalizeFileSegment(name);
   if (!id || !trimmed)
     return json({ error: "参数无效" }, 400);
 
-  const item = await env.DB.prepare("SELECT id, parent_id, type FROM files WHERE id = ?")
+  const item = await env.DB.prepare("SELECT id, parent_id, type, r2_key, mime_type FROM files WHERE id = ?")
     .bind(id)
     .first();
   if (!item)
@@ -630,9 +733,37 @@ async function handleFilesRename(request, env) {
   if (existing)
     return json({ error: "同名已存在", success: false }, 409);
 
-  await env.DB.prepare("UPDATE files SET name = ?, updated_at = datetime('now') WHERE id = ?")
-    .bind(trimmed, id)
-    .run();
+  if (item.type === "file") {
+    const nextKey = await buildR2Key(env, item.parent_id, trimmed);
+    await moveR2Object(env, item.r2_key, nextKey, item.mime_type);
+    await env.DB.prepare("UPDATE files SET name = ?, r2_key = ?, updated_at = datetime('now') WHERE id = ?")
+      .bind(trimmed, nextKey, id)
+      .run();
+  }
+  else {
+    await env.DB.prepare("UPDATE files SET name = ?, updated_at = datetime('now') WHERE id = ?")
+      .bind(trimmed, id)
+      .run();
+
+    const { results: descendants } = await env.DB.prepare(`
+      WITH RECURSIVE children AS (
+        SELECT id, parent_id, type, name, r2_key, mime_type FROM files WHERE parent_id = ?
+        UNION ALL
+        SELECT f.id, f.parent_id, f.type, f.name, f.r2_key, f.mime_type FROM files f JOIN children c ON f.parent_id = c.id
+      )
+      SELECT * FROM children WHERE type = 'file'
+    `)
+      .bind(id)
+      .all();
+
+    for (const file of descendants) {
+      const nextKey = await buildR2Key(env, file.parent_id, file.name);
+      await moveR2Object(env, file.r2_key, nextKey, file.mime_type);
+      await env.DB.prepare("UPDATE files SET r2_key = ?, updated_at = datetime('now') WHERE id = ?")
+        .bind(nextKey, file.id)
+        .run();
+    }
+  }
 
   return json({ name: trimmed, success: true });
 }
@@ -653,7 +784,7 @@ async function handleFilesTogglePublic(request, env) {
   const newState = item.is_public ? 0 : 1;
   await env.DB.prepare("UPDATE files SET is_public = ? WHERE id = ?").bind(newState, id).run();
 
-  const publicUrl = newState ? `${new URL(request.url).origin}/api/files/${item.r2_key}` : null;
+  const publicUrl = newState ? `${new URL(request.url).origin}/api/files/${encodeURI(item.r2_key)}` : null;
 
   return json({ is_public: newState === 1, success: true, url: publicUrl });
 }
