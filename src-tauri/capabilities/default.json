@@ -21,7 +21,8 @@
     "fs:allow-appdata-write-recursive",
     "store:default",
     "shell:allow-open",
-    "updater:default"
+    "updater:default",
+    "process:allow-restart"
   ],
   "windows": ["main"]
 }

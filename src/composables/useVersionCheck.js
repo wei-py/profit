@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 
 const CURRENT_VERSION = __APP_VERSION__;
@@ -148,7 +149,7 @@ export function useVersionCheck() {
       });
 
       updateStatus.value = "restarting";
-      await invoke("plugin:updater|relaunch");
+      await relaunch();
     }
     catch (e) {
       updateStatus.value = "error";
