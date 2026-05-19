@@ -161,3 +161,5 @@ TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容
 20. 最后支持远程数据库
 19. 能不能把这个 dasui 给到用户自己配呢
 21. 给一下这个项目的描述给我，我要给其他的 ai 生成 logo
+
+<!--puter-->
