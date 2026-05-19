@@ -152,7 +152,7 @@ Phase 2（后续按需）：
 <!--ADMIN_API_BASE=https://profit-admin.xu-wei.space
 ADMIN_SECRET=你的 admin secret
 TAURI_SIGNING_PRIVATE_KEY=src-tauri/profit-updater.key 的完整内容
-TAURI_SIGNING_PRIVATE_KEY_PASSWORD=-->
+TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容。-->
 
 
 15. admin 移动端能够预览 json excel
