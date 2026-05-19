@@ -2,14 +2,14 @@
   "version": "1.0.2",
   "force": false,
   "notes": "profit 公测上线了",
-  "pub_date": "2026-05-19T12:25:07.364Z",
+  "pub_date": "2026-05-19T12:46:27.371Z",
   "platforms": {
     "darwin-aarch64": {
       "manual": {
         "url": "https://profit-admin.xu-wei.space/api/files/releases%2Fmac%2Fprofit_1.0.2_aarch64.dmg"
       },
       "url": "https://profit-admin.xu-wei.space/api/files/releases%2Fmac%2Fprofit.app.tar.gz",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUkxc2dvSzVkeFpCbVFUMVFoa2FpOWJYNnpaYUpaSWtYZEgwMEFjb0xHV0JrSitQdUNLdTZEUkJPa2h0MVl1Z21TNkNPZHdOQWJRZnFxNWhJSkJCZC9PajJ1MktQQ3dVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5MTkzNTA3CWZpbGU6cHJvZml0LmFwcC50YXIuZ3oKWGpUT3lXQmVXczVDQlI5a24xU2NJNHhWVGt0ZlZmdDVDUjJHR01kYzRub3RQSDNGN2NaQm5zZzR1cVhGRXk2RDFDdmtJeG9yK3k1NVA4MW93eHhqQXc9PQo="
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUkxc2dvSzVkeGJQbTZlQnNZYkFwMEkwMmpaZm94TzhaSWxwUk5rOUgwWThpeTZscWxQL2hSQUlkOXM1VW5ZK3UyVHZWdGo2SWw5c2cvOTl0MXNadXRiODZXOUJqWFEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5MTk0Nzg3CWZpbGU6cHJvZml0LmFwcC50YXIuZ3oKSE1Hb0QwQjZSK0FvR3p1Q01WKy8yVEFtdmNqSmZadGJvRlg4cG0vQkpBRStaWEIvbDNZbndNRWZSVDlGNW4rZVZBblhOOWlyQUpDL3lHcWNFNkJiQ3c9PQo="
     }
   }
 }

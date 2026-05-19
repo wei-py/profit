@@ -52,7 +52,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: win-artifacts
-          if-no-files-found: ignore
+          if-no-files-found: error
           path: |
             src-tauri/target/**/*.exe
             src-tauri/target/**/*.nsis.zip
@@ -64,6 +64,7 @@ jobs:
     env:
       ADMIN_API_BASE: ${{ secrets.ADMIN_API_BASE }}
       ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+      REQUIRE_PLATFORMS: darwin-aarch64,windows-x86_64
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -74,7 +75,6 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           name: win-artifacts
-        continue-on-error: true
       - name: Debug artifact layout
         run: find . -path '*/target*' -type f 2>/dev/null | head -50
       - run: node scripts/release-upload.cjs

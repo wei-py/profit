@@ -140,11 +140,30 @@ async function main() {
   let macUrls = null;
   let winUrls = null;
 
+  const requirePlatforms = (process.env.REQUIRE_PLATFORMS || "").split(",").filter(Boolean);
+
   if (macDmg || macTarGz) {
     macUrls = await uploadPlatform(apiBase, secret, "macOS", macLatest, macArchive, macDmg, macTarGz);
   }
   if (winExe || winNsisZip) {
     winUrls = await uploadPlatform(apiBase, secret, "Windows", winLatest, winArchive, winExe, winNsisZip);
+  }
+
+  // check required platforms
+  for (const p of requirePlatforms) {
+    if (p === "darwin-aarch64" && !macUrls) {
+      console.error(`missing required platform: darwin-aarch64 (no mac artifacts found)`);
+      process.exit(1);
+    }
+    if (p === "windows-x86_64" && !winUrls) {
+      console.error(`missing required platform: windows-x86_64 (no windows artifacts found)`);
+      process.exit(1);
+    }
+  }
+
+  if (!macUrls && !winUrls) {
+    console.error("no release artifacts found for any platform, refusing to upload empty version.json");
+    process.exit(1);
   }
 
   const macSignature = readSig(macSig);
