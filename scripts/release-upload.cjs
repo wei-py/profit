@@ -64,12 +64,13 @@ async function uploadFile(apiBase, secret, filePath, remotePath, overwrite, make
 
 async function uploadPlatform(apiBase, secret, label, latestPath, archivePath, manualFile, updaterFile) {
   console.log(`\n=== ${label} ===`);
+  const sameFile = manualFile && updaterFile && path.resolve(manualFile) === path.resolve(updaterFile);
 
   if (manualFile) {
     console.log(`  uploading manual: ${path.basename(manualFile)} → ${latestPath}`);
     await uploadFile(apiBase, secret, manualFile, latestPath, true, true);
   }
-  if (updaterFile) {
+  if (updaterFile && !sameFile) {
     console.log(`  uploading updater: ${path.basename(updaterFile)} → ${latestPath}`);
     await uploadFile(apiBase, secret, updaterFile, latestPath, true, true);
   }
@@ -78,7 +79,7 @@ async function uploadPlatform(apiBase, secret, label, latestPath, archivePath, m
     console.log(`  archiving manual: ${archivePath}`);
     await uploadFile(apiBase, secret, manualFile, archivePath, false, true);
   }
-  if (updaterFile) {
+  if (updaterFile && !sameFile) {
     console.log(`  archiving updater: ${archivePath}`);
     await uploadFile(apiBase, secret, updaterFile, archivePath, false, true);
   }
@@ -116,15 +117,20 @@ async function main() {
   const macSig = findFiles(path.join(bundleDir, "macos"), /\.app\.tar\.gz\.sig$/)[0] || null;
 
   const winExe = pickVersioned(findFiles(path.join(bundleDir, "nsis"), /\.exe$/), version);
-  const winNsisZip = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip$/)[0] || null;
-  const winSig = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip\.sig$/)[0] || null;
+  const winExeSig = pickVersioned(findFiles(path.join(bundleDir, "nsis"), /\.exe\.sig$/), version);
+  const winNsisZip = pickVersioned(findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip$/), version);
+  const winNsisSig = pickVersioned(findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip\.sig$/), version);
+  const useWinNsisZip = winNsisZip && winNsisSig;
+  const useWinExe = winExe && winExeSig;
+  const winUpdater = useWinNsisZip ? winNsisZip : (useWinExe ? winExe : null);
+  const winSig = useWinNsisZip ? winNsisSig : (useWinExe ? winExeSig : null);
 
   console.log("\n=== artifacts ===");
   console.log(`mac dmg: ${macDmg || "not found"}`);
   console.log(`mac updater: ${macTarGz || "not found"}`);
   console.log(`mac sig: ${macSig || "not found"}`);
   console.log(`win exe: ${winExe || "not found"}`);
-  console.log(`win updater: ${winNsisZip || "not found"}`);
+  console.log(`win updater: ${winUpdater || "not found"}`);
   console.log(`win sig: ${winSig || "not found"}`);
 
   const macLatest = "releases/mac";
@@ -138,8 +144,8 @@ async function main() {
   if (macDmg || macTarGz) {
     macUrls = await uploadPlatform(apiBase, secret, "macOS", macLatest, macArchive, macDmg, macTarGz);
   }
-  if (winExe || winNsisZip) {
-    winUrls = await uploadPlatform(apiBase, secret, "Windows", winLatest, winArchive, winExe, winNsisZip);
+  if (winExe || winUpdater) {
+    winUrls = await uploadPlatform(apiBase, secret, "Windows", winLatest, winArchive, winExe, winUpdater);
   }
 
   if (!macUrls && !winUrls) {

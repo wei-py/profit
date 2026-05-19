@@ -18,7 +18,7 @@ flowchart TD
     C2 --> D
     C3 --> D
 
-    D --> E["生成安装产物<br/>.dmg / .exe / .app.tar.gz / .nsis.zip / .sig"]
+    D --> E["生成安装产物<br/>.dmg / .exe / .app.tar.gz / .exe.sig / .sig"]
 
     E --> F["pnpm release:upload<br/>上传到 R2"]
     F --> G["releases/version.json<br/>远端版本协议文件"]
@@ -59,7 +59,7 @@ sequenceDiagram
     Dev->>Build: pnpm tbuild
     Build->>Key: 读取私钥
     Build->>Build: 对 updater 包签名
-    Build->>Dev: 生成 .app.tar.gz / .nsis.zip 和 .sig
+    Build->>Dev: 生成 .app.tar.gz / Windows .exe 和 .sig
 
     Dev->>R2: pnpm release:upload
     R2->>R2: 上传 updater 包
@@ -112,10 +112,12 @@ flowchart LR
 | 字段           | 给谁用         | 文件类型                        | 是否需要签名 |
 | ------------ | ----------- | --------------------------- | ------ |
 | `manual[platform].url` | 用户点击下载按钮 | `.dmg` / `.exe` | 不需要 |
-| `platforms[platform].url` | Tauri 自动更新器 | `.app.tar.gz` / `.nsis.zip` | 需要 |
+| `platforms[platform].url` | Tauri 自动更新器 | macOS `.app.tar.gz` / Windows `.exe` | 需要 |
 | `platforms[platform].signature` | Tauri 自动更新器 | `.sig` 内容 | 必须 |
 
 重要：`platforms` 只放 Tauri updater 可解析的完整平台结构。某个平台如果没有 `url + signature`，就不要写进 `platforms`，否则 updater 会报 `missing field \`url\``。手动下载地址统一放在顶层 `manual`。
+
+当前配置使用 `"createUpdaterArtifacts": true`，Tauri v2 在 Windows 上会复用 NSIS 安装器作为 updater 包，因此需要上传 `.exe` 和同名 `.exe.sig`。只有把 `createUpdaterArtifacts` 改成 `"v1Compatible"` 时，Windows 才会生成 `.nsis.zip` / `.nsis.zip.sig`。
 
 ---
 
