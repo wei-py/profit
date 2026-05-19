@@ -128,9 +128,9 @@ async function main() {
   const macTarGz = findFiles(path.join(bundleDir, "macos"), /\.app\.tar\.gz$/)[0] || null;
   const macSig = findFiles(path.join(bundleDir, "macos"), /\.app\.tar\.gz\.sig$/)[0] || null;
 
-  const winExe = findFilesRecursive(path.join(bundleDir, ".."), /\.exe$/)[0] || null;
-  const winNsisZip = findFilesRecursive(path.join(bundleDir, ".."), /\.nsis\.zip$/)[0] || null;
-  const winSig = findFilesRecursive(path.join(bundleDir, ".."), /\.nsis\.zip\.sig$/)[0] || null;
+  const winExe = findFilesRecursive(path.join(root, "src-tauri/target"), /\.exe$/).find(f => f.includes("nsis") || f.includes("setup")) || null;
+  const winNsisZip = findFilesRecursive(path.join(root, "src-tauri/target"), /\.nsis\.zip$/)[0] || null;
+  const winSig = findFilesRecursive(path.join(root, "src-tauri/target"), /\.nsis\.zip\.sig$/)[0] || null;
 
   const macLatest = "releases/mac";
   const macArchive = `releases/archive/${ts}_mac`;
