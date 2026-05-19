@@ -23,23 +23,6 @@ function findFiles(dir, pattern) {
   return fs.readdirSync(dir).filter((f) => pattern.test(f)).map((f) => path.join(dir, f));
 }
 
-function findFilesRecursive(rootDir, pattern) {
-  if (!fs.existsSync(rootDir)) return [];
-  const results = [];
-  function walk(dir) {
-    try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const e of entries) {
-        const full = path.join(dir, e.name);
-        if (e.isDirectory()) { walk(full); }
-        else if (pattern.test(e.name)) { results.push(full); }
-      }
-    } catch { /* permission or missing */ }
-  }
-  walk(rootDir);
-  return results;
-}
-
 function readSig(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return null;
   return fs.readFileSync(filePath, "utf-8").trim();
@@ -128,9 +111,9 @@ async function main() {
   const macTarGz = findFiles(path.join(bundleDir, "macos"), /\.app\.tar\.gz$/)[0] || null;
   const macSig = findFiles(path.join(bundleDir, "macos"), /\.app\.tar\.gz\.sig$/)[0] || null;
 
-  const winExe = findFilesRecursive(path.join(root, "src-tauri/target"), /\.exe$/).find(f => f.includes("nsis") || f.includes("setup")) || null;
-  const winNsisZip = findFilesRecursive(path.join(root, "src-tauri/target"), /\.nsis\.zip$/)[0] || null;
-  const winSig = findFilesRecursive(path.join(root, "src-tauri/target"), /\.nsis\.zip\.sig$/)[0] || null;
+  const winExe = findFiles(path.join(bundleDir, "nsis"), /\.exe$/)[0] || null;
+  const winNsisZip = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip$/)[0] || null;
+  const winSig = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip\.sig$/)[0] || null;
 
   const macLatest = "releases/mac";
   const macArchive = `releases/archive/${ts}_mac`;
@@ -140,25 +123,11 @@ async function main() {
   let macUrls = null;
   let winUrls = null;
 
-  const requirePlatforms = (process.env.REQUIRE_PLATFORMS || "").split(",").filter(Boolean);
-
   if (macDmg || macTarGz) {
     macUrls = await uploadPlatform(apiBase, secret, "macOS", macLatest, macArchive, macDmg, macTarGz);
   }
   if (winExe || winNsisZip) {
     winUrls = await uploadPlatform(apiBase, secret, "Windows", winLatest, winArchive, winExe, winNsisZip);
-  }
-
-  // check required platforms
-  for (const p of requirePlatforms) {
-    if (p === "darwin-aarch64" && !macUrls) {
-      console.error(`missing required platform: darwin-aarch64 (no mac artifacts found)`);
-      process.exit(1);
-    }
-    if (p === "windows-x86_64" && !winUrls) {
-      console.error(`missing required platform: windows-x86_64 (no windows artifacts found)`);
-      process.exit(1);
-    }
   }
 
   if (!macUrls && !winUrls) {
