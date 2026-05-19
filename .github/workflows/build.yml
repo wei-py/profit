@@ -75,4 +75,6 @@ jobs:
         with:
           name: win-artifacts
         continue-on-error: true
+      - name: Debug artifact layout
+        run: find . -path '*/target*' -type f 2>/dev/null | head -50
       - run: node scripts/release-upload.cjs
