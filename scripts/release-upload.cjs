@@ -23,6 +23,23 @@ function findFiles(dir, pattern) {
   return fs.readdirSync(dir).filter((f) => pattern.test(f)).map((f) => path.join(dir, f));
 }
 
+function findFilesRecursive(rootDir, pattern) {
+  if (!fs.existsSync(rootDir)) return [];
+  const results = [];
+  function walk(dir) {
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) { walk(full); }
+        else if (pattern.test(e.name)) { results.push(full); }
+      }
+    } catch { /* permission or missing */ }
+  }
+  walk(rootDir);
+  return results;
+}
+
 function readSig(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return null;
   return fs.readFileSync(filePath, "utf-8").trim();
@@ -111,9 +128,9 @@ async function main() {
   const macTarGz = findFiles(path.join(bundleDir, "macos"), /\.app\.tar\.gz$/)[0] || null;
   const macSig = findFiles(path.join(bundleDir, "macos"), /\.app\.tar\.gz\.sig$/)[0] || null;
 
-  const winExe = findFiles(path.join(bundleDir, "nsis"), /\.exe$/)[0] || null;
-  const winNsisZip = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip$/)[0] || null;
-  const winSig = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip\.sig$/)[0] || null;
+  const winExe = findFilesRecursive(path.join(bundleDir, ".."), /\.exe$/)[0] || null;
+  const winNsisZip = findFilesRecursive(path.join(bundleDir, ".."), /\.nsis\.zip$/)[0] || null;
+  const winSig = findFilesRecursive(path.join(bundleDir, ".."), /\.nsis\.zip\.sig$/)[0] || null;
 
   const macLatest = "releases/mac";
   const macArchive = `releases/archive/${ts}_mac`;

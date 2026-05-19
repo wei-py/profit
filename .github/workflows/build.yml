@@ -48,15 +48,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm tbuild -- --bundles nsis
       - shell: pwsh
-        run: Get-ChildItem -Recurse src-tauri/target/release/bundle
+        run: Get-ChildItem -Recurse src-tauri/target -ErrorAction SilentlyContinue | Select-Object FullName
       - uses: actions/upload-artifact@v7
         with:
           name: win-artifacts
           if-no-files-found: ignore
           path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/nsis/*.nsis.zip
-            src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
+            src-tauri/target/**/*.exe
+            src-tauri/target/**/*.nsis.zip
+            src-tauri/target/**/*.nsis.zip.sig
 
   upload-release:
     needs: [build-mac, build-windows]
