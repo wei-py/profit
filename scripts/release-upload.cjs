@@ -115,6 +115,14 @@ async function main() {
   const winNsisZip = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip$/)[0] || null;
   const winSig = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip\.sig$/)[0] || null;
 
+  console.log("\n=== artifacts ===");
+  console.log(`mac dmg: ${macDmg || "not found"}`);
+  console.log(`mac updater: ${macTarGz || "not found"}`);
+  console.log(`mac sig: ${macSig || "not found"}`);
+  console.log(`win exe: ${winExe || "not found"}`);
+  console.log(`win updater: ${winNsisZip || "not found"}`);
+  console.log(`win sig: ${winSig || "not found"}`);
+
   const macLatest = "releases/mac";
   const macArchive = `releases/archive/${ts}_mac`;
   const winLatest = "releases/windows";

@@ -67,7 +67,11 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           name: mac-artifacts
+          path: src-tauri/target/release/bundle
       - uses: actions/download-artifact@v7
         with:
           name: win-artifacts
+          path: src-tauri/target/release/bundle/nsis
+      - name: Check release artifacts
+        run: find src-tauri/target/release/bundle -type f
       - run: node scripts/release-upload.cjs
