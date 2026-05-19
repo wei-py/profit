@@ -18,6 +18,7 @@ async function getPlatformKey() {
 }
 
 function resolveManualUrl(data, platformKey) {
+  if (data?.manual?.[platformKey]?.url) return data.manual[platformKey].url;
   if (!data?.platforms?.[platformKey]?.manual?.url) return null;
   return data.platforms[platformKey].manual.url;
 }

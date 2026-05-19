@@ -93,15 +93,15 @@ sequenceDiagram
 
 ---
 
-## 4. `manual.url` 和 `url` 的区别
+## 4. `manual` 和 `platforms` 的区别
 
 ```mermaid
 flowchart LR
-    A["version.json"] --> B["manual.url"]
-    A --> C["url + signature"]
+    A["version.json"] --> B["manual"]
+    A --> C["platforms"]
 
     B --> D["给用户手动下载<br/>.dmg / .exe"]
-    C --> E["给 Tauri updater 自动更新<br/>.app.tar.gz / .nsis.zip"]
+    C --> E["给 Tauri updater 自动更新<br/>url + signature"]
 
     E --> F["需要 signature 验签"]
     D --> G["不需要 signature"]
@@ -111,9 +111,11 @@ flowchart LR
 
 | 字段           | 给谁用         | 文件类型                        | 是否需要签名 |
 | ------------ | ----------- | --------------------------- | ------ |
-| `manual.url` | 用户点击下载按钮    | `.dmg` / `.exe`             | 不需要    |
-| `url`        | Tauri 自动更新器 | `.app.tar.gz` / `.nsis.zip` | 需要     |
-| `signature`  | Tauri 自动更新器 | `.sig` 内容                   | 必须     |
+| `manual[platform].url` | 用户点击下载按钮 | `.dmg` / `.exe` | 不需要 |
+| `platforms[platform].url` | Tauri 自动更新器 | `.app.tar.gz` / `.nsis.zip` | 需要 |
+| `platforms[platform].signature` | Tauri 自动更新器 | `.sig` 内容 | 必须 |
+
+重要：`platforms` 只放 Tauri updater 可解析的完整平台结构。某个平台如果没有 `url + signature`，就不要写进 `platforms`，否则 updater 会报 `missing field \`url\``。手动下载地址统一放在顶层 `manual`。
 
 ---
 

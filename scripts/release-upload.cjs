@@ -23,6 +23,10 @@ function findFiles(dir, pattern) {
   return fs.readdirSync(dir).filter((f) => pattern.test(f)).map((f) => path.join(dir, f));
 }
 
+function pickVersioned(files, version) {
+  return files.find(f => path.basename(f).includes(version)) || files[0] || null;
+}
+
 function readSig(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return null;
   return fs.readFileSync(filePath, "utf-8").trim();
@@ -107,11 +111,11 @@ async function main() {
 
   const bundleDir = path.join(root, "src-tauri/target/release/bundle");
 
-  const macDmg = findFiles(path.join(bundleDir, "dmg"), /\.dmg$/)[0] || null;
+  const macDmg = pickVersioned(findFiles(path.join(bundleDir, "dmg"), /\.dmg$/), version);
   const macTarGz = findFiles(path.join(bundleDir, "macos"), /\.app\.tar\.gz$/)[0] || null;
   const macSig = findFiles(path.join(bundleDir, "macos"), /\.app\.tar\.gz\.sig$/)[0] || null;
 
-  const winExe = findFiles(path.join(bundleDir, "nsis"), /\.exe$/)[0] || null;
+  const winExe = pickVersioned(findFiles(path.join(bundleDir, "nsis"), /\.exe$/), version);
   const winNsisZip = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip$/)[0] || null;
   const winSig = findFiles(path.join(bundleDir, "nsis"), /\.nsis\.zip\.sig$/)[0] || null;
 
@@ -151,26 +155,31 @@ async function main() {
     force: false,
     notes: "profit 公测上线了",
     pub_date: isoDate,
+    manual: {},
     platforms: {},
   };
 
   if (macUrls) {
-    versionJson.platforms["darwin-aarch64"] = {
-      manual: { url: macUrls.manualUrl },
-    };
+    if (macUrls.manualUrl) {
+      versionJson.manual["darwin-aarch64"] = { url: macUrls.manualUrl };
+    }
     if (macUrls.updaterUrl && macSignature) {
-      versionJson.platforms["darwin-aarch64"].url = macUrls.updaterUrl;
-      versionJson.platforms["darwin-aarch64"].signature = macSignature;
+      versionJson.platforms["darwin-aarch64"] = {
+        signature: macSignature,
+        url: macUrls.updaterUrl,
+      };
     }
   }
 
   if (winUrls) {
-    versionJson.platforms["windows-x86_64"] = {
-      manual: { url: winUrls.manualUrl },
-    };
+    if (winUrls.manualUrl) {
+      versionJson.manual["windows-x86_64"] = { url: winUrls.manualUrl };
+    }
     if (winUrls.updaterUrl && winSignature) {
-      versionJson.platforms["windows-x86_64"].url = winUrls.updaterUrl;
-      versionJson.platforms["windows-x86_64"].signature = winSignature;
+      versionJson.platforms["windows-x86_64"] = {
+        signature: winSignature,
+        url: winUrls.updaterUrl,
+      };
     }
   }
 
