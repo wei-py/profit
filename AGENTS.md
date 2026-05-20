@@ -31,3 +31,6 @@ This project uses Git. See .gitignore for excluded files.
 ## Important Notes
 
 <!-- Add project-specific notes here -->
+
+- I use opencode. Plan mode uses `gpt-5.5`; build mode uses `deepseek-v4-pro`.
+- When working in plan mode, `gpt-5.5` must provide `deepseek-v4-pro` with detailed follow-up implementation instructions, including the intended changes, relevant files, constraints, and verification steps.
