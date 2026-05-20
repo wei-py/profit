@@ -13,7 +13,7 @@ export async function buildWorkbookBuffer(config) {
 
   for (const name of CONFIG_SHEET_NAMES) {
     const data = config[name] || [];
-    if (!data.length && name !== "模板参数")
+    if (!data.length && name !== "模板参数" && name !== "查表配置")
       continue;
     const preferred
       = name === "国家平台" && config.国家平台ColOrder?.length

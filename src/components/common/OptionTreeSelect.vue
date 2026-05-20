@@ -26,11 +26,7 @@ const props = defineProps({
     default: "",
     type: String,
   },
-  optionGroupsData: {
-    type: Array,
-    default: () => [],
-  },
-  optionItems: {
+  optionConfigs: {
     type: Array,
     default: () => [],
   },
@@ -93,8 +89,7 @@ const treeNodes = computed(() => {
   if (props.options.length)
     return normalizeGenericOptions(props.options);
   return buildOptionValueTree({
-    optionGroups: props.optionGroupsData,
-    optionItems: props.optionItems,
+    optionConfigs: props.optionConfigs,
     rootGroupId: props.rootGroupId,
   });
 });

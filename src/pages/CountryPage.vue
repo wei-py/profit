@@ -10,6 +10,7 @@ import TemplateModal from "@/components/country/TemplateModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
 import { useTour } from "@/composables/useTour";
 import { useConfigStore } from "@/stores/config";
+import { normalizeId } from "@/utils/value";
 
 const store = useConfigStore();
 const { openConfigExcel, restoreRemoteUrl, saveConfigExcel } = useFileIO();
@@ -194,8 +195,12 @@ function addRow() {
 }
 function deleteRow(id) {
   const i = store["国家平台"].findIndex(r => r.编号 === id);
-  if (i !== -1)
+  if (i !== -1) {
     store["国家平台"].splice(i, 1);
+    if (expandedId.value === id)
+      expandedId.value = null;
+    store.pruneOrphanConfig();
+  }
 }
 function deleteField(idx) {
   const fields = store.getFieldsByCountry(cpId.value);
@@ -207,11 +212,11 @@ function deleteField(idx) {
 function deleteOptGroup(group) {
   if (!group)
     return;
-  const ids = collectDescendantIds(group.编号);
-  ids.add(group.编号);
-  store["选项组"] = store["选项组"].filter(r => !ids.has(r.编号));
-  store["选项值"] = store["选项值"].filter(r => !ids.has(r.所属分组));
-  localOptGroups.value = localOptGroups.value.filter(r => !ids.has(r.编号));
+  const gid = group.编号;
+  const ids = collectDescendantIds(gid);
+  ids.add(gid);
+  store["选项配置"] = store["选项配置"].filter(r => normalizeId(r.选项组编号) !== gid && !ids.has(normalizeId(r.编号)));
+  localOptGroups.value = localOptGroups.value.filter(r => r.编号 !== gid);
 }
 
 function collectDescendantIds(rootId) {
@@ -219,13 +224,14 @@ function collectDescendantIds(rootId) {
   let changed = true;
   while (changed) {
     changed = false;
-    for (const g of store["选项组"]) {
+    for (const g of store["选项配置"]) {
+      const pid = normalizeId(g.父级);
       if (
-        g.父级编号
-        && (ids.has(g.父级编号) || g.父级编号 === rootId || g.编号 === rootId)
-        && !ids.has(g.编号)
+        pid
+        && (ids.has(pid) || pid === rootId || normalizeId(g.编号) === rootId)
+        && !ids.has(normalizeId(g.编号))
       ) {
-        ids.add(g.编号);
+        ids.add(normalizeId(g.编号));
         changed = true;
       }
     }
@@ -279,33 +285,36 @@ function reorderOptionGroupsForCurrentCountry() {
     return;
 
   const localIds = new Set(expOptGroupsSource.value.map(group => group.编号));
-  const otherGroups = store["选项组"].filter(group => !localIds.has(group.编号));
-  const byParent = new Map();
-  for (const group of expOptGroupsSource.value) {
-    const parentId = group.父级编号 || "";
-    const list = byParent.get(parentId) || [];
-    list.push(group);
-    byParent.set(parentId, list);
+  const otherOpts = store["选项配置"].filter(row => !localIds.has(normalizeId(row.选项组编号)));
+  const orderedOpts = [];
+
+  for (const group of localOptGroups.value) {
+    const groupId = group.编号;
+    const groupRows = store["选项配置"]
+      .filter(r => normalizeId(r.选项组编号) === groupId)
+      .sort((a, b) => orderRows(a, b, groupId));
+    orderedOpts.push(...groupRows.map((r) => {
+      r.排序 = group.排序;
+      return r;
+    }));
   }
 
-  const orderedCountryGroups = [];
-  const appendedIds = new Set();
-  const appendTree = (group) => {
-    if (!group || appendedIds.has(group.编号))
-      return;
-    orderedCountryGroups.push(group);
-    appendedIds.add(group.编号);
-    for (const child of sortOptionGroups(byParent.get(group.编号) || [])) appendTree(child);
-  };
+  store["选项配置"] = [...otherOpts, ...orderedOpts];
+}
 
-  for (const root of localOptGroups.value) appendTree(root);
-
-  for (const group of expOptGroupsSource.value) {
-    if (!appendedIds.has(group.编号))
-      orderedCountryGroups.push(group);
-  }
-
-  store["选项组"] = [...otherGroups, ...orderedCountryGroups];
+function orderRows(a, b, _rootGroupId) {
+  const oa = Number(a?.排序);
+  const ob = Number(b?.排序);
+  if (Number.isFinite(oa) && Number.isFinite(ob))
+    return oa - ob;
+  if (Number.isFinite(oa))
+    return -1;
+  if (Number.isFinite(ob))
+    return 1;
+  return String(a?.显示名 || a?.选项值 || "").localeCompare(
+    String(b?.显示名 || b?.选项值 || ""),
+    "zh-Hans-CN",
+  );
 }
 
 function deleteTpl(idx) {

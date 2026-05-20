@@ -767,8 +767,7 @@ function handleJumpSkuPage() {
                   :key="f.字段键"
                   :field="f"
                   :modelValue="createStore.productInputs[f.字段键]"
-                  :optionGroupsData="configStore['选项组']"
-                  :optionItems="configStore['选项值']"
+                  :optionConfigs="configStore['选项配置']"
                 />
                 <div class="flex flex-col gap-1 pt-3">
                   <label class="label py-0"><span class="label-text text-xs">SKU前缀</span></label>
@@ -936,8 +935,7 @@ function handleJumpSkuPage() {
                               :field="getSkuField(fk)"
                               :modelValue="item.sku.inputs[fk]"
                               noLabel
-                              :optionGroupsData="configStore['选项组']"
-                              :optionItems="configStore['选项值']"
+                              :optionConfigs="configStore['选项配置']"
                             />
                           </template>
                           <template v-else-if="fk === '图片'">
@@ -1047,8 +1045,7 @@ function handleJumpSkuPage() {
                                 :field="getSkuField(fk)"
                                 :modelValue="item.sku.inputs[fk]"
                                 noLabel
-                                :optionGroupsData="configStore['选项组']"
-                                :optionItems="configStore['选项值']"
+                                :optionConfigs="configStore['选项配置']"
                               />
                             </div>
                           </template>

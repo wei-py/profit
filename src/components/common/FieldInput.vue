@@ -13,6 +13,10 @@ const props = defineProps({
     default: false,
     type: Boolean,
   },
+  optionConfigs: {
+    type: Array,
+    default: () => [],
+  },
   optionGroups: {
     type: Array,
     default: () => [],
@@ -38,7 +42,7 @@ const fdesc = computed(() => props.field.description || props.field.说明 || ""
 const isDropdown = computed(() => ftype.value === "select" || ftype.value === "下拉");
 const groupId = computed(() => props.field.optionGroupId || props.field.选项组编号);
 const hasOptionTreeData = computed(
-  () => !!groupId.value && props.optionGroupsData.length > 0 && props.optionItems.length > 0,
+  () => !!groupId.value && props.optionConfigs.length > 0,
 );
 
 const options = computed(() => getItems(groupId.value));
@@ -73,8 +77,7 @@ function onInput(e) {
       v-if="isDropdown && hasOptionTreeData"
       @update:model-value="emit('update:modelValue', $event)"
       :modelValue="modelValue"
-      :optionGroupsData="optionGroupsData"
-      :optionItems="optionItems"
+      :optionConfigs="optionConfigs"
       :placeholder="`请选择${fname || ''}`"
       :rootGroupId="groupId"
       size="xs"

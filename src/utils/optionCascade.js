@@ -1,7 +1,6 @@
 import { isEnabled, normalizeId, orderByNumber } from "@/utils/value";
 
 export const CASCADE_SEPARATOR = " > ";
-const TRIGGER_KEYS = ["父级选项值", "父选项值", "父级选项", "父选项"];
 
 export function parseCascadePath(value) {
   if (!value)
@@ -19,8 +18,10 @@ export function formatCascadePath(values) {
     .join(CASCADE_SEPARATOR);
 }
 
+// -- legacy compat helpers (used only by config-normalizer for old data migration) --
+
 export function getParentTriggerValue(group) {
-  for (const key of TRIGGER_KEYS) {
+  for (const key of ["父级选项值", "父选项值", "父级选项", "父选项"]) {
     const value = normalizeId(group?.[key]);
     if (value)
       return value;
@@ -45,61 +46,20 @@ export function normalizeOptionGroup(row = {}) {
   return group;
 }
 
-export function parseParentTriggerValues(group) {
-  const raw = getParentTriggerValue(group);
-  if (!raw)
-    return [];
-  return raw
-    .split(/[|,，;；]/)
-    .map(s => s.trim())
-    .filter(Boolean);
+// -- new flat-table helpers --
+
+export function sortOptionConfigs(rows) {
+  return orderByNumber(rows, "排序");
 }
 
-export function groupLooksBoundToOption(group, parentValue) {
-  const selected = normalizeId(parentValue);
-  if (!selected)
-    return false;
-
-  const candidates = [
-    group?.名称,
-    group?.编号,
-    String(group?.编号 || "")
-      .split(/[\s_\-./\\]+/)
-      .pop(),
-  ]
-    .map(normalizeId)
-    .filter(Boolean);
-
-  return candidates.includes(selected);
-}
-
-export function parentOptionMatches(group, parentValue) {
-  const triggers = parseParentTriggerValues(group);
-  const selected = normalizeId(parentValue);
-  if (!selected)
-    return false;
-  if (triggers.length)
-    return triggers.includes(selected);
-
-  // 新模型：子级选项组必须挂在某个父选项值下。
-  // 兼容旧数据：如果旧数据没填“父级选项值”，但子组名称/编号刚好等于父选项值，自动按该选项挂载。
-  return groupLooksBoundToOption(group, selected);
-}
-
-export function sortOptionItems(items) {
-  return orderByNumber(items, "排序");
-}
-
-export function sortOptionGroups(groups) {
-  return orderByNumber(groups, "排序");
-}
-
-export function getEnabledOptionItems(optionItems, groupId) {
-  const gid = normalizeId(groupId);
+export function getEnabledOptionItems(optionConfigs, rootGroupId) {
+  const gid = normalizeId(rootGroupId);
   if (!gid)
     return [];
-  return sortOptionItems(
-    (optionItems || []).filter(item => normalizeId(item.所属分组) === gid && isEnabled(item)),
+  return sortOptionConfigs(
+    (optionConfigs || []).filter(
+      row => normalizeId(row.选项组编号) === gid && isEnabled(row) && row.选项值,
+    ),
   );
 }
 
@@ -110,28 +70,23 @@ export function toSelectOptions(items) {
   }));
 }
 
-export function getChildGroups(optionGroups, parentGroupId, parentValue) {
-  const pid = normalizeId(parentGroupId);
+export function getChildGroups(optionConfigs, parentNodeId) {
+  const pid = normalizeId(parentNodeId);
   if (!pid)
     return [];
-  return sortOptionGroups(
-    (optionGroups || []).filter(
-      group => normalizeId(group.父级编号) === pid && parentOptionMatches(group, parentValue),
-    ),
+  return sortOptionConfigs(
+    (optionConfigs || []).filter(row => normalizeId(row.父级) === pid),
   );
 }
 
-export function getAnyChildGroups(optionGroups, parentGroupId) {
-  const pid = normalizeId(parentGroupId);
-  if (!pid)
-    return [];
-  return sortOptionGroups(
-    (optionGroups || []).filter(group => normalizeId(group.父级编号) === pid),
-  );
+export function getGroupName(optionConfigs, rootGroupId) {
+  const gid = normalizeId(rootGroupId);
+  const row = (optionConfigs || []).find(r => normalizeId(r.选项组编号) === gid);
+  return row ? row.选项组名称 || row.选项组编号 || gid : gid;
 }
 
-export function groupHasDescendants(optionGroups, rootGroupId) {
-  const rootId = normalizeId(rootGroupId);
+export function groupHasDescendants(optionConfigs, rootNodeId) {
+  const rootId = normalizeId(rootNodeId);
   if (!rootId)
     return false;
 
@@ -139,79 +94,120 @@ export function groupHasDescendants(optionGroups, rootGroupId) {
   const queue = [rootId];
   while (queue.length) {
     const parentId = queue.shift();
-    const children = getAnyChildGroups(optionGroups, parentId).filter(
-      child => !seen.has(child.编号),
+    const children = getChildGroups(optionConfigs, parentId).filter(
+      child => !seen.has(normalizeId(child.编号)),
     );
     if (children.length)
       return true;
     for (const child of children) {
-      seen.add(child.编号);
-      queue.push(child.编号);
+      const childId = normalizeId(child.编号);
+      seen.add(childId);
+      queue.push(childId);
     }
   }
   return false;
-}
-
-export function getGroupName(optionGroups, groupId) {
-  const gid = normalizeId(groupId);
-  const group = (optionGroups || []).find(g => normalizeId(g.编号) === gid);
-  return group ? group.名称 || group.编号 : gid;
 }
 
 function makeTreeKey(pathValues) {
   return pathValues.join("\u001F");
 }
 
-function buildOptionValueTreeForGroup({
+function buildOptionValueTreeForNode({
   depth = 0,
-  groupId,
-  optionGroups,
-  optionItems,
+  nodeId,
+  optionConfigs,
   pathLabels = [],
   pathValues = [],
   visited = new Set(),
 }) {
-  const gid = normalizeId(groupId);
+  const nid = normalizeId(nodeId);
+  if (!nid || depth > 20 || visited.has(nid))
+    return [];
+
+  const nextVisited = new Set(visited);
+  nextVisited.add(nid);
+
+  const children = getChildGroups(optionConfigs, nid).flatMap(child =>
+    buildOptionValueTreeForNode({
+      depth: depth + 1,
+      nodeId: child.编号,
+      optionConfigs,
+      pathLabels: [],
+      pathValues: [],
+      visited: nextVisited,
+    }),
+  );
+
+  const node = (optionConfigs || []).find(r => normalizeId(r.编号) === nid && r.选项值);
+  if (!node)
+    return children;
+
+  const value = normalizeId(node.选项值);
+  const label = String(node.显示名 || node.选项值 || value);
+  const nextPathValues = [...pathValues, value];
+  const nextPathLabels = [...pathLabels, label];
+
+  return [{
+    children,
+    groupId: normalizeId(node.选项组编号),
+    key: makeTreeKey(nextPathValues),
+    label,
+    pathLabels: nextPathLabels,
+    pathValues: nextPathValues,
+    value,
+  }];
+}
+
+function buildOptionValueTreeFromRoot({
+  depth = 0,
+  optionConfigs,
+  rootGroupId,
+  visited = new Set(),
+}) {
+  const gid = normalizeId(rootGroupId);
   if (!gid || depth > 20 || visited.has(gid))
     return [];
 
   const nextVisited = new Set(visited);
   nextVisited.add(gid);
 
-  return getEnabledOptionItems(optionItems, gid).map((item) => {
-    const value = normalizeId(item.选项值);
-    const label = String(item.显示名 || item.选项值 || value);
-    const nextPathValues = [...pathValues, value];
-    const nextPathLabels = [...pathLabels, label];
-    const children = getChildGroups(optionGroups, gid, value).flatMap(childGroup =>
-      buildOptionValueTreeForGroup({
+  const topLevelNodes = sortOptionConfigs(
+    (optionConfigs || []).filter(
+      row => normalizeId(row.选项组编号) === gid && !normalizeId(row.父级) && isEnabled(row) && row.选项值,
+    ),
+  );
+
+  return topLevelNodes.flatMap((node) => {
+    const value = normalizeId(node.选项值);
+    const label = String(node.显示名 || node.选项值 || value);
+
+    const children = getChildGroups(optionConfigs, node.编号).flatMap(child =>
+      buildOptionValueTreeForNode({
         depth: depth + 1,
-        groupId: childGroup.编号,
-        optionGroups,
-        optionItems,
-        pathLabels: nextPathLabels,
-        pathValues: nextPathValues,
+        nodeId: child.编号,
+        optionConfigs,
+        pathLabels: [label],
+        pathValues: [value],
         visited: nextVisited,
       }),
     );
 
-    return {
+    return [{
       children,
       groupId: gid,
-      key: makeTreeKey(nextPathValues),
+      key: makeTreeKey([value]),
       label,
-      pathLabels: nextPathLabels,
-      pathValues: nextPathValues,
+      pathLabels: [label],
+      pathValues: [value],
       value,
-    };
+    }];
   });
 }
 
-export function buildOptionValueTree({ optionGroups = [], optionItems = [], rootGroupId }) {
-  return buildOptionValueTreeForGroup({
-    groupId: rootGroupId,
-    optionGroups,
-    optionItems,
+export function buildOptionValueTree({ optionConfigs = [], rootGroupId }) {
+  return buildOptionValueTreeFromRoot({
+    optionConfigs,
+    rootGroupId,
   });
 }
 
@@ -254,8 +250,7 @@ export function getOptionTreeAncestorKeys(pathValues = []) {
 }
 
 export function buildCascadeSteps({
-  optionGroups = [],
-  optionItems = [],
+  optionConfigs = [],
   pathValues = [],
   rootGroupId,
 }) {
@@ -265,53 +260,64 @@ export function buildCascadeSteps({
 
   const steps = [];
   const visited = new Set();
-  let currentGroupIds = [rootId];
+  let currentNodeIds = (optionConfigs || [])
+    .filter(row => normalizeId(row.选项组编号) === rootId && !normalizeId(row.父级) && isEnabled(row) && row.选项值)
+    .map(row => normalizeId(row.编号))
+    .filter(Boolean);
   let pathIndex = 0;
 
-  while (currentGroupIds.length) {
-    const levelSteps = [];
+  while (currentNodeIds.length) {
+    const levelItems = [];
 
-    for (const groupId of currentGroupIds) {
-      const gid = normalizeId(groupId);
-      if (!gid || visited.has(gid))
+    for (const nodeId of currentNodeIds) {
+      if (visited.has(nodeId))
         continue;
-      visited.add(gid);
+      visited.add(nodeId);
 
-      const items = toSelectOptions(getEnabledOptionItems(optionItems, gid));
-      if (!items.length)
+      const node = (optionConfigs || []).find(r => normalizeId(r.编号) === nodeId);
+      if (!node)
         continue;
 
-      levelSteps.push({
-        groupId: gid,
-        groupName: getGroupName(optionGroups, gid),
-        items,
-        selectedValue: normalizeId(pathValues[pathIndex]),
+      levelItems.push({
+        label: node.显示名 || node.选项值,
+        value: node.选项值,
       });
-      pathIndex += 1;
     }
 
-    if (!levelSteps.length)
+    if (!levelItems.length)
       break;
 
-    steps.push(...levelSteps);
+    const groupName = getGroupName(optionConfigs, rootId);
+    steps.push({
+      groupId: rootId,
+      groupName,
+      items: levelItems,
+      selectedValue: normalizeId(pathValues[pathIndex]),
+    });
+    pathIndex += 1;
 
-    const nextGroupIds = [];
-    for (const step of levelSteps) {
+    const nextNodeIds = [];
+    for (const step of steps) {
       if (!step.selectedValue)
         continue;
-      for (const child of getChildGroups(optionGroups, step.groupId, step.selectedValue)) {
-        const childId = normalizeId(child.编号);
-        if (childId && !visited.has(childId) && !nextGroupIds.includes(childId))
-          nextGroupIds.push(childId);
+      for (const node of (optionConfigs || [])) {
+        if (normalizeId(node.选项值) === step.selectedValue && normalizeId(node.选项组编号) === rootId) {
+          const children = getChildGroups(optionConfigs, node.编号);
+          for (const child of children) {
+            const childId = normalizeId(child.编号);
+            if (childId && !visited.has(childId) && !nextNodeIds.includes(childId))
+              nextNodeIds.push(childId);
+          }
+        }
       }
     }
-    currentGroupIds = nextGroupIds;
+    currentNodeIds = nextNodeIds;
   }
 
   return steps;
 }
 
-export function getCascadeDefaultValue({ optionGroups = [], optionItems = [], rootGroupId }) {
-  const firstStep = buildCascadeSteps({ optionGroups, optionItems, rootGroupId })[0];
+export function getCascadeDefaultValue({ optionConfigs = [], rootGroupId }) {
+  const firstStep = buildCascadeSteps({ optionConfigs, rootGroupId })[0];
   return firstStep?.items?.[0]?.value || "";
 }

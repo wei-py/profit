@@ -76,7 +76,7 @@ const outputKeys = computed(() =>
       value: f.字段键,
     })),
 );
-const allLookupNames = computed(() => Object.keys(store.lookupTables));
+const allLookupNames = computed(() => store.getLookupNames());
 const flatTree = computed(() => (condTree.value ? flattenTree(condTree.value) : []));
 const fieldSelectOptions = computed(() =>
   store.getFieldsByCountry(props.cpId).map(f => ({
@@ -474,8 +474,7 @@ defineExpose({
                 v-if="getFieldOptionRootId(getCondValue(item.node.idx, '字段'))"
                 @update:model-value="setCondValue(item.node.idx, '值', $event)"
                 :modelValue="getCondValue(item.node.idx, '值')"
-                :optionGroupsData="store['选项组']"
-                :optionItems="store['选项值']"
+                :optionConfigs="store['选项配置']"
                 placeholder="值"
                 :rootGroupId="getFieldOptionRootId(getCondValue(item.node.idx, '字段'))"
                 size="xs"

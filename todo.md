@@ -164,3 +164,5 @@ TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容
 22. admin 文件名改了之后链接也没有跟进呀
 
 <!--puter-->
+
+23. 修改一下 agent.md 加上，我使用opencode，plan 模式是gpt5.5 build 模式是 deepseek v4 pro, gpt5.5 需要详细的告诉 deepseek 后续的工作

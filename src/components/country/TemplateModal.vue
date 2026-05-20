@@ -55,7 +55,8 @@ const showRulePreview = ref(false);
 const previewInputs = reactive({});
 const previewResult = ref(null);
 
-const allLookupNames = computed(() => Object.keys(store.lookupTables));
+const lookupConfigs = computed(() => store.getLookupConfigsByTemplate(form.编号));
+const allLookupNames = computed(() => lookupConfigs.value.map(row => row.表名));
 const newLookupName = ref("");
 const showNewLookupInput = ref(false);
 
@@ -262,6 +263,7 @@ function openNewLookup() {
     ...store.lookupTables,
     [name]: [],
   };
+  store.upsertLookupConfig(name, { 所属模板: form.编号 });
   newLookupName.value = "";
   showNewLookupInput.value = false;
 }
@@ -271,6 +273,7 @@ function deleteLookup(name) {
   confirmAction.value = () => {
     delete store.lookupTables[name];
     store.lookupTables = { ...store.lookupTables };
+    store.removeLookupConfig(name);
     for (const r of store["费用规则"]) {
       if (r.查表名称 === name)
         r.查表名称 = "";
@@ -301,6 +304,12 @@ function save() {
     const x = store["计算模板"].indexOf(currentTemplate);
     if (x !== -1)
       store["计算模板"][x] = { ...form };
+    if (previousTemplateId !== form.编号) {
+      for (const config of store["查表配置"]) {
+        if (config.所属模板 === previousTemplateId)
+          config.所属模板 = form.编号;
+      }
+    }
     const keepR = store["费用规则"].filter(
       r => r.所属模板 !== previousTemplateId && r.所属模板 !== form.编号,
     );
@@ -309,7 +318,12 @@ function save() {
   else {
     store["计算模板"].push({ ...form });
     store["费用规则"] = [...store["费用规则"], ...rulesForSave];
+    for (const config of store["查表配置"]) {
+      if (!config.所属模板)
+        config.所属模板 = form.编号;
+    }
   }
+  store.syncLookupConfigs();
   emit("close");
 }
 
@@ -319,6 +333,7 @@ function deleteTemplate() {
     const t = templates[props.templateIdx];
     store["计算模板"] = store["计算模板"].filter(r => r.编号 !== t.编号);
     store["费用规则"] = store["费用规则"].filter(r => r.所属模板 !== t.编号);
+    store.pruneOrphanConfig();
   }
   emit("close");
 }
@@ -440,8 +455,7 @@ function onConfirmOk() {
               v-for="f in previewFields"
               :key="f.字段键"
               :field="f"
-              :optionGroupsData="store['选项组']"
-              :optionItems="store['选项值']"
+              :optionConfigs="store['选项配置']"
             />
           </div>
           <div v-else class="text-xs opacity-50">无输入字段</div>
