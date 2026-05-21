@@ -1,6 +1,7 @@
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { open } from "@tauri-apps/plugin-dialog";
 import { exists, mkdir, readFile, remove, writeFile } from "@tauri-apps/plugin-fs";
+import dayjs from "dayjs";
 import { ref } from "vue";
 
 const imageDir = ref("");
@@ -31,7 +32,7 @@ function mimeFromExt(ext) {
 }
 
 function uid() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${dayjs().valueOf()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 async function initImageDir() {

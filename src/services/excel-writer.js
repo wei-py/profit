@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { CONFIG_HEADERS, CONFIG_SHEET_NAMES, META_SHEET_NAME } from "@/constants/schema";
 import { displayWidth } from "@/utils/value";
@@ -9,7 +10,7 @@ const PAD = 2;
 export async function buildWorkbookBuffer(config) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "profit-tool";
-  wb.created = new Date();
+  wb.created = dayjs().toDate();
 
   for (const name of CONFIG_SHEET_NAMES) {
     const data = config[name] || [];

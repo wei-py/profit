@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { buildWorkbookBufferInWorker } from "@/services/config-export-worker";
@@ -441,7 +442,7 @@ export const useConfigStore = defineStore("config", () => {
       config: snapshotConfig(),
       filePath: filePath.value,
       remoteUrl: remoteUrl.value,
-      savedAt: Date.now(),
+      savedAt: dayjs().valueOf(),
     };
     try {
       localStorage.setItem(draftKey(), JSON.stringify(payload));

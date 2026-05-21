@@ -1,6 +1,20 @@
 import XEUtils from "xe-utils";
 import { parseCascadePath } from "@/utils/optionCascade";
-import { isBlank, normalizeText, parseDelimited, readJson, toNumber, toRate } from "@/utils/value";
+import {
+  addNumbers,
+  avgNumber,
+  clampNumber,
+  isBlank,
+  maxNumber,
+  minNumber,
+  multiplyNumbers,
+  normalizeText,
+  parseDelimited,
+  readJson,
+  roundNumber,
+  toNumber,
+  toRate,
+} from "@/utils/value";
 
 const ENABLED_VALUES = new Set(["是", "TRUE", "true", "1", "启用", ""]);
 const FUNCTION_ALIASES = {
@@ -16,28 +30,21 @@ const FUNCTION_ALIASES = {
 };
 
 const FORMULA_FUNCTIONS = {
-  ABS: Math.abs,
-  CEIL: Math.ceil,
-  FLOOR: Math.floor,
+  ABS: value => Math.abs(toNumber(value, 0)),
   AND: (...args) => (args.every(Boolean) ? 1 : 0),
-  AVG: (...args) => {
-    const nums = args.map(v => toNumber(v, 0));
-    return nums.length ? nums.reduce((s, n) => s + n, 0) / nums.length : 0;
-  },
-  CLAMP: (value, min, max) =>
-    Math.min(Math.max(toNumber(value, 0), toNumber(min, 0)), toNumber(max, 0)),
+  AVG: (...args) => avgNumber(args),
+  CEIL: value => Math.ceil(toNumber(value, 0)),
+  CLAMP: (value, min, max) => clampNumber(value, min, max),
   DIV: (a, b) => (toNumber(b, 0) === 0 ? 0 : toNumber(a, 0) / toNumber(b, 0)),
+  FLOOR: value => Math.floor(toNumber(value, 0)),
   IF: (cond, yes, no) => (cond ? yes : no),
-  MAX: (...args) => Math.max(...args.map(v => toNumber(v, 0))),
-  MIN: (...args) => Math.min(...args.map(v => toNumber(v, 0))),
-  MUL: (...args) => args.map(v => toNumber(v, 0)).reduce((s, n) => s * n, 1),
+  MAX: (...args) => maxNumber(args),
+  MIN: (...args) => minNumber(args),
+  MUL: (...args) => multiplyNumbers(args),
   OR: (...args) => (args.some(Boolean) ? 1 : 0),
   PCT: value => toRate(value, 0),
-  ROUND: (value, digits = 2) => {
-    const factor = 10 ** toNumber(digits, 0);
-    return Math.round(toNumber(value, 0) * factor) / factor;
-  },
-  SUM: (...args) => args.map(v => toNumber(v, 0)).reduce((s, n) => s + n, 0),
+  ROUND: (value, digits = 2) => roundNumber(value, digits),
+  SUM: (...args) => addNumbers(args),
 };
 
 export function execute(feeRules, lookupTables, userInputs) {
@@ -209,9 +216,9 @@ export function matches(value, op, target, target2 = "") {
     case "不为空":
       return !isBlank(value);
     case "介于":
-      return nVal >= Math.min(nTarget, nTarget2) && nVal <= Math.max(nTarget, nTarget2);
+      return nVal >= minNumber([nTarget, nTarget2]) && nVal <= maxNumber([nTarget, nTarget2]);
     case "不介于":
-      return !(nVal >= Math.min(nTarget, nTarget2) && nVal <= Math.max(nTarget, nTarget2));
+      return !(nVal >= minNumber([nTarget, nTarget2]) && nVal <= maxNumber([nTarget, nTarget2]));
     case "属于":
       return parseDelimited(target).some(item => textMatches(sVal, item));
     case "不属于":

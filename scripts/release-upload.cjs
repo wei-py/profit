@@ -1,6 +1,7 @@
 const { createReadStream } = require("node:fs");
 const fs = require("node:fs");
 const path = require("node:path");
+const dayjs = require("dayjs");
 
 const root = path.resolve(__dirname, "..");
 
@@ -43,8 +44,6 @@ function readLocalVersionTemplate() {
     return {};
   }
 }
-
-const pad = (n) => String(n).padStart(2, "0");
 
 async function apiPost(apiBase, secret, urlPath, body) {
   const headers = { Authorization: `Bearer ${secret}` };
@@ -119,8 +118,8 @@ async function main() {
   const version = pkg.version;
   const localVersionTemplate = readLocalVersionTemplate();
 
-  const now = new Date();
-  const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  const now = dayjs();
+  const ts = now.format("YYYY-MM-DD_HH-mm-ss");
   const isoDate = now.toISOString();
 
   const bundleDir = path.join(root, "src-tauri/target/release/bundle");

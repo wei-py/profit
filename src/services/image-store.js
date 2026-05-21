@@ -1,5 +1,7 @@
 /** 图片本地存储服务。 Tauri: 保存到 app 数据目录下的 images 文件夹。 Web: 仅保存 base64，不写文件。 */
 
+import dayjs from "dayjs";
+
 let imageDir = "";
 
 async function getImageDir() {
@@ -37,7 +39,7 @@ export async function saveImage(base64) {
         ? "jpg"
         : "png";
     const b64 = base64.split(",")[1];
-    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const id = `${dayjs().valueOf()}_${Math.random().toString(36).slice(2, 8)}`;
     const filename = `${id}.${ext}`;
     const filepath = `${dir}/${filename}`;
 

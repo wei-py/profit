@@ -130,3 +130,38 @@ export function displayWidth(str) {
     .split("")
     .reduce((sum, char) => sum + (/[^\x00-\xFF]/.test(char) ? 2 : 1), 0);
 }
+
+export function addNumbers(values = []) {
+  return toArray(values).reduce((sum, value) => sum + toNumber(value, 0), 0);
+}
+
+export function multiplyNumbers(values = []) {
+  return toArray(values).reduce((total, value) => total * toNumber(value, 0), 1);
+}
+
+export function maxNumber(values = []) {
+  const nums = toArray(values).map(value => toNumber(value, 0));
+  return nums.length ? Math.max(...nums) : 0;
+}
+
+export function minNumber(values = []) {
+  const nums = toArray(values).map(value => toNumber(value, 0));
+  return nums.length ? Math.min(...nums) : 0;
+}
+
+export function avgNumber(values = []) {
+  const nums = toArray(values).map(value => toNumber(value, 0));
+  return nums.length ? addNumbers(nums) / nums.length : 0;
+}
+
+export function clampNumber(value, min, max) {
+  const n = toNumber(value, 0);
+  const lo = toNumber(min, 0);
+  const hi = toNumber(max, 0);
+  return Math.min(Math.max(n, lo), hi);
+}
+
+export function roundNumber(value, digits = 2) {
+  const factor = 10 ** toNumber(digits, 0);
+  return Math.round(toNumber(value, 0) * factor) / factor;
+}

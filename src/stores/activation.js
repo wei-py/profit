@@ -1,4 +1,5 @@
 import { Store } from "@tauri-apps/plugin-store";
+import dayjs from "dayjs";
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { activateCode, validateCode } from "@/services/activation";
@@ -61,7 +62,7 @@ export const useActivationStore = defineStore("activation", () => {
 
     if (hasCache && code.value) {
       // 有缓存：先判断离线宽限期是否生效
-      const elapsed = Date.now() - lastVerifiedAt.value;
+      const elapsed = dayjs().valueOf() - lastVerifiedAt.value;
       if (elapsed < OFFLINE_GRACE_MS) {
         // 在宽限期内，直接放行
         status.value = "activated";
@@ -89,7 +90,7 @@ export const useActivationStore = defineStore("activation", () => {
       const resp = await validateCode(code.value);
       if (resp.success) {
         token.value = resp.token || "";
-        lastVerifiedAt.value = Date.now();
+        lastVerifiedAt.value = dayjs().valueOf();
         await saveCache();
         if (status.value !== "activated") {
           status.value = "activated";
@@ -119,7 +120,7 @@ export const useActivationStore = defineStore("activation", () => {
       if (resp.success) {
         code.value = inputCode;
         token.value = resp.token || "";
-        lastVerifiedAt.value = Date.now();
+        lastVerifiedAt.value = dayjs().valueOf();
         await saveCache();
         status.value = "activated";
         return {

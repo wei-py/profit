@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
 import { open } from "@tauri-apps/plugin-shell";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useFileIO } from "@/composables/useFileIO";
 import { useTheme } from "@/composables/useTheme";
 import { useVersionCheck } from "@/composables/useVersionCheck";
@@ -15,9 +15,9 @@ const activationStore = useActivationStore();
 const {
   checkVersion,
   currentVersion,
+  downloadedBytes,
   downloadPercent,
   downloadTotal,
-  downloadedBytes,
   forceUpdate,
   formatBytes,
   hasUpdater,
@@ -33,6 +33,31 @@ const {
 const showUpdateModal = ref(false);
 const showForceModal = ref(false);
 const showAutoBtn = ref(false);
+const appInitialized = ref(false);
+
+async function initAppAfterActivation() {
+  if (appInitialized.value)
+    return;
+
+  const ok = await activationStore.checkActivation();
+  if (!ok) {
+    router.replace("/activate");
+    return;
+  }
+
+  await restoreLastPath();
+  await initTheme();
+
+  await checkVersion();
+  showAutoBtn.value = hasUpdater(updateInfo.value, platformKey.value);
+
+  if (forceUpdate.value)
+    showForceModal.value = true;
+  else if (updateAvailable.value)
+    showUpdateModal.value = true;
+
+  appInitialized.value = true;
+}
 
 function showCheckedUpdateResult() {
   showAutoBtn.value = hasUpdater(updateInfo.value, platformKey.value);
@@ -64,7 +89,8 @@ async function handleManualDownload() {
 }
 
 async function handleCheckUpdateRequest() {
-  if (isUpdating.value) return;
+  if (isUpdating.value)
+    return;
   showUpdateModal.value = false;
   showForceModal.value = false;
   await checkVersion();
@@ -74,24 +100,21 @@ async function handleCheckUpdateRequest() {
 onMounted(async () => {
   window.addEventListener("profit-check-update", handleCheckUpdateRequest);
 
-  if (route.path === "/activate")
-    return;
-
-  const ok = await activationStore.checkActivation();
-  if (!ok) {
-    router.replace("/activate");
+  if (route.path === "/activate") {
+    await initTheme();
     return;
   }
 
-  await restoreLastPath();
-  await initTheme();
-
-  await checkVersion();
-  showAutoBtn.value = hasUpdater(updateInfo.value, platformKey.value);
-
-  if (forceUpdate.value) showForceModal.value = true;
-  else if (updateAvailable.value) showUpdateModal.value = true;
+  await initAppAfterActivation();
 });
+
+watch(
+  () => route.path,
+  async (path, oldPath) => {
+    if (oldPath === "/activate" && path !== "/activate")
+      await initAppAfterActivation();
+  },
+);
 
 onUnmounted(() => {
   window.removeEventListener("profit-check-update", handleCheckUpdateRequest);
@@ -141,9 +164,9 @@ const statusText = computed(() => {
           </div>
           <progress
             v-if="updateStatus === 'downloading'"
-            :value="downloadPercent"
-            max="100"
             class="progress progress-primary w-full"
+            max="100"
+            :value="downloadPercent"
           />
           <div v-if="updateStatus === 'downloading'" class="text-xs text-base-content/40">
             {{ formatBytes(downloadedBytes) }}
@@ -167,9 +190,9 @@ const statusText = computed(() => {
         </button>
         <button
           v-if="showAutoBtn && updateStatus !== 'restarting'"
-          :disabled="isUpdating"
           @click="handleAutoUpdate"
           class="btn btn-sm btn-primary"
+          :disabled="isUpdating"
         >
           {{ isUpdating ? "更新中..." : "自动更新" }}
         </button>
@@ -211,9 +234,9 @@ const statusText = computed(() => {
           </div>
           <progress
             v-if="updateStatus === 'downloading'"
-            :value="downloadPercent"
-            max="100"
             class="progress progress-primary w-full"
+            max="100"
+            :value="downloadPercent"
           />
           <div v-if="updateStatus === 'downloading'" class="text-xs text-base-content/40">
             {{ formatBytes(downloadedBytes) }}
@@ -230,9 +253,9 @@ const statusText = computed(() => {
       <div class="modal-action">
         <button
           v-if="showAutoBtn && updateStatus !== 'restarting'"
-          :disabled="isUpdating"
           @click="handleAutoUpdate"
           class="btn btn-sm btn-primary"
+          :disabled="isUpdating"
         >
           {{ isUpdating ? "更新中..." : "自动更新" }}
         </button>
