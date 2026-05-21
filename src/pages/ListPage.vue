@@ -5,6 +5,7 @@ import { vDraggable } from "vue-draggable-plus";
 import ColEditorModal from "@/components/common/ColEditorModal.vue";
 import FieldInput from "@/components/common/FieldInput.vue";
 import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
+import PaginationBar from "@/components/common/PaginationBar.vue";
 import ReverseCalcModal from "@/components/list/ReverseCalcModal.vue";
 import TraceModal from "@/components/list/TraceModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
@@ -636,25 +637,6 @@ function buildSkuRowsWithoutVariants(rows) {
     })),
   );
 }
-
-const jumpPage = ref("");
-const jumpSkuPage = ref("");
-
-function handleJumpPage() {
-  const n = Number(jumpPage.value);
-  if (n >= 1 && n <= totalPages.value) {
-    currentPage.value = n;
-    jumpPage.value = "";
-  }
-}
-
-function handleJumpSkuPage() {
-  const n = Number(jumpSkuPage.value);
-  if (n >= 1 && n <= skuTotalPages.value) {
-    skuPage.value = n;
-    jumpSkuPage.value = "";
-  }
-}
 </script>
 
 <template>
@@ -1108,35 +1090,14 @@ function handleJumpSkuPage() {
                 <div v-if="!createStore.skus.length" class="mt-2 text-base-content/40 text-sm">
                   选择模板后自动生成 SKU，或点击「生成SKU」手动刷新
                 </div>
-                <div
+                <PaginationBar
                   v-if="createStore.skus.length"
-                  class="flex items-center justify-end gap-1 mt-2 text-xs"
-                >
-                  <input
-                    v-model.number="skuPageSize"
-                    class="input input-bordered input-xs w-12"
-                    min="1"
-                  >
-                  <span class="opacity-50">条/页</span>
-                  <button @click="skuPage--" class="btn btn-ghost btn-xs" :disabled="skuPage <= 1">
-                    ◀
-                  </button>
-                  <span>{{ skuPage }}/{{ skuTotalPages }}</span>
-                  <button
-                    @click="skuPage++"
-                    class="btn btn-ghost btn-xs"
-                    :disabled="skuPage >= skuTotalPages"
-                  >
-                    ▶
-                  </button>
-                  <input
-                    v-model="jumpSkuPage"
-                    @keyup.enter="handleJumpSkuPage"
-                    class="input input-bordered input-xs w-10"
-                    placeholder="页"
-                  >
-                  <button @click="handleJumpSkuPage" class="btn btn-ghost btn-xs">跳转</button>
-                </div>
+                  v-model:currentPage="skuPage"
+                  v-model:pageSize="skuPageSize"
+                  class="justify-end mt-2"
+                  showJump
+                  :totalPages="skuTotalPages"
+                />
               </div>
             </div>
           </template>
@@ -1331,35 +1292,14 @@ function handleJumpSkuPage() {
               </div>
             </div>
 
-            <div
+            <PaginationBar
               v-if="listStore.records.length"
-              class="flex items-center justify-end gap-1 mt-2 text-xs"
-            >
-              <input v-model.number="pageSize" class="input input-bordered input-xs w-12" min="1">
-              <span class="opacity-50">条/页</span>
-              <button
-                @click="currentPage--"
-                class="btn btn-ghost btn-xs"
-                :disabled="currentPage <= 1"
-              >
-                ◀
-              </button>
-              <span>{{ currentPage }}/{{ totalPages }}</span>
-              <button
-                @click="currentPage++"
-                class="btn btn-ghost btn-xs"
-                :disabled="currentPage >= totalPages"
-              >
-                ▶
-              </button>
-              <input
-                v-model="jumpPage"
-                @keyup.enter="handleJumpPage"
-                class="input input-bordered input-xs w-10"
-                placeholder="页"
-              >
-              <button @click="handleJumpPage" class="btn btn-ghost btn-xs">跳转</button>
-            </div>
+              v-model:currentPage="currentPage"
+              v-model:pageSize="pageSize"
+              class="justify-end mt-2"
+              showJump
+              :totalPages="totalPages"
+            />
           </template>
         </div>
       </div>

@@ -4,9 +4,9 @@ import { readWorkbookBuffer } from "@/services/excel-reader";
 import { buildWorkbookBuffer } from "@/services/excel-writer";
 import {
   buildCascadeSteps,
-  getChildGroups as getCascadeChildGroups,
   getCascadeDefaultValue,
-  getEnabledOptionItems,
+  getChildOptionItems,
+  getRootOptionItems,
   groupHasDescendants as hasOptionGroupDescendants,
 } from "@/utils/optionCascade";
 import { isEnabled, normalizeId, orderByNumber } from "@/utils/value";
@@ -46,6 +46,7 @@ export const useConfigStore = defineStore("config", () => {
       const config = readWorkbookBuffer(buffer);
       applyConfig(config);
       workbook.value = buffer;
+      restoreDraft();
     }
     catch (e) {
       error.value = e.message;
@@ -141,7 +142,7 @@ export const useConfigStore = defineStore("config", () => {
     );
 
     费用规则.value = 费用规则.value.filter(row => keepTemplateIds.has(normalizeId(row.所属模板)));
-    模板参数.value = 模板参数.value.filter(row => keepTemplateIds.has(normalizeId(row.模板编号)));
+    模板参数.value = 模板参数.value.filter(row => keepTemplateIds.has(normalizeId(row.所属模板)));
     const removedLookupConfigNames = new Set(
       查表配置.value
         .filter(row => normalizeId(row.所属模板) && !keepTemplateIds.has(normalizeId(row.所属模板)))
@@ -291,69 +292,67 @@ export const useConfigStore = defineStore("config", () => {
 
   function getFieldsByCountry(cpId) {
     const countryId = normalizeId(cpId);
-    return 计算字段.value.filter(f => normalizeId(f.所属国家平台) === countryId);
+    return orderByNumber(
+      计算字段.value.filter(f => normalizeId(f.所属国家平台) === countryId),
+      "排序",
+    );
   }
 
   function getEnabledFieldsByCountry(cpId) {
     return getFieldsByCountry(cpId).filter(field => isEnabled(field));
   }
 
-  function getAllOptionGroupIdsByCountry(cpId) {
+  function getAllOptionGroupsByCountry(cpId) {
     const countryId = normalizeId(cpId);
-    const seen = new Set();
-    return 选项配置.value
-      .filter(row => normalizeId(row.所属国家平台) === countryId && row.选项组编号 && row.选项值 && !seen.has(row.选项组编号) && seen.add(row.选项组编号))
-      .map(row => ({
-        名称: row.选项组名称 || row.选项组编号,
-        所属国家平台: row.所属国家平台,
-        排序: row.排序,
-        编号: row.选项组编号,
-      }));
+    const rootItems = getRootOptionItems(
+      选项配置.value.filter(r => normalizeId(r.所属国家平台) === countryId),
+    );
+    return rootItems.map(r => ({
+      名称: r.选项值编号 || r.选项值,
+      所属国家平台: r.所属国家平台,
+      排序: r.排序,
+    }));
   }
 
   function getOptionGroupsByCountry(cpId) {
     const countryId = normalizeId(cpId);
 
-    const usedGroupIds = new Set(
+    const usedRootIds = new Set(
       计算字段.value
         .filter(field => normalizeId(field.所属国家平台) === countryId)
-        .map(field => normalizeId(field.选项组编号))
+        .map(field => (field.选项组 || "").trim())
         .filter(Boolean),
     );
 
-    const byGroupId = new Map();
+    const byId = new Map();
     for (const row of 选项配置.value) {
-      const gid = normalizeId(row.选项组编号);
-      if (!gid || !usedGroupIds.has(gid) || byGroupId.has(gid))
+      const nodeId = (row.选项值编号 || "").trim();
+      if (!nodeId || !usedRootIds.has(nodeId) || byId.has(nodeId))
         continue;
-      byGroupId.set(gid, {
-        名称: row.选项组名称 || gid,
+      byId.set(nodeId, {
+        名称: nodeId,
         所属国家平台: row.所属国家平台,
         排序: row.排序 || "",
-        编号: gid,
       });
     }
 
-    return orderByNumber([...byGroupId.values()], "排序");
+    return orderByNumber([...byId.values()], "排序");
   }
 
-  function getOptionItemsByGroup(groupId) {
-    const id = normalizeId(groupId);
-    return 选项配置.value.filter(
-      item => normalizeId(item.选项组编号) === id && !item.父级,
-    );
+  function getOptionItemsByGroup(nodeId) {
+    return getChildOptionItems(选项配置.value, nodeId);
   }
 
-  function getEnabledOptionItemsByGroup(groupId) {
-    return getEnabledOptionItems(选项配置.value, groupId);
+  function getEnabledOptionItemsByGroup(nodeId) {
+    return getChildOptionItems(选项配置.value, nodeId);
   }
 
-  function getChildGroups(groupId, parentOptionValue = "") {
-    return getCascadeChildGroups(选项配置.value, groupId, parentOptionValue);
+  function getChildGroups(nodeId) {
+    return getChildOptionItems(选项配置.value, nodeId);
   }
 
-  function groupHasDescendants(groupId) {
-    return hasOptionGroupDescendants(选项配置.value, groupId);
+  function groupHasDescendants(nodeId) {
+    return hasOptionGroupDescendants(选项配置.value, nodeId);
   }
 
   function buildOptionCascade(groupId, pathValues = []) {
@@ -376,10 +375,10 @@ export const useConfigStore = defineStore("config", () => {
     const attachChildren = parent => ({
       ...parent,
       children: all
-        .filter(g => normalizeId(g.父级) === normalizeId(parent.编号))
+        .filter(g => (g.父级选项值编号 || "").trim() === (parent.选项值编号 || "").trim())
         .map(attachChildren),
     });
-    return all.filter(g => !normalizeId(g.父级)).map(attachChildren);
+    return all.filter(g => !(g.父级选项值编号 || "").trim()).map(attachChildren);
   }
 
   function getField(fieldKey, cpId) {
@@ -392,7 +391,7 @@ export const useConfigStore = defineStore("config", () => {
 
   function getTemplateParams(templateId) {
     const id = normalizeId(templateId);
-    return 模板参数.value.filter(param => normalizeId(param.模板编号) === id);
+    return 模板参数.value.filter(param => normalizeId(param.所属模板) === id);
   }
 
   function clear() {
@@ -410,14 +409,95 @@ export const useConfigStore = defineStore("config", () => {
     国家平台ColOrder.value = [];
     国家平台HiddenCols.value = [];
     lookupTables.value = {};
+    clearDraft();
+  }
+
+  // -- draft persistence --
+
+  const dirty = ref(false);
+
+  function draftKey() {
+    const key = filePath.value || remoteUrl.value || "default";
+    return `profit_config_draft:${key}`;
+  }
+
+  function snapshotConfig() {
+    return {
+      lookupTables: JSON.parse(JSON.stringify(lookupTables.value)),
+      国家平台: JSON.parse(JSON.stringify(国家平台.value)),
+      国家平台ColOrder: [...国家平台ColOrder.value],
+      国家平台HiddenCols: [...国家平台HiddenCols.value],
+      查表配置: JSON.parse(JSON.stringify(查表配置.value)),
+      模板参数: JSON.parse(JSON.stringify(模板参数.value)),
+      计算字段: JSON.parse(JSON.stringify(计算字段.value)),
+      计算模板: JSON.parse(JSON.stringify(计算模板.value)),
+      费用规则: JSON.parse(JSON.stringify(费用规则.value)),
+      选项配置: JSON.parse(JSON.stringify(选项配置.value)),
+    };
+  }
+
+  function persistDraft() {
+    const payload = {
+      config: snapshotConfig(),
+      filePath: filePath.value,
+      remoteUrl: remoteUrl.value,
+      savedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem(draftKey(), JSON.stringify(payload));
+    }
+    catch {
+      // storage full or unavailable
+    }
+  }
+
+  function markDirty() {
+    dirty.value = true;
+    persistDraft();
+  }
+
+  function clearDirty() {
+    dirty.value = false;
+  }
+
+  function restoreDraft() {
+    try {
+      const raw = localStorage.getItem(draftKey());
+      if (!raw)
+        return false;
+
+      const payload = JSON.parse(raw);
+      if (!payload?.config)
+        return false;
+
+      applyConfig(payload.config);
+      dirty.value = true;
+      return true;
+    }
+    catch {
+      return false;
+    }
+  }
+
+  function clearDraft() {
+    try {
+      localStorage.removeItem(draftKey());
+    }
+    catch {
+      // ignore
+    }
+    dirty.value = false;
   }
 
   return {
     buildOptionCascade,
     clear,
+    clearDirty,
+    clearDraft,
+    dirty,
     error,
     filePath,
-    getAllOptionGroupIdsByCountry,
+    getAllOptionGroupsByCountry,
     getChildGroups,
     getEnabledFieldsByCountry,
     getEnabledOptionItemsByGroup,
@@ -439,6 +519,7 @@ export const useConfigStore = defineStore("config", () => {
     loadFromBuffer,
     loading,
     lookupTables,
+    markDirty,
     pruneOrphanConfig,
     remoteUrl,
     removeLookupConfig,

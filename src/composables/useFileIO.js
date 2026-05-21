@@ -200,6 +200,7 @@ export function useFileIO() {
       localStorage.setItem("lastConfigPath", name);
       configStore.setFilePath(name);
     }
+    configStore.clearDraft();
     return { success: true };
   }
 

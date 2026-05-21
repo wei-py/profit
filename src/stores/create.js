@@ -85,8 +85,8 @@ export const useCreateStore = defineStore("create", () => {
       return templateDefault;
     if (field.默认值)
       return field.默认值;
-    if (field.类型 === "下拉" && field.选项组编号)
-      return configStore.getOptionCascadeDefault(field.选项组编号);
+    if (field.类型 === "下拉" && field.选项组)
+      return configStore.getOptionCascadeDefault(field.选项组);
     return "";
   }
 

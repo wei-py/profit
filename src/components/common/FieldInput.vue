@@ -40,7 +40,7 @@ const frequired = computed(() => props.field.required || props.field.必填 === 
 const fdesc = computed(() => props.field.description || props.field.说明 || "");
 
 const isDropdown = computed(() => ftype.value === "select" || ftype.value === "下拉");
-const groupId = computed(() => props.field.optionGroupId || props.field.选项组编号);
+const groupId = computed(() => props.field.optionGroupId || props.field.选项组);
 const hasOptionTreeData = computed(
   () => !!groupId.value && props.optionConfigs.length > 0,
 );

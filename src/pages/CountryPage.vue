@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
 import ColEditorModal from "@/components/common/ColEditorModal.vue";
 import CountryModal from "@/components/country/CountryModal.vue";
@@ -10,7 +10,6 @@ import TemplateModal from "@/components/country/TemplateModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
 import { useTour } from "@/composables/useTour";
 import { useConfigStore } from "@/stores/config";
-import { normalizeId } from "@/utils/value";
 
 const store = useConfigStore();
 const { openConfigExcel, restoreRemoteUrl, saveConfigExcel } = useFileIO();
@@ -112,8 +111,12 @@ watch(
   { immediate: true },
 );
 function onFieldsDragEnd() {
+  localFields.value.forEach((field, index) => {
+    field.排序 = index + 1;
+  });
   const other = store["计算字段"].filter(f => f.所属国家平台 !== cpId.value);
   store["计算字段"] = [...other, ...localFields.value];
+  store.markDirty();
 }
 
 const expOptGroupsSource = computed(() =>
@@ -134,15 +137,15 @@ function sortOptionGroups(groups) {
       if (na !== nb)
         return na - nb;
     }
-    return String(a?.名称 || a?.编号 || "").localeCompare(
-      String(b?.名称 || b?.编号 || ""),
+    return String(a?.名称 || "").localeCompare(
+      String(b?.名称 || ""),
       "zh-Hans-CN",
     );
   });
 }
 
 function rootOptionGroups(groups) {
-  return sortOptionGroups((groups || []).filter(g => !g.父级编号));
+  return sortOptionGroups(groups || []);
 }
 
 watch(
@@ -168,6 +171,7 @@ watch(
 function onTemplatesDragEnd() {
   const other = store["计算模板"].filter(t => t.所属国家平台 !== cpId.value);
   store["计算模板"] = [...other, ...localTemplates.value];
+  store.markDirty();
 }
 
 function addColumn() {
@@ -179,12 +183,14 @@ function addColumn() {
       r[n] = "";
   }
   store.sync国家平台ColOrder();
+  store.markDirty();
   newColName.value = "";
   showAddCol.value = false;
 }
 function removeColumn(k) {
   if (!CORE_KEYS.includes(k)) {
     for (const r of store["国家平台"]) delete r[k];
+    store.markDirty();
   }
 }
 function addRow() {
@@ -192,6 +198,7 @@ function addRow() {
   for (const k of allKeys.value) r[k] = "";
   r.启用 = "是";
   store["国家平台"].push(r);
+  store.markDirty();
 }
 function deleteRow(id) {
   const i = store["国家平台"].findIndex(r => r.编号 === id);
@@ -200,40 +207,46 @@ function deleteRow(id) {
     if (expandedId.value === id)
       expandedId.value = null;
     store.pruneOrphanConfig();
+    store.markDirty();
   }
 }
 function deleteField(idx) {
   const fields = store.getFieldsByCountry(cpId.value);
   const x = store["计算字段"].indexOf(fields[idx]);
-  if (x !== -1)
+  if (x !== -1) {
     store["计算字段"].splice(x, 1);
+    store["计算字段"].forEach((f, i) => {
+      if (f.所属国家平台 === cpId.value)
+        f.排序 = i + 1;
+    });
+    store.markDirty();
+  }
   localFields.value.splice(idx, 1);
 }
 function deleteOptGroup(group) {
   if (!group)
     return;
-  const gid = group.编号;
-  const ids = collectDescendantIds(gid);
-  ids.add(gid);
-  store["选项配置"] = store["选项配置"].filter(r => normalizeId(r.选项组编号) !== gid && !ids.has(normalizeId(r.编号)));
-  localOptGroups.value = localOptGroups.value.filter(r => r.编号 !== gid);
+  const rootId = (group.名称 || "").trim();
+  if (!rootId)
+    return;
+  // Remove root node and all descendants
+  const prefix = `${rootId} / `;
+  store["选项配置"] = store["选项配置"].filter(r =>
+    (r.选项值编号 || "").trim() !== rootId
+    && !(r.选项值编号 || "").trim().startsWith(prefix),
+  );
+  localOptGroups.value = localOptGroups.value.filter(r => (r.名称 || "").trim() !== rootId);
+  store.markDirty();
 }
 
 function collectDescendantIds(rootId) {
   const ids = new Set();
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const g of store["选项配置"]) {
-      const pid = normalizeId(g.父级);
-      if (
-        pid
-        && (ids.has(pid) || pid === rootId || normalizeId(g.编号) === rootId)
-        && !ids.has(normalizeId(g.编号))
-      ) {
-        ids.add(normalizeId(g.编号));
-        changed = true;
-      }
+  const prefix = `${rootId} / `;
+  for (const g of store["选项配置"]) {
+    const pid = (g.父级选项值编号 || "").trim();
+    const nid = (g.选项值编号 || "").trim();
+    if (pid === rootId || pid.startsWith(prefix)) {
+      ids.add(nid);
     }
   }
   return ids;
@@ -272,7 +285,7 @@ function onOptionGroupDragStart() {
 }
 
 function onOptionGroupsDragEnd(evt) {
-  ensureDraggedItemPosition(localOptGroups, evt, group => group?.编号, ".option-source-row");
+  ensureDraggedItemPosition(localOptGroups, evt, group => group?.名称, ".option-source-row");
   localOptGroups.value.forEach((group, index) => {
     group.排序 = index + 1;
   });
@@ -284,15 +297,16 @@ function reorderOptionGroupsForCurrentCountry() {
   if (!cpId.value)
     return;
 
-  const localIds = new Set(expOptGroupsSource.value.map(group => group.编号));
-  const otherOpts = store["选项配置"].filter(row => !localIds.has(normalizeId(row.选项组编号)));
+  const localNames = new Set(localOptGroups.value.map(g => (g.名称 || "").trim()).filter(Boolean));
+  const otherOpts = store["选项配置"].filter(row => !localNames.has((row.选项值编号 || "").trim()));
   const orderedOpts = [];
 
   for (const group of localOptGroups.value) {
-    const groupId = group.编号;
+    const rootId = (group.名称 || "").trim();
+    const prefix = `${rootId} / `;
     const groupRows = store["选项配置"]
-      .filter(r => normalizeId(r.选项组编号) === groupId)
-      .sort((a, b) => orderRows(a, b, groupId));
+      .filter(r => (r.选项值编号 || "").trim() === rootId || (r.选项值编号 || "").trim().startsWith(prefix))
+      .sort((a, b) => orderRows(a, b));
     orderedOpts.push(...groupRows.map((r) => {
       r.排序 = group.排序;
       return r;
@@ -300,9 +314,10 @@ function reorderOptionGroupsForCurrentCountry() {
   }
 
   store["选项配置"] = [...otherOpts, ...orderedOpts];
+  store.markDirty();
 }
 
-function orderRows(a, b, _rootGroupId) {
+function orderRows(a, b) {
   const oa = Number(a?.排序);
   const ob = Number(b?.排序);
   if (Number.isFinite(oa) && Number.isFinite(ob))
@@ -311,8 +326,8 @@ function orderRows(a, b, _rootGroupId) {
     return -1;
   if (Number.isFinite(ob))
     return 1;
-  return String(a?.显示名 || a?.选项值 || "").localeCompare(
-    String(b?.显示名 || b?.选项值 || ""),
+  return String(a?.选项值 || "").localeCompare(
+    String(b?.选项值 || ""),
     "zh-Hans-CN",
   );
 }
@@ -322,6 +337,7 @@ function deleteTpl(idx) {
   const t = templates[idx];
   store["计算模板"] = store["计算模板"].filter(r => r.编号 !== t.编号);
   store["费用规则"] = store["费用规则"].filter(r => r.所属模板 !== t.编号);
+  store.markDirty();
   localTemplates.value.splice(idx, 1);
 }
 function toggleExpand(id) {
@@ -396,8 +412,20 @@ function openConfigColEditor() {
   showConfigColModal.value = true;
 }
 
+function onBeforeUnload(e) {
+  if (!store.dirty)
+    return;
+  e.preventDefault();
+  e.returnValue = "";
+}
+
 onMounted(() => {
   restoreRemoteUrl();
+  window.addEventListener("beforeunload", onBeforeUnload);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", onBeforeUnload);
 });
 </script>
 
@@ -442,7 +470,7 @@ onMounted(() => {
           :disabled="store.isRemote"
           :title="store.isRemote ? '远程配置不可直接保存，请先加载本地文件' : ''"
         >
-          保存配置
+          保存配置<span v-if="store.dirty"> *</span>
         </button>
         <button @click="openConfigColEditor" class="btn btn-ghost btn-sm">⚙️ 编辑列</button>
         <button v-if="!showAddCol" @click="showAddCol = true" class="btn btn-ghost btn-sm">
@@ -566,7 +594,7 @@ onMounted(() => {
                                   <span
                                     @click="openEditField(i)"
                                     class="cursor-pointer hover:text-primary"
-                                  >{{ f.字段键 || "(新)" }}
+                                  >{{ f.字段名称 || f.字段键 || "(新)" }}
                                     <span class="text-base-content/40">{{ f.层级 }}·{{ f.输入输出 }}</span></span>
                                 </span>
                                 <button
@@ -612,9 +640,9 @@ onMounted(() => {
                             >
                               <div
                                 v-for="(group, i) in localOptGroups"
-                                :key="group.编号 || i"
+                                :key="group.名称 || i"
                                 class="option-source-row border-b border-base-200 flex items-center justify-between py-1 text-xs"
-                                :data-drag-key="group.编号"
+                                :data-drag-key="group.名称"
                               >
                                 <span class="flex min-w-0 flex-1 gap-2 items-center">
                                   <span
@@ -625,11 +653,10 @@ onMounted(() => {
                                     @click="openEditOptGroup(group)"
                                     class="min-w-0 cursor-pointer font-semibold truncate hover:text-primary"
                                   >
-                                    {{ group.名称 || group.编号 || "(新)" }}
-                                    <span class="text-base-content/40">{{ group.编号 }}</span>
+                                    {{ group.名称 || "(新)" }}
                                   </span>
                                   <span
-                                    v-if="collectDescendantIds(group.编号).size"
+                                    v-if="collectDescendantIds(group.名称).size"
                                     class="badge badge-ghost badge-xs"
                                   >子级</span>
                                 </span>
@@ -705,44 +732,51 @@ onMounted(() => {
               </tbody>
             </table>
           </div>
-          <button @click="addRow" class="btn btn-ghost btn-sm mt-2">＋ 添加国家</button>
+          <button @click="addRow" class="btn btn-ghost btn-sm mt-2">
+            ＋ 添加国家
+          </button>
         </div>
       </div>
     </div>
-
-    <CountryModal
-      @close="showCountryModal = false"
-      :allKeys="allKeys"
-      :countryId="editingCountryId"
-      :open="showCountryModal"
-    />
-    <FieldModal
-      @close="showFieldModal = false"
-      :cpId="cpId"
-      :fieldIdx="editingFieldIdx"
-      :open="showFieldModal"
-    />
-    <OptionGroupModal
-      @close="showOptModal = false"
-      :cpId="cpId"
-      :open="showOptModal"
-      :selectedGroupId="editingOptGroupId"
-    />
-    <TemplateModal
-      @close="showTplModal = false"
-      :cpId="cpId"
-      :open="showTplModal"
-      :templateIdx="editingTplIdx"
-    />
-    <ColEditorModal
-      @close="showConfigColModal = false"
-      @update="store.国家平台ColOrder = $event"
-      @update-hidden="store.国家平台HiddenCols = $event"
-      filterKey=""
-      :hiddenKeys="store.国家平台HiddenCols"
-      :items="allConfigColumns"
-      :open="showConfigColModal"
-    />
-    <RemoteUrlModal @close="showRemoteModal = false" :open="showRemoteModal" />
   </div>
+
+  <CountryModal
+    @close="showCountryModal = false"
+    :allKeys="allKeys"
+    :countryId="editingCountryId"
+    :open="showCountryModal"
+  />
+
+  <FieldModal
+    @close="showFieldModal = false"
+    :cpId="cpId"
+    :fieldIdx="editingFieldIdx"
+    :open="showFieldModal"
+  />
+
+  <OptionGroupModal
+    @close="showOptModal = false"
+    :cpId="cpId"
+    :open="showOptModal"
+    :selectedGroupId="editingOptGroupId"
+  />
+
+  <TemplateModal
+    @close="showTplModal = false"
+    :cpId="cpId"
+    :open="showTplModal"
+    :templateIdx="editingTplIdx"
+  />
+
+  <ColEditorModal
+    @close="showConfigColModal = false"
+    @update="store.国家平台ColOrder = $event"
+    @update-hidden="store.国家平台HiddenCols = $event"
+    filterKey=""
+    :hiddenKeys="store.国家平台HiddenCols"
+    :items="allConfigColumns"
+    :open="showConfigColModal"
+  />
+
+  <RemoteUrlModal @close="showRemoteModal = false" :open="showRemoteModal" />
 </template>

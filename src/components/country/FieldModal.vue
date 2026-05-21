@@ -1,9 +1,10 @@
 <script setup>
 import { driver } from "driver.js";
-import { computed, reactive, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
 import { useModalEsc } from "@/composables/useModalEsc";
 import { useConfigStore } from "@/stores/config";
+import { normalizeId } from "@/utils/value";
 
 import "driver.js/dist/driver.css";
 
@@ -20,6 +21,7 @@ useModalEsc(
 
 const store = useConfigStore();
 const form = reactive({});
+const showTreeDefaultPicker = ref(false);
 
 const fieldEditSteps = [
   {
@@ -64,23 +66,22 @@ watch(
   (v) => {
     if (!v)
       return;
+    showTreeDefaultPicker.value = false;
     if (props.fieldIdx >= 0) {
       const fields = store.getFieldsByCountry(props.cpId);
       Object.assign(form, JSON.parse(JSON.stringify(fields[props.fieldIdx])));
-      normalizeOptionSourceToRoot();
     }
     else {
       Object.assign(form, {
         单位: "",
         字段名称: "",
-        字段键: "",
         层级: "商品级",
         必填: "否",
         所属国家平台: props.cpId,
         类型: "数字",
         说明: "",
         输入输出: "输入",
-        选项组编号: "",
+        选项组: "",
         默认值: "",
       });
     }
@@ -89,20 +90,16 @@ watch(
 
 const isDropdownField = computed(() => form.类型 === "下拉");
 
-const rootGroupRows = computed(() =>
+const rootGroupOptions = computed(() =>
   store
     .getOptionGroupsByCountry(props.cpId)
-    .filter(group => !group.父级编号)
-    .sort((a, b) => String(a.名称 || a.编号).localeCompare(String(b.名称 || b.编号), "zh-Hans-CN"))
+    .sort((a, b) => String(a.名称 || "").localeCompare(String(b.名称 || ""), "zh-Hans-CN"))
     .map(group => ({
-      group,
-      label: group.名称 || group.编号,
+      label: group.名称,
+      value: group.名称,
     })),
 );
 
-const rootGroupOptions = computed(() =>
-  rootGroupRows.value.map(row => ({ label: row.label, value: row.group.编号 })),
-);
 const fieldTypeOptions = ["数字", "文本", "下拉", "布尔"];
 const fieldLevelOptions = ["商品级", "SKU级"];
 const inputOutputOptions = ["输入", "输出"];
@@ -111,57 +108,35 @@ const yesNoOptions = ["是", "否"];
 const canUseTreeDefault = computed(
   () =>
     isDropdownField.value
-    && form.选项组编号
-    && store["选项组"].length > 0
-    && store["选项值"].length > 0,
+    && form.选项组
+    && store["选项配置"].length > 0,
 );
 
-function selectOptionGroup(groupId) {
-  if (form.选项组编号 !== groupId) {
-    form.选项组编号 = groupId;
+function selectOptionGroup(groupName) {
+  if (form.选项组 !== groupName) {
+    form.选项组 = groupName;
     form.默认值 = "";
   }
 }
 
-function findRootGroupId(groupId) {
-  if (!groupId)
-    return "";
-  const groups = store.getOptionGroupsByCountry(props.cpId);
-  const map = new Map(groups.map(group => [group.编号, group]));
-  let cur = map.get(groupId);
-  if (!cur)
-    return "";
-  const guard = new Set();
-  while (cur?.父级编号 && map.has(cur.父级编号) && !guard.has(cur.编号)) {
-    guard.add(cur.编号);
-    cur = map.get(cur.父级编号);
-  }
-  return cur?.编号 || "";
-}
-
-function normalizeOptionSourceToRoot() {
-  if (!form.选项组编号)
-    return;
-  const rootId = findRootGroupId(form.选项组编号);
-  if (rootId && rootId !== form.选项组编号)
-    form.选项组编号 = rootId;
-}
-
 function save() {
-  normalizeOptionSourceToRoot();
-
   if (!isDropdownField.value) {
-    form.选项组编号 = "";
+    form.选项组 = "";
   }
+
+  form.字段键 = normalizeId(form.字段键 || form.字段名称);
 
   if (props.fieldIdx >= 0) {
     const fields = store.getFieldsByCountry(props.cpId);
     const x = store["计算字段"].indexOf(fields[props.fieldIdx]);
-    if (x !== -1)
+    if (x !== -1) {
       store["计算字段"][x] = { ...form };
+      store.markDirty();
+    }
   }
   else {
     store["计算字段"].push({ ...form });
+    store.markDirty();
   }
   emit("close");
 }
@@ -170,8 +145,10 @@ function deleteField() {
   if (props.fieldIdx >= 0) {
     const fields = store.getFieldsByCountry(props.cpId);
     const x = store["计算字段"].indexOf(fields[props.fieldIdx]);
-    if (x !== -1)
+    if (x !== -1) {
       store["计算字段"].splice(x, 1);
+      store.markDirty();
+    }
   }
   emit("close");
 }
@@ -190,10 +167,6 @@ function deleteField() {
       </div>
 
       <div class="gap-3 grid grid-cols-1 sm:grid-cols-2">
-        <div>
-          <label class="label py-0 text-xs">字段键</label>
-          <input v-model="form.字段键" class="input input-bordered input-sm w-full">
-        </div>
         <div>
           <label class="label py-0 text-xs">字段名称</label>
           <input v-model="form.字段名称" class="input input-bordered input-sm w-full">
@@ -244,7 +217,7 @@ function deleteField() {
         <label class="label py-0 text-xs">选项来源</label>
         <OptionTreeSelect
           @update:model-value="selectOptionGroup"
-          :modelValue="form.选项组编号"
+          :modelValue="form.选项组"
           :options="rootGroupOptions"
           placeholder="选择选项来源"
           size="sm"
@@ -261,14 +234,22 @@ function deleteField() {
           size="sm"
         />
         <OptionTreeSelect
-          v-else-if="canUseTreeDefault"
+          v-else-if="canUseTreeDefault && showTreeDefaultPicker"
           @update:model-value="form.默认值 = $event"
           :modelValue="form.默认值"
           :optionConfigs="store['选项配置']"
           placeholder="选择默认值"
-          :rootGroupId="form.选项组编号"
+          :rootGroupId="form.选项组"
           size="sm"
         />
+        <button
+          v-else-if="canUseTreeDefault && !showTreeDefaultPicker"
+          @click="showTreeDefaultPicker = true"
+          class="btn btn-outline btn-sm w-full"
+          type="button"
+        >
+          选择默认值
+        </button>
         <div
           v-else-if="isDropdownField"
           class="border border-dashed border-base-300 px-3 py-2 text-sm opacity-60"

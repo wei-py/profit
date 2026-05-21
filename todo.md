@@ -155,6 +155,19 @@ TAURI_SIGNING_PRIVATE_KEY=src-tauri/profit-updater.key 的完整内容
 TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容。-->
 
 
+
+
+
+<!--23. 修改一下 agent.md 加上，我使用opencode，plan 模式是gpt5.5 build 模式是 deepseek v4 pro, gpt5.5 需要详细的告诉 deepseek 后续的工作-->
+
+<!--24. 选项配置不需要编号，因为有所属国家平台了， 计算字段里的字段键也可以不要了，也是因为有所属国家平台了，模板参数里的模板编号改为所属模板-->
+
+<!--25. 配置页面字段和拖拽和 excel 里的排序有关联的，保存配置的时候同步一下，对了，现在 excel 里没有排序这一列，你看看实现一下-->
+
+
+<!--27.  父级选项组改为父级选项值编号， 选项值编号（应该是这样子的“动物与宠物 / 鸟 / 鸟 / 鹌鹑”），通过选项值编号，这个有唯一性，选项值可能有一样的
+28. 选项组编号-->
+
 15. admin 移动端能够预览 json excel
 17. 右上角多一些问号，引导用户使用，在每一个弹窗中，也在每一块操作的区域， 旧的引导也跟进一下
 18. 美客多
@@ -162,7 +175,9 @@ TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容
 19. 能不能把这个 dasui 给到用户自己配呢
 21. 给一下这个项目的描述给我，我要给其他的 ai 生成 logo
 22. admin 文件名改了之后链接也没有跟进呀
+26. 选项值在第 2 列
+27. puter
 
-<!--puter-->
+28. 编辑模板里的查表数据有个表类目佣金查询表里面数据很多点击之后没有反应了
 
-23. 修改一下 agent.md 加上，我使用opencode，plan 模式是gpt5.5 build 模式是 deepseek v4 pro, gpt5.5 需要详细的告诉 deepseek 后续的工作
+29. 你看看项目哪里还可以使用 pretext

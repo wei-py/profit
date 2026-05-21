@@ -306,7 +306,7 @@ function getFieldDef(fieldKey) {
 
 function getFieldOptionRootId(fieldKey) {
   const field = getFieldDef(fieldKey);
-  return field.类型 === "下拉" ? field.选项组编号 || "" : "";
+  return field.类型 === "下拉" ? field.选项组 || "" : "";
 }
 
 function conditionNeedsSecondValue(idx) {

@@ -1,9 +1,10 @@
 <script setup>
 import { driver } from "driver.js";
-import { ref, watch } from "vue";
-import { vDraggable } from "vue-draggable-plus";
+import { computed, ref, shallowRef, watch } from "vue";
+import PaginationBar from "@/components/common/PaginationBar.vue";
 import { useModalEsc } from "@/composables/useModalEsc";
 import { useConfigStore } from "@/stores/config";
+import { FONT_TABLE_XS, LINE_HEIGHT_TABLE_XS, measureTextHeight } from "@/utils/textMeasure";
 
 import "driver.js/dist/driver.css";
 
@@ -19,18 +20,23 @@ useModalEsc(
 
 const store = useConfigStore();
 const newName = ref("");
-const rowsLocal = ref([]);
+const rowsLocal = shallowRef([]);
 let rowUid = 0;
+const currentPage = ref(1);
+const pageSize = ref(100);
 
-const dragOpts = {
-  animation: 150,
-  chosenClass: "drag-chosen",
-  dragClass: "drag-drag",
-  fallbackOnBody: true,
-  forceFallback: true,
-  ghostClass: "drag-ghost",
-  handle: ".drag-handle",
-};
+const columns = computed(() =>
+  Object.keys(rowsLocal.value[0] || {}).filter(k => k !== "_uid"),
+);
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(rowsLocal.value.length / pageSize.value)),
+);
+
+const pagedRows = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return rowsLocal.value.slice(start, start + pageSize.value);
+});
 
 const lookupEditSteps = [
   {
@@ -69,6 +75,34 @@ function startTour(steps) {
   d.drive();
 }
 
+const COLUMN_WIDTHS = {
+  catName: 140,
+  chCatName: 120,
+  chPath: 180,
+  parentName: 140,
+  path: 180,
+};
+
+function getColumnWidth(col) {
+  return COLUMN_WIDTHS[col] || 92;
+}
+
+const rowHeights = computed(() => {
+  return pagedRows.value.map((row) => {
+    let maxH = LINE_HEIGHT_TABLE_XS;
+
+    for (const col of columns.value) {
+      const text = String(row[col] ?? "");
+      const width = getColumnWidth(col) - 8;
+      const h = measureTextHeight(text, width, LINE_HEIGHT_TABLE_XS, FONT_TABLE_XS);
+      if (h > maxH)
+        maxH = h;
+    }
+
+    return Math.max(28, maxH + 10);
+  });
+});
+
 watch(
   () => props.open,
   (v) => {
@@ -76,23 +110,31 @@ watch(
       return;
     newName.value = props.tableName;
     rowUid = 0;
+    currentPage.value = 1;
     rowsLocal.value = JSON.parse(JSON.stringify(store.lookupTables[props.tableName] || [])).map(
       row => ({ ...row, _uid: ++rowUid }),
     );
   },
 );
 
+watch([totalPages, pageSize], () => {
+  if (currentPage.value > totalPages.value)
+    currentPage.value = totalPages.value;
+});
+
 function addRow() {
   if (!rowsLocal.value.length) {
-    rowsLocal.value.push({ _uid: ++rowUid });
+    rowsLocal.value = [{ _uid: ++rowUid }];
     return;
   }
   const row = { _uid: ++rowUid };
-  for (const k of Object.keys(rowsLocal.value[0]).filter(k => k !== "_uid")) row[k] = "";
-  rowsLocal.value.push(row);
+  for (const k of columns.value) row[k] = "";
+  rowsLocal.value = [...rowsLocal.value, row];
 }
 function delRow(i) {
-  rowsLocal.value.splice(i, 1);
+  const arr = [...rowsLocal.value];
+  arr.splice(i, 1);
+  rowsLocal.value = arr;
 }
 
 const newCol = ref("");
@@ -140,6 +182,7 @@ function save() {
     };
     store.upsertLookupConfig(nn);
   }
+  store.markDirty();
   emit("close");
 }
 </script>
@@ -167,43 +210,61 @@ function save() {
           placeholder="列名"
         >
       </div>
-      <div v-if="rowsLocal.length" class="overflow-x-auto" data-tour="lookup-table">
-        <table class="table table-xs">
-          <thead>
-            <tr>
-              <th class="w-8" />
-              <th
-                v-for="k in Object.keys(rowsLocal[0] || {}).filter((k) => k !== '_uid')"
-                :key="k"
-                class="group relative"
-              >
-                {{ k }}
-                <button
-                  @click="delCol(k)"
-                  class="-right-1 -top-1 absolute btn btn-ghost btn-xs group-hover:opacity-100 opacity-0 text-error"
+      <div v-if="rowsLocal.length" data-tour="lookup-table">
+        <div class="overflow-x-auto">
+          <table class="table table-xs">
+            <thead>
+              <tr>
+                <th
+                  v-for="k in columns"
+                  :key="k"
+                  class="group relative"
+                  :style="{ minWidth: `${getColumnWidth(k)}px`, width: `${getColumnWidth(k)}px` }"
                 >
-                  ✕
-                </button>
-              </th>
-              <th class="w-12" />
-            </tr>
-          </thead>
-          <tbody v-draggable="[rowsLocal, dragOpts]">
-            <tr v-for="(row, i) in rowsLocal" :key="row._uid">
-              <td>
-                <span
-                  class="drag-handle flex hover:text-base-content items-center justify-center select-none text-base-content/30 text-xs"
-                >☰</span>
-              </td>
-              <td v-for="k in Object.keys(rowsLocal[0] || {}).filter((k) => k !== '_uid')" :key="k">
-                <input v-model="row[k]" class="input input-bordered input-xs w-full">
-              </td>
-              <td>
-                <button @click="delRow(i)" class="btn btn-ghost btn-xs text-error">🗑️</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                  {{ k }}
+                  <button
+                    @click="delCol(k)"
+                    class="-right-1 -top-1 absolute btn btn-ghost btn-xs group-hover:opacity-100 opacity-0 text-error"
+                  >
+                    ✕
+                  </button>
+                </th>
+                <th class="w-12" />
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, i) in pagedRows" :key="row._uid">
+                <td
+                  v-for="k in columns"
+                  :key="k"
+                  class="p-0 align-top"
+                  :style="{ minWidth: `${getColumnWidth(k)}px`, width: `${getColumnWidth(k)}px` }"
+                >
+                  <textarea
+                    @input="row[k] = $event.target.value"
+                    class="textarea textarea-xs w-full resize-none rounded-none border-0 px-1 py-1 leading-5"
+                    rows="1"
+                    :style="{ height: `${rowHeights[i]}px` }"
+                    :value="row[k]"
+                  />
+                </td>
+                <td>
+                  <button @click="delRow((currentPage - 1) * pageSize + i)" class="btn btn-ghost btn-xs text-error">🗑️</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <PaginationBar
+          v-model:currentPage="currentPage"
+          v-model:pageSize="pageSize"
+          class="justify-end mt-2"
+          showJump
+          showTotal
+          :total="rowsLocal.length"
+          :totalPages="totalPages"
+        />
       </div>
       <div v-else class="mb-4 text-base-content/40 text-xs">空表，点击「＋ 行」或「＋ 列」开始</div>
       <div class="modal-action">
