@@ -92,7 +92,7 @@ const isDropdownField = computed(() => form.类型 === "下拉");
 
 const rootGroupOptions = computed(() =>
   store
-    .getOptionGroupsByCountry(props.cpId)
+    .getAllOptionGroupsByCountry(props.cpId)
     .sort((a, b) => String(a.名称 || "").localeCompare(String(b.名称 || ""), "zh-Hans-CN"))
     .map(group => ({
       label: group.名称,

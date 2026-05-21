@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { buildWorkbookBufferInWorker } from "@/services/config-export-worker";
 import { readWorkbookBuffer } from "@/services/excel-reader";
-import { buildWorkbookBuffer } from "@/services/excel-writer";
 import {
   buildCascadeSteps,
   getCascadeDefaultValue,
@@ -75,7 +75,7 @@ export const useConfigStore = defineStore("config", () => {
   async function getExportBuffer() {
     sync国家平台ColOrder();
     pruneOrphanConfig();
-    return await buildWorkbookBuffer({
+    return await buildWorkbookBufferInWorker({
       lookupTables: lookupTables.value,
       国家平台: 国家平台.value,
       国家平台ColOrder: 国家平台ColOrder.value,

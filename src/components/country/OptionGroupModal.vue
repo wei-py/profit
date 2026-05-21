@@ -72,10 +72,26 @@ watch(
   },
 );
 
+const editingSingleRoot = computed(() => !!(props.selectedGroupId || "").trim());
+
+function isInRoot(row, rootId) {
+  const nodeId = (row.选项值编号 || "").trim();
+  return nodeId === rootId || nodeId.startsWith(`${rootId} / `);
+}
+
 function loadDraft() {
+  const rootId = (props.selectedGroupId || "").trim();
+
   const rows = store["选项配置"]
-    .filter(r => normalizeId(r.所属国家平台) === normalizeId(props.cpId))
+    .filter((r) => {
+      if (normalizeId(r.所属国家平台) !== normalizeId(props.cpId))
+        return false;
+      if (!rootId)
+        return true;
+      return isInRoot(r, rootId);
+    })
     .map(r => JSON.parse(JSON.stringify(r)));
+
   draftRows.value = rows;
 }
 
@@ -191,11 +207,22 @@ function toggleExpand(row) {
   expandedIds.value = next;
 }
 
+function renameOptionGroupReferences(oldRootId, newRootId) {
+  for (const field of store["计算字段"]) {
+    if (normalizeId(field.所属国家平台) !== normalizeId(props.cpId))
+      continue;
+
+    if ((field.选项组 || "").trim() === oldRootId)
+      field.选项组 = newRootId;
+
+    const defaultValue = (field.默认值 || "").trim();
+    if (defaultValue === oldRootId || defaultValue.startsWith(`${oldRootId} / `))
+      field.默认值 = defaultValue.replace(oldRootId, newRootId);
+  }
+}
+
 function saveDraft() {
-  const oldRootIds = new Set(
-    store.getAllOptionGroupsByCountry(props.cpId).map(g => g.名称),
-  );
-  const keep = store["选项配置"].filter(r => !oldRootIds.has((r.选项值编号 || "").trim()));
+  const oldRootId = (props.selectedGroupId || "").trim();
 
   const cleanRows = draftRows.value.map((row, index) => ({
     启用: row.启用 || "是",
@@ -208,7 +235,23 @@ function saveDraft() {
     选项值编号: (row.选项值编号 || "").trim(),
   }));
 
+  const newRootId = (rootNodes.value[0]?.选项值编号 || "").trim();
+
+  let keep;
+  if (oldRootId) {
+    keep = store["选项配置"].filter(row => !isInRoot(row, oldRootId));
+  }
+  else {
+    keep = store["选项配置"].filter(
+      row => normalizeId(row.所属国家平台) !== normalizeId(props.cpId),
+    );
+  }
+
   store["选项配置"] = [...keep, ...cleanRows];
+
+  if (oldRootId && newRootId && oldRootId !== newRootId)
+    renameOptionGroupReferences(oldRootId, newRootId);
+
   store.markDirty();
   emit("close");
 }
@@ -279,7 +322,7 @@ const flatVisibleRows = computed(() => {
       <div class="min-h-0 flex-1 overflow-auto border border-base-300" data-tour="option-tree-list">
         <div class="sticky top-0 z-10 flex h-10 items-center justify-between border-b border-base-300 bg-base-100 px-3">
           <div class="font-semibold text-sm">选项树</div>
-          <button @click="addRootNode" class="btn btn-ghost btn-xs">＋顶级</button>
+          <button v-if="!editingSingleRoot" @click="addRootNode" class="btn btn-ghost btn-xs">＋顶级</button>
         </div>
 
         <div v-if="flatVisibleRows.length">

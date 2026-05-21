@@ -1,6 +1,8 @@
 import { useConfigStore } from "@/stores/config";
 import { useListStore } from "@/stores/list";
 
+const DEFAULT_REMOTE_CONFIG_URL = "https://profit-admin.xu-wei.space/api/files/%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6/default.xlsx";
+
 const isTauri = () => !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
 
 export function useFileIO() {
@@ -265,19 +267,31 @@ export function useFileIO() {
 
   async function restoreLastPath() {
     const paths = await getLastPaths();
+
     if (isTauri()) {
       if (paths.config) {
         try {
           const { readFile } = await import("@tauri-apps/plugin-fs");
           const bytes = await readFile(paths.config);
           await configStore.loadFromBuffer(bytes, paths.config);
+          return { source: "local", success: true };
         }
         catch {
           configStore.setFilePath(paths.config);
         }
       }
     }
-    // Web 端不支持自动恢复，需手动打开文件
+
+    const remoteUrl = paths.remoteUrl || DEFAULT_REMOTE_CONFIG_URL;
+    if (remoteUrl) {
+      const result = await openRemoteConfigExcel(remoteUrl);
+      return {
+        ...result,
+        source: "remote",
+      };
+    }
+
+    return { success: false };
   }
 
   return {

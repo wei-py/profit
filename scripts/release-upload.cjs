@@ -32,6 +32,18 @@ function readSig(filePath) {
   return fs.readFileSync(filePath, "utf-8").trim();
 }
 
+function readLocalVersionTemplate() {
+  const versionPath = path.join(root, "public/version.json");
+  if (!fs.existsSync(versionPath))
+    return {};
+  try {
+    return JSON.parse(fs.readFileSync(versionPath, "utf-8"));
+  }
+  catch {
+    return {};
+  }
+}
+
 const pad = (n) => String(n).padStart(2, "0");
 
 async function apiPost(apiBase, secret, urlPath, body) {
@@ -105,6 +117,7 @@ async function main() {
 
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8"));
   const version = pkg.version;
+  const localVersionTemplate = readLocalVersionTemplate();
 
   const now = new Date();
   const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
@@ -158,8 +171,8 @@ async function main() {
 
   const versionJson = {
     version,
-    force: false,
-    notes: "profit 公测上线了",
+    force: localVersionTemplate.force ?? false,
+    notes: localVersionTemplate.notes || "",
     pub_date: isoDate,
     manual: {},
     platforms: {},

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
 import ColEditorModal from "@/components/common/ColEditorModal.vue";
 import CountryModal from "@/components/country/CountryModal.vue";
@@ -120,7 +120,7 @@ function onFieldsDragEnd() {
 }
 
 const expOptGroupsSource = computed(() =>
-  cpId.value ? store.getOptionGroupsByCountry(cpId.value) : [],
+  cpId.value ? store.getAllOptionGroupsByCountry(cpId.value) : [],
 );
 const localOptGroups = ref([]);
 const isDraggingOptGroups = ref(false);
@@ -357,6 +357,8 @@ const showConfigColModal = ref(false);
 const isDraggingCp = ref(false);
 const dragExpandedId = ref(null);
 const local国家平台 = ref([]);
+
+const savingConfig = ref(false);
 watch(
   () => [...store["国家平台"]],
   (v) => {
@@ -397,7 +399,7 @@ function openNewOpt() {
   showOptModal.value = true;
 }
 function openEditOptGroup(group) {
-  editingOptGroupId.value = group?.编号 || "";
+  editingOptGroupId.value = (group?.名称 || "").trim();
   showOptModal.value = true;
 }
 function openNewTpl() {
@@ -410,6 +412,26 @@ function openEditTpl(idx) {
 }
 function openConfigColEditor() {
   showConfigColModal.value = true;
+}
+
+function waitForPaint() {
+  return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+async function handleSaveConfigExcel() {
+  if (savingConfig.value || store.isRemote)
+    return;
+
+  savingConfig.value = true;
+
+  try {
+    await nextTick();
+    await waitForPaint();
+    await saveConfigExcel();
+  }
+  finally {
+    savingConfig.value = false;
+  }
 }
 
 function onBeforeUnload(e) {
@@ -465,12 +487,14 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <button
-          @click="saveConfigExcel"
+          @click="handleSaveConfigExcel"
           class="btn btn-outline btn-sm"
-          :disabled="store.isRemote"
+          :disabled="store.isRemote || savingConfig"
           :title="store.isRemote ? '远程配置不可直接保存，请先加载本地文件' : ''"
         >
-          保存配置<span v-if="store.dirty"> *</span>
+          <span v-if="savingConfig" class="loading loading-spinner loading-xs" />
+          <span>{{ savingConfig ? "保存中" : "保存配置" }}</span>
+          <span v-if="store.dirty && !savingConfig"> *</span>
         </button>
         <button @click="openConfigColEditor" class="btn btn-ghost btn-sm">⚙️ 编辑列</button>
         <button v-if="!showAddCol" @click="showAddCol = true" class="btn btn-ghost btn-sm">
