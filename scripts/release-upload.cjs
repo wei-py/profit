@@ -6,22 +6,27 @@ const dayjs = require("dayjs");
 const root = path.resolve(__dirname, "..");
 
 function loadEnv(filePath) {
-  if (!fs.existsSync(filePath)) return;
+  if (!fs.existsSync(filePath))
+    return;
   const lines = fs.readFileSync(filePath, "utf-8").split("\n");
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
+    if (!trimmed || trimmed.startsWith("#"))
+      continue;
     const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
+    if (eq === -1)
+      continue;
     const key = trimmed.slice(0, eq).trim();
     const val = trimmed.slice(eq + 1).trim();
-    if (!process.env[key]) process.env[key] = val;
+    if (!process.env[key])
+      process.env[key] = val;
   }
 }
 
 function findFiles(dir, pattern) {
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).filter((f) => pattern.test(f)).map((f) => path.join(dir, f));
+  if (!fs.existsSync(dir))
+    return [];
+  return fs.readdirSync(dir).filter(f => pattern.test(f)).map(f => path.join(dir, f));
 }
 
 function pickVersioned(files, version) {
@@ -29,7 +34,8 @@ function pickVersioned(files, version) {
 }
 
 function readSig(filePath) {
-  if (!filePath || !fs.existsSync(filePath)) return null;
+  if (!filePath || !fs.existsSync(filePath))
+    return null;
   return fs.readFileSync(filePath, "utf-8").trim();
 }
 
@@ -51,7 +57,7 @@ async function apiPost(apiBase, secret, urlPath, body) {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(body);
   }
-  const resp = await fetch(`${apiBase}${urlPath}`, { method: "POST", headers, body });
+  const resp = await fetch(`${apiBase}${urlPath}`, { body, headers, method: "POST" });
   return resp.json();
 }
 
@@ -60,16 +66,19 @@ async function uploadFile(apiBase, secret, filePath, remotePath, overwrite, make
   const buf = fs.readFileSync(filePath);
   form.append("file", new Blob([buf]), path.basename(filePath));
   form.append("path", remotePath);
-  if (overwrite) form.append("overwrite", "true");
-  if (makePublic) form.append("public", "true");
+  if (overwrite)
+    form.append("overwrite", "true");
+  if (makePublic)
+    form.append("public", "true");
 
   const resp = await fetch(`${apiBase}/api/admin/files/upload`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${secret}` },
     body: form,
+    headers: { Authorization: `Bearer ${secret}` },
+    method: "POST",
   });
   const data = await resp.json();
-  if (!data.success) throw new Error(`upload failed ${filePath}: ${data.error}`);
+  if (!data.success)
+    throw new Error(`upload failed ${filePath}: ${data.error}`);
   return data.file;
 }
 
@@ -99,8 +108,8 @@ async function uploadPlatform(apiBase, secret, label, latestPath, archivePath, m
   const updaterName = updaterFile ? path.basename(updaterFile) : null;
 
   return {
-    manualUrl: manualName ? `${apiBase}/api/files/${encodeURIComponent(latestPath + "/" + manualName)}` : null,
-    updaterUrl: updaterName ? `${apiBase}/api/files/${encodeURIComponent(latestPath + "/" + updaterName)}` : null,
+    manualUrl: manualName ? `${apiBase}/api/files/${encodeURIComponent(`${latestPath}/${manualName}`)}` : null,
+    updaterUrl: updaterName ? `${apiBase}/api/files/${encodeURIComponent(`${latestPath}/${updaterName}`)}` : null,
   };
 }
 
@@ -169,12 +178,12 @@ async function main() {
   const winSignature = readSig(winSig);
 
   const versionJson = {
-    version,
     force: localVersionTemplate.force ?? false,
-    notes: localVersionTemplate.notes || "",
-    pub_date: isoDate,
     manual: {},
+    notes: localVersionTemplate.notes || "",
     platforms: {},
+    pub_date: isoDate,
+    version,
   };
 
   if (macUrls) {
@@ -202,7 +211,7 @@ async function main() {
   }
 
   const localVersionPath = path.join(root, "public/version.json");
-  fs.writeFileSync(localVersionPath, JSON.stringify(versionJson, null, 2) + "\n", "utf-8");
+  fs.writeFileSync(localVersionPath, `${JSON.stringify(versionJson, null, 2)}\n`, "utf-8");
   console.log("\n  ✓  public/version.json generated locally (template + last release snapshot)");
 
   const versionForm = new FormData();
@@ -211,14 +220,15 @@ async function main() {
   versionForm.append("overwrite", "true");
   versionForm.append("public", "true");
   const versionResp = await fetch(`${apiBase}/api/admin/files/upload`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${secret}` },
     body: versionForm,
+    headers: { Authorization: `Bearer ${secret}` },
+    method: "POST",
   });
   const versionData = await versionResp.json();
   if (versionData.success) {
     console.log(`  ✓  version.json uploaded → ${apiBase}/api/files/releases/version.json`);
-  } else {
+  }
+  else {
     console.error(`  ✗  version.json upload failed: ${versionData.error}`);
   }
 
