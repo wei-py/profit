@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.2",
   "force": false,
   "notes": "- 保存配置改为 Web Worker 导出，减少卡顿 \n- 保存按钮增加 loading 状态 \n- 默认自动加载远程配置 \n- 发布上传自动使用本地 notes 和 force \n- 选项来源支持全部显示、单树编辑和重命名同步 \n- 查表大表分页编辑优化 \n- 查表单元格使用 pretext 优化显示 \n- 公共分页组件改为 daisyUI 风格，支持输入页码和跳转",
   "pub_date": "2026-05-22 00:21",
