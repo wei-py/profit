@@ -27,15 +27,56 @@ const ruleDragOpts = {
   animation: 150,
   chosenClass: "drag-chosen",
   dragClass: "drag-drag",
+  draggable: ".rule-row",
   fallbackOnBody: true,
   forceFallback: true,
   ghostClass: "drag-ghost",
   handle: ".rule-drag-handle",
 };
 
-function onRuleDragEnd() {
+const flow = ref(createEmptyFlow());
+const localRules = ref([]);
+const currentRule = computed(() => localRules.value.find(rule => rule.id === selectedRuleId.value) || localRules.value[0] || null);
+
+function onRuleDragEnd(evt) {
+  ensureDraggedRulePosition(evt);
   normalizeRuleOrders();
   commitFlow();
+}
+
+function dragTargetIndex(evt) {
+  if (evt?.newDraggableIndex !== undefined && evt?.newDraggableIndex !== null)
+    return evt.newDraggableIndex;
+  if (evt?.to && evt?.item) {
+    const items = [...evt.to.children].filter(el => el.matches?.(".rule-row"));
+    const index = items.indexOf(evt.item);
+    if (index >= 0)
+      return index;
+  }
+  return evt?.newIndex;
+}
+
+function ensureDraggedRulePosition(evt) {
+  const targetIndex = dragTargetIndex(evt);
+  const dragKey = evt?.item?.dataset?.dragKey;
+  if (!dragKey || targetIndex === undefined || targetIndex === null)
+    return;
+
+  if (String(localRules.value[targetIndex]?.id || "") === dragKey)
+    return;
+
+  const currentIndex = localRules.value.findIndex(r => r.id === dragKey);
+  if (currentIndex < 0 || currentIndex === targetIndex)
+    return;
+
+  const [moved] = localRules.value.splice(currentIndex, 1);
+  localRules.value.splice(targetIndex, 0, moved);
+}
+
+function normalizeRuleOrders() {
+  localRules.value.forEach((rule, index) => {
+    rule.order = (index + 1) * 10;
+  });
 }
 
 const calculationConfigs = computed(() => props.cpId ? store.getCalculationConfigsByCountry(props.cpId) : []);
@@ -48,16 +89,6 @@ const outputOptions = computed(() => outputFields.value.map(field => ({
   label: field.字段名称 ? `${field.字段名称}（${field.字段键}）` : field.字段键,
   value: field.字段键,
 })));
-
-const flow = computed(() => normalizeFlow(form.流程JSON));
-const rules = computed(() => flow.value.rules);
-const currentRule = computed(() => rules.value.find(rule => rule.id === selectedRuleId.value) || rules.value[0] || null);
-
-function normalizeRuleOrders() {
-  flow.value.rules.forEach((rule, index) => {
-    rule.order = (index + 1) * 10;
-  });
-}
 
 watch(
   () => props.open,
@@ -84,26 +115,31 @@ function initForm() {
       流程JSON: serializeFlow(createEmptyFlow()),
     });
   }
+  flow.value = normalizeFlow(form.流程JSON);
+  localRules.value = flow.value.rules;
   selectedRuleId.value = null;
 }
 
 function applyCommissionPreset() {
-  form.流程JSON = serializeFlow(buildDefaultCommissionFlow());
+  const preset = buildDefaultCommissionFlow();
+  form.流程JSON = serializeFlow(preset);
+  flow.value = normalizeFlow(form.流程JSON);
+  localRules.value = flow.value.rules;
   selectedRuleId.value = null;
 }
 
 function addRule() {
-  const rule = createEmptyRule(`规则 ${rules.value.length + 1}`);
-  flow.value.rules.push(rule);
+  const rule = createEmptyRule(`规则 ${localRules.value.length + 1}`);
+  localRules.value.push(rule);
   selectedRuleId.value = rule.id;
   commitFlow();
 }
 
 function deleteRule(ruleId) {
-  const idx = flow.value.rules.findIndex(rule => rule.id === ruleId);
+  const idx = localRules.value.findIndex(rule => rule.id === ruleId);
   if (idx < 0)
     return;
-  flow.value.rules.splice(idx, 1);
+  localRules.value.splice(idx, 1);
   if (selectedRuleId.value === ruleId)
     selectedRuleId.value = null;
   commitFlow();
@@ -114,7 +150,7 @@ function selectRule(ruleId) {
 }
 
 function updateRuleGraph(ruleId, graphJson) {
-  const rule = flow.value.rules.find(rule => rule.id === ruleId);
+  const rule = localRules.value.find(rule => rule.id === ruleId);
   if (!rule)
     return;
   rule.graph = JSON.parse(graphJson);
@@ -122,6 +158,7 @@ function updateRuleGraph(ruleId, graphJson) {
 }
 
 function commitFlow() {
+  flow.value.rules = localRules.value;
   form.流程JSON = serializeFlow(flow.value);
 }
 
@@ -171,23 +208,29 @@ function deleteTemplate() {
               <span class="text-xs font-semibold opacity-70">规则列表</span>
               <button @click="addRule" class="btn btn-ghost btn-xs">＋</button>
             </div>
-            <div v-if="!rules.length" class="mb-3 text-xs opacity-40">暂无规则，点击 ＋ 新增。</div>
-            <div v-draggable="[rules, ruleDragOpts, { onEnd: onRuleDragEnd }]" class="space-y-1">
+            <div v-if="!localRules.length" class="mb-3 text-xs opacity-40">暂无规则，点击 ＋ 新增。</div>
+            <div v-else v-draggable="[localRules, { ...ruleDragOpts, onEnd: onRuleDragEnd }]" class="space-y-1">
               <div
-                v-for="rule in rules"
+                v-for="(rule, idx) in localRules"
                 :key="rule.id"
-                class="w-full rounded border p-2 text-left text-xs hover:border-primary"
-                :class="selectedRuleId === rule.id || (!selectedRuleId && rules[0]?.id === rule.id) ? 'border-primary bg-primary/10' : 'border-base-300 bg-base-200'"
+                class="rule-row w-full rounded border p-2 text-left text-xs hover:border-primary"
+                :class="selectedRuleId === rule.id || (!selectedRuleId && localRules[0]?.id === rule.id) ? 'border-primary bg-primary/10' : 'border-base-300 bg-base-200'"
+                :data-drag-key="rule.id"
               >
                 <div class="flex items-center justify-between gap-1">
                   <span class="rule-drag-handle cursor-grab shrink-0 px-0.5 opacity-40">☰</span>
-                  <button @click="selectRule(rule.id)" class="min-w-0 flex-1 text-left">
+                  <div @click="selectRule(rule.id)" class="min-w-0 flex-1 cursor-pointer">
                     <div class="flex items-center gap-1">
-                      <span class="badge badge-xs" :class="rule.enabled ? 'badge-primary' : 'badge-ghost'">{{ rule.order }}</span>
-                      <span class="truncate font-semibold">{{ rule.name }}</span>
+                      <span class="text-xs font-semibold opacity-50">{{ idx + 1 }}.</span>
+                      <input
+                        v-model="rule.name"
+                        @change="commitFlow()"
+                        @click.stop
+                        class="input input-bordered input-xs min-w-0 flex-1 font-semibold"
+                      >
                     </div>
                     <div class="mt-0.5 truncate opacity-50">{{ rule.graph.nodes?.length || 0 }} 个节点</div>
-                  </button>
+                  </div>
                   <button @click.stop="deleteRule(rule.id)" class="btn btn-ghost btn-xs shrink-0 text-error">✕</button>
                 </div>
               </div>
