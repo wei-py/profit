@@ -9,10 +9,7 @@ export function readWorkbookBuffer(buffer) {
 
 function readConfigWorkbook(wb) {
   const names = wb.SheetNames || [];
-  const hasOldOptionSheets = names.includes("选项组") && names.includes("选项值");
   for (const sheetName of REQUIRED_CONFIG_SHEETS) {
-    if (sheetName === "选项配置" && hasOldOptionSheets)
-      continue;
     if (!names.includes(sheetName))
       throw new Error(`配置缺少 sheet：「${sheetName}」`);
   }
@@ -22,40 +19,24 @@ function readConfigWorkbook(wb) {
     国家平台: sheetToRows(wb, "国家平台"),
     国家平台ColOrder: getSheetHeaders(wb, "国家平台"),
     国家平台HiddenCols: readMetaArray(wb, "国家平台HiddenCols"),
-    查表配置: sheetToRows(wb, "查表配置", true),
-    模板参数: sheetToRows(wb, "模板参数", true),
     计算字段: sheetToRows(wb, "计算字段"),
-    计算模板: sheetToRows(wb, "计算模板"),
-    费用规则: sheetToRows(wb, "费用规则"),
-    选项值: sheetToRows(wb, "选项值", true),
-    选项组: sheetToRows(wb, "选项组", true),
-    选项配置: sheetToRows(wb, "选项配置", true),
+    计算配置: sheetToRows(wb, "计算配置"),
+    选项配置: sheetToRows(wb, "选项配置"),
   };
 
-  for (const sheetName of collectLookupSheetNames(names, raw.费用规则))
+  for (const sheetName of collectLookupSheetNames(names))
     raw.lookupTables[sheetName] = sheetToRows(wb, sheetName, true);
 
   return normalizeConfig(raw);
 }
 
-function collectLookupSheetNames(sheetNames, rules) {
+function collectLookupSheetNames(sheetNames) {
   const standard = new Set([
     ...REQUIRED_CONFIG_SHEETS,
-    "模板参数",
     "配置说明",
-    "查表配置",
-    "选项配置",
-    "选项组",
-    "选项值",
-    "规则字典",
     META_SHEET_NAME,
   ]);
   const refs = new Set();
-
-  for (const rule of rules || []) {
-    if (rule.查表名称)
-      refs.add(String(rule.查表名称).trim());
-  }
 
   for (const sheetName of sheetNames) {
     if (standard.has(sheetName))

@@ -3,7 +3,6 @@ import { normalizeOptionGroup } from "@/utils/optionCascade";
 import {
   cleanRow,
   dropEmptyRows,
-  isBlank,
   isEnabled,
   normalizeId,
   orderByNumber,
@@ -23,25 +22,16 @@ export function normalizeConfig(raw = {}) {
   const 国家平台 = normalizeRows(raw.国家平台, "国家平台", ["编号"]);
   const 计算字段 = normalizeFields(raw.计算字段);
   const 选项配置 = normalizeOptionConfigs(raw);
-  const 计算模板 = normalizeRows(raw.计算模板, "计算模板", ["编号"]);
-  const 费用规则 = normalizeRules(raw.费用规则);
-  const 模板参数 = normalizeRows(raw.模板参数, "模板参数", ["所属模板", "字段键"]).map(row => ({
-    ...row,
-    所属模板: normalizeId(row.所属模板 || row.模板编号),
-  }));
+  const 计算配置 = normalizeCalculationConfig(raw.计算配置);
   const lookupTables = normalizeLookupTables(raw.lookupTables);
-  const 查表配置 = normalizeLookupConfigs(raw.查表配置, lookupTables, 费用规则);
 
   return {
     lookupTables,
     国家平台,
     国家平台ColOrder: raw.国家平台ColOrder || CONFIG_HEADERS.国家平台,
     国家平台HiddenCols: raw.国家平台HiddenCols || [],
-    查表配置,
-    模板参数,
     计算字段,
-    计算模板,
-    费用规则,
+    计算配置,
     选项配置,
   };
 }
@@ -220,60 +210,19 @@ function convertLegacyToOptionConfigs(groups = [], items = []) {
   return rows;
 }
 
-export function normalizeRules(rows = []) {
+function normalizeCalculationConfig(rows = []) {
   return orderByNumber(
-    normalizeRows(rows, "费用规则", ["编号"]).map((row, index) => ({
-      ...row,
-      启用: isEnabled(row) ? "是" : "否",
-      所属模板: normalizeId(row.所属模板),
-      累加: row.累加 === "是" ? "是" : "否",
-      编号: normalizeId(row.编号) || `rule_${index + 1}`,
-      计算顺序: isBlank(row.计算顺序) ? String((index + 1) * 10) : row.计算顺序,
-      费用名称: row.费用名称 || row.输出字段键,
-      输出字段键: normalizeId(row.输出字段键),
+    normalizeRows(rows, "计算配置", ["所属国家平台", "模板编号"]).map((row, index) => ({
+      所属国家平台: normalizeId(row.所属国家平台),
+      排序: row.排序 || "",
+      模板名称: row.模板名称 || row.名称 || normalizeId(row.模板编号) || `模板${index + 1}`,
+      模板启用: isEnabled({ 启用: row.模板启用 || row.启用 }) ? "是" : "否",
+      模板编号: normalizeId(row.模板编号) || `template_${index + 1}`,
+      模板说明: row.模板说明 || row.说明 || "",
+      流程JSON: row.流程JSON || row.流程 || "",
     })),
-    "计算顺序",
+    "排序",
   );
-}
-
-function normalizeLookupConfigs(rows = [], lookupTables = {}, rules = []) {
-  const configs = normalizeRows(rows, "查表配置", ["表名"]).map(row => ({
-    ...row,
-    启用: isEnabled(row) ? "是" : "否",
-    所属模板: normalizeId(row.所属模板),
-    表名: String(row.表名 || "").trim(),
-  }));
-  const byName = new Map(configs.map(row => [row.表名, row]));
-
-  for (const name of Object.keys(lookupTables || {})) {
-    if (!name || byName.has(name))
-      continue;
-    byName.set(name, {
-      启用: "是",
-      所属模板: findLookupTemplateId(name, rules),
-      表名: name,
-      说明: "",
-    });
-  }
-
-  for (const rule of rules || []) {
-    const name = String(rule.查表名称 || "").trim();
-    if (!name || byName.has(name))
-      continue;
-    byName.set(name, {
-      启用: "是",
-      所属模板: normalizeId(rule.所属模板),
-      表名: name,
-      说明: "",
-    });
-  }
-
-  return [...byName.values()];
-}
-
-function findLookupTemplateId(name, rules = []) {
-  const rule = rules.find(row => String(row.查表名称 || "").trim() === name);
-  return normalizeId(rule?.所属模板);
 }
 
 function normalizeLookupTables(tables = {}) {

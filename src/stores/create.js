@@ -1,9 +1,32 @@
 import { defineStore } from "pinia";
 import { computed, reactive, ref } from "vue";
 import { buildProductRows, parseVariantValues } from "@/domain/product-records";
-import { execute } from "@/services/rule-engine";
+import { executeFlow } from "@/services/graph-engine";
 import { normalizeId, nowText } from "@/utils/value";
 import { useConfigStore } from "./config";
+
+function runBatchInWorker(flow, lookupTables, batchInputs) {
+  if (typeof Worker === "undefined")
+    return Promise.resolve(batchInputs.map(inputs => executeFlow(flow, lookupTables, inputs)));
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(
+      new URL("../workers/graph-engine.worker.js", import.meta.url),
+      { type: "module" },
+    );
+    worker.onmessage = (event) => {
+      worker.terminate();
+      if (event.data.success)
+        resolve(event.data.results);
+      else
+        reject(new Error(event.data.error || "worker failed"));
+    };
+    worker.onerror = (event) => {
+      worker.terminate();
+      reject(new Error(event.message));
+    };
+    worker.postMessage({ batchInputs, flow, lookupTables });
+  });
+}
 
 export const useCreateStore = defineStore("create", () => {
   const configStore = useConfigStore();
@@ -21,11 +44,8 @@ export const useCreateStore = defineStore("create", () => {
   const calculating = ref(false);
   const lastCalculatedAt = ref("");
 
-  const selectedTemplate = computed(() =>
-    configStore.计算模板.find(t => normalizeId(t.编号) === normalizeId(selectedTemplateId.value)),
-  );
-
-  const currentRules = computed(() => configStore.getFeeRulesByTemplate(selectedTemplateId.value));
+  const selectedTemplate = computed(() => configStore.getCalculationConfigById(selectedTemplateId.value));
+  const currentFlow = computed(() => selectedTemplate.value?.流程JSON || "");
 
   const productFields = computed(() => getFields("商品级", "输入"));
   const skuInputFields = computed(() => getFields("SKU级", "输入"));
@@ -71,18 +91,11 @@ export const useCreateStore = defineStore("create", () => {
   }
 
   function applyDefaultProductInputs() {
-    const paramDefaults = new Map(
-      configStore
-        .getTemplateParams(selectedTemplateId.value)
-        .map(param => [param.字段键, param.默认值]),
-    );
     for (const field of productFields.value)
-      productInputs[field.字段键] = defaultValueForField(field, paramDefaults.get(field.字段键));
+      productInputs[field.字段键] = defaultValueForField(field);
   }
 
-  function defaultValueForField(field, templateDefault = undefined) {
-    if (templateDefault !== undefined && templateDefault !== "")
-      return templateDefault;
+  function defaultValueForField(field) {
     if (field.默认值)
       return field.默认值;
     if (field.类型 === "下拉" && field.选项组)
@@ -91,14 +104,9 @@ export const useCreateStore = defineStore("create", () => {
   }
 
   function makeDefaultSkuInputs() {
-    const paramDefaults = new Map(
-      configStore
-        .getTemplateParams(selectedTemplateId.value)
-        .map(param => [param.字段键, param.默认值]),
-    );
     const inputs = {};
     for (const field of skuInputFields.value)
-      inputs[field.字段键] = defaultValueForField(field, paramDefaults.get(field.字段键));
+      inputs[field.字段键] = defaultValueForField(field);
     return inputs;
   }
 
@@ -191,27 +199,31 @@ export const useCreateStore = defineStore("create", () => {
     else updateSkuInput(skuIndex, field, value);
   }
 
-  function calculateAll() {
+  async function calculateAll() {
     calculating.value = true;
     if (!skus.length)
       generateSkus();
 
-    for (const sku of skus) {
-      try {
-        const inputs = {
-          ...productInputs,
-          ...(sku.inputs || {}),
-        };
-        const { errors, results, traces } = execute(
-          currentRules.value,
-          configStore.lookupTables,
-          inputs,
-        );
+    const batchInputs = skus.map(sku => ({
+      ...productInputs,
+      ...(sku.inputs || {}),
+    }));
+
+    try {
+      const batchResults = await runBatchInWorker(
+        currentFlow.value,
+        configStore.lookupTables,
+        batchInputs,
+      );
+      skus.forEach((sku, i) => {
+        const { errors, results, traces } = batchResults[i];
         sku.results = results;
         sku.traces = traces;
         sku.error = errors.length ? errors.join("; ") : "";
-      }
-      catch (error) {
+      });
+    }
+    catch (error) {
+      for (const sku of skus) {
         sku.error = error.message;
         sku.results = {};
         sku.traces = {};
@@ -248,7 +260,7 @@ export const useCreateStore = defineStore("create", () => {
     addVariantAttribute,
     calculateAll,
     calculating,
-    currentRules,
+    currentFlow,
     generateSkus,
     lastCalculatedAt,
     makeDefaultSkuInputs,

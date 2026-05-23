@@ -2,7 +2,7 @@
 import { ref, watch } from "vue";
 import { useModalEsc } from "@/composables/useModalEsc";
 import { useTour } from "@/composables/useTour";
-import { execute } from "@/services/rule-engine";
+import { executeFlow } from "@/services/graph-engine";
 
 import { useConfigStore } from "@/stores/config";
 import { useCreateStore } from "@/stores/create";
@@ -62,7 +62,7 @@ function runEngine(price) {
     };
   }
   const sku = createStore.skus[props.skuIndex];
-  if (!sku || !createStore.currentRules.length) {
+  if (!sku || !createStore.currentFlow) {
     return {
       margin: 0,
       profit: 0,
@@ -78,7 +78,7 @@ function runEngine(price) {
     成本价: String(cost),
     重量: String(weight),
   };
-  const { results } = execute(createStore.currentRules, tables, inputs);
+  const { results } = executeFlow(createStore.currentFlow, tables, inputs);
   return {
     margin: results["利润率"] || 0,
     profit: results["净利润"] || 0,
@@ -90,7 +90,7 @@ function recalc(field, event) {
   if (props.skuIndex < 0)
     return;
   const sku = createStore.skus[props.skuIndex];
-  if (!sku || !createStore.currentRules.length)
+  if (!sku || !createStore.currentFlow)
     return;
   const cost = Number.parseFloat(sku.inputs["成本价"]) || 0;
 

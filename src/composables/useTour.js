@@ -87,7 +87,7 @@ const countrySteps = [
     element: "[data-tour=\"country-templates\"]",
     popover: {
       description:
-        "模板把字段、SKU 参数、费用规则和查表数据串起来。商品页选择模板后会按模板生成 SKU 和计算结果。",
+        "模板把字段、查表数据和计算流程串起来。商品页选择模板后会按流程生成 SKU 和计算结果。",
       title: "模板配置",
     },
   },

@@ -108,6 +108,14 @@ const baseDragOpts = {
   ghostClass: "drag-ghost",
 };
 
+const isDraggingSku = ref(false);
+const isDraggingRecordGroup = ref(false);
+const editingSourceProductId = ref("");
+const editingRecordUids = ref(new Set());
+const isEditingProduct = computed(
+  () => !!editingSourceProductId.value || editingRecordUids.value.size > 0,
+);
+
 const skuDragOpts = {
   ...baseDragOpts,
   draggable: ".sku-draggable-row",
@@ -142,7 +150,7 @@ watch(
 const enabledCountries = computed(() => configStore["国家平台"].filter(c => c.启用 === "是"));
 const availableTemplates = computed(() =>
   createStore.selectedCountryId
-    ? configStore.getTemplatesByCountry(createStore.selectedCountryId)
+    ? configStore.getCalculationConfigsByCountry(createStore.selectedCountryId)
     : [],
 );
 const countryOptions = computed(() =>
@@ -153,17 +161,17 @@ const countryOptions = computed(() =>
 );
 const templateOptions = computed(() =>
   availableTemplates.value.map(t => ({
-    label: t.名称,
-    value: t.编号,
+    label: t.模板名称,
+    value: t.模板编号,
   })),
 );
 
 function handleCalculate() {
   createStore.calculateAll();
 }
-function handleSaveToList() {
+async function handleSaveToList() {
   if (!createStore.lastCalculatedAt)
-    createStore.calculateAll();
+    await createStore.calculateAll();
   const rows = createStore.productRows();
   if (!rows.length)
     return;
@@ -212,12 +220,6 @@ const skuViewMode = ref("table");
 const recordViewMode = ref("table");
 const skuCardExpanded = ref(localStorage.getItem("skuCardExpanded") === "true");
 const recordCardExpanded = ref(localStorage.getItem("recordCardExpanded") === "true");
-const editingSourceProductId = ref("");
-const editingRecordUids = ref(new Set());
-
-const isEditingProduct = computed(
-  () => !!editingSourceProductId.value || editingRecordUids.value.size > 0,
-);
 const createPanelTitle = computed(() => (isEditingProduct.value ? "修改商品" : "新建商品"));
 
 watch(skuCardExpanded, v => localStorage.setItem("skuCardExpanded", String(v)));
@@ -296,7 +298,6 @@ function buildRecordGroupPages(groups, maxRows) {
 const recordGroupPages = computed(() => buildRecordGroupPages(recordGroups.value, pageSize.value));
 const totalPages = computed(() => recordGroupPages.value.length || 1);
 const pagedRecordGroups = ref([]);
-const isDraggingRecordGroup = ref(false);
 
 function syncPagedRecordGroups() {
   if (isDraggingRecordGroup.value)
@@ -310,7 +311,6 @@ const skuPage = ref(1);
 const skuPageSize = ref(20);
 const skuPageOffset = computed(() => (skuPage.value - 1) * skuPageSize.value);
 const pagedSkus = ref([]);
-const isDraggingSku = ref(false);
 
 function syncPagedSkus() {
   if (isDraggingSku.value)
@@ -876,7 +876,7 @@ function buildSkuRowsWithoutVariants(rows) {
                     </thead>
                     <tbody v-draggable="[pagedSkus, skuDragOpts]">
                       <tr
-                        v-for="(item, pIdx) in pagedSkus"
+                        v-for="item in pagedSkus"
                         :key="item.sku.key"
                         class="sku-draggable-row"
                         :data-drag-key="item.sku.key"
@@ -980,7 +980,7 @@ function buildSkuRowsWithoutVariants(rows) {
                     data-tour="sku-table"
                   >
                     <div
-                      v-for="(item, pIdx) in pagedSkus"
+                      v-for="item in pagedSkus"
                       :key="item.sku.key"
                       class="sku-draggable-row bg-base-200 border border-base-300 flex flex-col gap-1 p-2 rounded text-xs"
                       :data-drag-key="item.sku.key"

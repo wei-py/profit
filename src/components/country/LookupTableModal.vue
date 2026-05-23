@@ -169,18 +169,12 @@ function save() {
       [nn]: cleanRows(),
     };
     delete store.lookupTables[oldName];
-    store.renameLookupConfig(oldName, nn);
-    for (const r of store["费用规则"]) {
-      if (r.查表名称 === oldName)
-        r.查表名称 = nn;
-    }
   }
   else {
     store.lookupTables = {
       ...store.lookupTables,
       [nn]: cleanRows(),
     };
-    store.upsertLookupConfig(nn);
   }
   store.markDirty();
   emit("close");

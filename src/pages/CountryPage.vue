@@ -38,7 +38,7 @@ const countryTemplateHelpSteps = [
   {
     element: "[data-tour=\"country-templates\"]",
     popover: {
-      description: "模板包含费用规则和查表数据。商品页选择模板后，会按模板生成 SKU 并执行计算。",
+      description: "模板包含计算规则和查表数据。商品页选择模板后，会按模板生成 SKU 并执行计算。",
       title: "模板配置",
     },
   },
@@ -158,7 +158,7 @@ watch(
 );
 
 const expTemplatesSource = computed(() =>
-  cpId.value ? store.getTemplatesByCountry(cpId.value) : [],
+  cpId.value ? store.getCalculationConfigsByCountry(cpId.value) : [],
 );
 const localTemplates = ref([]);
 watch(
@@ -169,8 +169,8 @@ watch(
   { immediate: true },
 );
 function onTemplatesDragEnd() {
-  const other = store["计算模板"].filter(t => t.所属国家平台 !== cpId.value);
-  store["计算模板"] = [...other, ...localTemplates.value];
+  const other = store["计算配置"].filter(t => t.所属国家平台 !== cpId.value);
+  store["计算配置"] = [...other, ...localTemplates.value];
   store.markDirty();
 }
 
@@ -333,10 +333,10 @@ function orderRows(a, b) {
 }
 
 function deleteTpl(idx) {
-  const templates = store.getTemplatesByCountry(cpId.value);
+  const templates = store.getCalculationConfigsByCountry(cpId.value);
   const t = templates[idx];
-  store["计算模板"] = store["计算模板"].filter(r => r.编号 !== t.编号);
-  store["费用规则"] = store["费用规则"].filter(r => r.所属模板 !== t.编号);
+  if (t)
+    store.deleteCalculationConfig(t.模板编号);
   store.markDirty();
   localTemplates.value.splice(idx, 1);
 }
@@ -723,7 +723,7 @@ onBeforeUnmount(() => {
                             >
                               <div
                                 v-for="(t, i) in localTemplates"
-                                :key="t.编号 || i"
+                                :key="t.模板编号 || i"
                                 class="border-b border-base-200 flex items-center justify-between py-1 text-xs"
                               >
                                 <span class="flex gap-2 items-center">
@@ -734,9 +734,9 @@ onBeforeUnmount(() => {
                                     @click="openEditTpl(i)"
                                     class="cursor-pointer hover:text-primary"
                                   >
-                                    {{ t.名称 || "(新)" }}
+                                    {{ t.模板名称 || "(新)" }}
                                     <span class="badge badge-xs">
-                                      {{ t.启用 === "是" ? "启用" : "—" }}
+                                      {{ t.模板启用 === "是" ? "启用" : "—" }}
                                     </span></span>
                                 </span>
                                 <button

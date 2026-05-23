@@ -1,0 +1,178 @@
+import { normalizeFlow, normalizeGraph } from "@/domain/rule-graph";
+import { isBlank, normalizeId, toNumber } from "@/utils/value";
+
+export function executeFlow(flowValue, lookupTables = {}, userInputs = {}) {
+  const flow = normalizeFlow(flowValue);
+  const errors = [];
+  const traces = {};
+  const results = {};
+  const accumulated = { ...userInputs };
+
+  for (const rule of flow.rules) {
+    if (!rule.enabled)
+      continue;
+
+    try {
+      const ruleResults = executeGraph(rule.graph, accumulated, lookupTables, traces);
+      Object.assign(results, ruleResults.results);
+      Object.assign(accumulated, ruleResults.results);
+      if (ruleResults.errors.length)
+        errors.push(...ruleResults.errors);
+    }
+    catch (error) {
+      errors.push(`[${rule.name || rule.id}] ${error.message}`);
+    }
+  }
+
+  return { errors, results, traces };
+}
+
+function executeGraph(graphValue, inputs, lookupTables, traces) {
+  const graph = normalizeGraph(graphValue);
+  const errors = [];
+  const results = {};
+  const values = new Map();
+  const nodeById = new Map(graph.nodes.map(node => [node.id, node]));
+
+  try {
+    for (const node of topologicalSort(graph)) {
+      const incoming = graph.edges.filter(edge => edge.target === node.id).map(edge => values.get(edge.source));
+      const value = executeNode(node, incoming, values, lookupTables, inputs, traces);
+      values.set(node.id, value);
+      if (node.data.kind === "output") {
+        const field = normalizeId(node.data.field || node.data.label);
+        if (field)
+          results[field] = value;
+      }
+    }
+  }
+  catch (error) {
+    errors.push(error.message);
+  }
+
+  for (const edge of graph.edges) {
+    if (!nodeById.has(edge.source) || !nodeById.has(edge.target))
+      errors.push(`连线 ${edge.id} 引用了不存在的节点`);
+  }
+
+  return { errors, results };
+}
+
+function executeNode(node, incoming, values, lookupTables, userInputs, traces) {
+  const data = node.data || {};
+  switch (data.kind) {
+    case "input":
+      return readInputValue(data, userInputs);
+    case "constant":
+      return data.value ?? "";
+    case "lookup":
+      return executeLookup(node, values, lookupTables, userInputs, traces);
+    case "map":
+      return executeMap(data, incoming[0]);
+    case "pick":
+      return executePick(data, incoming, values);
+    case "calc":
+      return executeCalc(data, incoming, values, userInputs);
+    case "condition":
+      return executeCondition(data, incoming);
+    case "output":
+      return incoming.length ? incoming[incoming.length - 1] : data.value;
+    default:
+      return incoming.length ? incoming[incoming.length - 1] : undefined;
+  }
+}
+
+function readInputValue(data, userInputs) {
+  const field = normalizeId(data.field || data.label);
+  const value = userInputs[field];
+  if (data.valueMode === "cascadePath" && Array.isArray(value))
+    return value.join(" / ");
+  return value;
+}
+
+function executeLookup(node, values, lookupTables, userInputs, traces) {
+  const data = node.data || {};
+  const table = lookupTables[data.sheet] || [];
+  const conditions = Array.isArray(data.where) ? data.where : [];
+  const matched = table.find(row => conditions.every((condition) => {
+    const sourceValue = condition.source ? values.get(condition.source) : userInputs[normalizeId(condition.input)];
+    return compare(sourceValue, row?.[condition.column], condition.operator || "=");
+  }));
+  traces[node.id] = matched ? `命中 ${data.sheet}` : `未命中 ${data.sheet}`;
+  return matched || null;
+}
+
+function executeMap(data, inputValue) {
+  const rows = Array.isArray(data.map) ? data.map : [];
+  const matched = rows.find(row => String(row.from) === String(inputValue));
+  return matched ? matched.to : inputValue;
+}
+
+function executePick(data, incoming, values) {
+  const row = data.rowSource ? values.get(data.rowSource) : incoming.find(value => value && typeof value === "object" && !Array.isArray(value));
+  const column = data.columnSource ? values.get(data.columnSource) : data.column;
+  if (!row || isBlank(column))
+    return undefined;
+  return row[column];
+}
+
+function executeCalc(data, incoming, values, userInputs) {
+  const expression = String(data.expression || "").trim();
+  if (!expression)
+    return incoming[incoming.length - 1];
+  const context = { ...userInputs };
+  for (const [id, value] of values.entries()) context[id] = value;
+  for (const [index, value] of incoming.entries()) context[`in${index + 1}`] = value;
+  const compiled = expression.replace(/\{([^}]+)\}/g, (_, key) => String(toNumber(context[key.trim()] ?? 0)));
+  if (!/^[\d+\-*/().\s]+$/.test(compiled))
+    throw new Error(`计算表达式不安全或无法识别：${expression}`);
+  // eslint-disable-next-line no-new-func
+  return new Function(`"use strict"; return (${compiled})`)();
+}
+
+function executeCondition(data, incoming) {
+  const condition = String(data.condition || "").trim();
+  if (!condition)
+    return incoming[0];
+  return incoming[0] ? incoming[1] : incoming[2];
+}
+
+function compare(left, right, operator) {
+  if (operator === "!=")
+    return String(left ?? "") !== String(right ?? "");
+  if (operator === ">")
+    return toNumber(left) > toNumber(right);
+  if (operator === ">=")
+    return toNumber(left) >= toNumber(right);
+  if (operator === "<")
+    return toNumber(left) < toNumber(right);
+  if (operator === "<=")
+    return toNumber(left) <= toNumber(right);
+  return String(left ?? "") === String(right ?? "");
+}
+
+function topologicalSort(graph) {
+  const nodes = graph.nodes || [];
+  const inDegree = new Map(nodes.map(node => [node.id, 0]));
+  const outgoing = new Map(nodes.map(node => [node.id, []]));
+  for (const edge of graph.edges || []) {
+    if (!inDegree.has(edge.source) || !inDegree.has(edge.target))
+      continue;
+    inDegree.set(edge.target, inDegree.get(edge.target) + 1);
+    outgoing.get(edge.source).push(edge.target);
+  }
+  const queue = nodes.filter(node => inDegree.get(node.id) === 0);
+  const sorted = [];
+  for (let index = 0; index < queue.length; index++) {
+    const node = queue[index];
+    sorted.push(node);
+    for (const target of outgoing.get(node.id) || []) {
+      inDegree.set(target, inDegree.get(target) - 1);
+      if (inDegree.get(target) === 0)
+        queue.push(nodes.find(item => item.id === target));
+    }
+  }
+  if (sorted.length !== nodes.length)
+    throw new Error("计算流程存在循环依赖");
+  return sorted;
+}
