@@ -138,95 +138,69 @@ function runPreview() {
   const flow = { rules: [{ enabled: true, graph, id: props.ruleId, name: props.ruleName || "当前规则", order: 10 }], version: 2 };
   preview.value = executeFlow(flow, props.lookupTables, { ...previewInputs });
 }
-
-function nodeDepLabels(node) {
-  const deps = [];
-  const data = node.data || {};
-  if (data.kind === "lookup") {
-    for (const w of data.where || []) {
-      if (w.source)
-        deps.push(w.source);
-    }
-  }
-  else if (data.kind === "map" && data.source) {
-    deps.push(data.source);
-  }
-  else if (data.kind === "pick") {
-    if (data.rowSource)
-      deps.push(data.rowSource);
-    if (data.columnSource)
-      deps.push(data.columnSource);
-  }
-  else if (data.kind === "output" && data.source) {
-    deps.push(data.source);
-  }
-  return deps.map(id => nodes.value.find(n => n.id === id)?.data?.label || id).join(", ");
-}
 </script>
 
 <template>
-  <div class="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-base-200">
-    <div class="flex flex-wrap items-center gap-2 border-b border-base-300 bg-base-100 px-3 py-2">
-      <span class="text-xs font-semibold opacity-70">新增节点</span>
+  <div class="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] bg-base-200">
+    <div class="flex items-center gap-2 border-b border-base-300 bg-base-100 px-3 py-1.5">
+      <span class="truncate text-xs font-semibold">{{ ruleName || "当前规则" }}</span>
+      <span class="text-xs opacity-50">{{ nodes.length }} 个节点</span>
+      <button @click="openPreviewPanel" class="btn btn-outline btn-xs ml-auto">
+        试算
+      </button>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-1.5 border-b border-base-300 bg-base-100 px-3 py-1.5">
+      <span class="text-xs font-semibold opacity-50">新增节点</span>
       <button
         @click="addNode(kind)"
         v-for="kind in GRAPH_NODE_TYPES"
         :key="kind"
         class="btn btn-ghost btn-xs"
       >
-        ＋ {{ nodeTypeLabel(kind) }}
-      </button>
-      <button @click="openPreviewPanel" class="btn btn-outline btn-xs ml-auto">
-        试算
+        ＋{{ nodeTypeLabel(kind) }}
       </button>
     </div>
 
-    <div class="min-h-0 overflow-auto p-4">
-      <div v-if="!nodes.length" class="grid h-full place-items-center text-sm opacity-40">
-        暂无节点，点击上方按钮新增。
+    <div class="grid min-h-0 grid-cols-[minmax(0,1fr)_14rem] overflow-hidden">
+      <div class="min-h-0 overflow-auto bg-base-200 p-4">
+        <template v-if="selectedNode">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-xs font-semibold">节点配置</span>
+            <button @click="removeNode(selectedNode.id)" class="btn btn-ghost btn-xs text-error">
+              删除
+            </button>
+          </div>
+          <RuleDagNodeConfig
+            @update:node="updateNode"
+            :key="selectedNode.id"
+            :fieldOptions="fieldOptions"
+            :lookupColumns="getLookupColumns(selectedNode.data?.sheet)"
+            :lookupNames="lookupNames"
+            :node="selectedNode"
+            :nodeOptions="nodeOptions"
+            :outputOptions="outputOptions"
+          />
+        </template>
+        <div v-else class="grid h-full place-items-center text-sm opacity-40">
+          点击右侧节点卡片进行配置
+        </div>
       </div>
-      <template v-else>
-        <div class="grid gap-3 mb-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-          <div
+
+      <aside class="min-h-0 overflow-auto border-l border-base-300 bg-base-100 p-2">
+        <div class="mb-1 text-[11px] font-semibold opacity-50">节点</div>
+        <div v-if="!nodes.length" class="text-xs opacity-40">暂无节点</div>
+        <div v-else class="space-y-1">
+          <RuleDagNodeCard
+            @select="selectNode"
             v-for="node in nodes"
             :key="node.id"
-            class="flex flex-col gap-2"
-          >
-            <RuleDagNodeCard
-              @select="selectNode"
-              :node="node"
-              :selected="selectedNodeId === node.id"
-            />
-            <div v-if="nodeDepLabels(node)" class="px-2 text-center text-[11px] opacity-40">
-              ← {{ nodeDepLabels(node) }}
-            </div>
-          </div>
+            :compact="true"
+            :node="node"
+            :selected="selectedNodeId === node.id"
+          />
         </div>
-
-        <div class="rounded border border-base-300 bg-base-100 p-3">
-          <template v-if="selectedNode">
-            <div class="mb-2 flex items-center justify-between">
-              <span class="text-xs font-semibold opacity-70">节点配置</span>
-              <button @click="removeNode(selectedNode.id)" class="btn btn-ghost btn-xs text-error">
-                删除节点
-              </button>
-            </div>
-            <RuleDagNodeConfig
-              @update:node="updateNode"
-              :key="selectedNode.id"
-              :fieldOptions="fieldOptions"
-              :lookupColumns="getLookupColumns(selectedNode.data?.sheet)"
-              :lookupNames="lookupNames"
-              :node="selectedNode"
-              :nodeOptions="nodeOptions"
-              :outputOptions="outputOptions"
-            />
-          </template>
-          <div v-else class="text-sm opacity-40">
-            点击上方节点卡片进行配置
-          </div>
-        </div>
-      </template>
+      </aside>
     </div>
 
     <div v-if="showPreviewPanel" class="border-t border-base-300 bg-base-100 p-3">

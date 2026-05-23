@@ -184,21 +184,17 @@ function deleteTemplate() {
   <dialog @cancel.prevent class="modal" :open="open">
     <div class="modal-box h-[min(92vh,880px)] w-[min(98rem,calc(100vw-1rem))] max-w-none overflow-hidden p-0">
       <div class="flex h-full flex-col bg-base-200">
-        <header class="grid grid-cols-[12rem_1fr_7rem_auto] items-end gap-3 border-b border-base-300 bg-base-100 p-4">
-          <div>
-            <label class="label py-0 text-xs">模板编号</label>
-            <input v-model="form.模板编号" class="input input-bordered input-sm w-full">
-          </div>
-          <div>
+        <header class="flex items-end gap-3 border-b border-base-300 bg-base-100 px-3 py-2">
+          <div class="min-w-0 flex-1">
             <label class="label py-0 text-xs">模板名称</label>
-            <input v-model="form.模板名称" class="input input-bordered input-sm w-full">
+            <input v-model="form.模板名称" class="input input-bordered input-xs w-full">
           </div>
-          <div>
+          <div class="w-16 shrink-0">
             <label class="label py-0 text-xs">启用</label>
-            <OptionTreeSelect v-model="form.模板启用" :options="yesNoOptions" size="sm" />
+            <OptionTreeSelect v-model="form.模板启用" :options="yesNoOptions" size="xs" />
           </div>
-          <button @click="applyCommissionPreset" class="btn btn-outline btn-sm">
-            套用销售佣金流程
+          <button @click="applyCommissionPreset" class="btn btn-outline btn-xs shrink-0">
+            应用示例
           </button>
         </header>
 
@@ -257,7 +253,7 @@ function deleteTemplate() {
           <button v-if="templateIdx >= 0" @click="deleteTemplate" class="btn btn-error btn-outline btn-sm">
             删除模板
           </button>
-          <input v-model="form.模板说明" class="input input-bordered input-sm min-w-0 flex-1" placeholder="模板说明">
+          <div class="flex-1" />
           <button @click="emit('close')" class="btn btn-ghost btn-sm">取消</button>
           <button @click="save" class="btn btn-primary btn-sm">保存模板</button>
         </footer>
