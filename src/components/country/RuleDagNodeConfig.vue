@@ -10,7 +10,10 @@ const props = defineProps({
   nodeOptions: Array,
   outputOptions: Array,
 });
+
 const emit = defineEmits(["update:node"]);
+
+const operatorOptions = ["=", "!=", ">", ">=", "<", "<="];
 
 function emitPatch(patch) {
   emit("update:node", { ...props.node, data: { ...props.node?.data, ...patch } });
@@ -102,13 +105,20 @@ function removeMap(index) {
         <span class="font-semibold opacity-70">WHERE 条件</span>
         <button @click="addWhere" class="btn btn-ghost btn-xs">＋</button>
       </div>
-      <div v-for="(row, index) in node.data?.where || []" :key="index" class="grid grid-cols-[1fr_1fr_auto] gap-1">
+      <div v-for="(row, index) in node.data?.where || []" :key="index" class="grid grid-cols-[1fr_4rem_1fr_auto] gap-1">
         <OptionTreeSelect
           @update:model-value="updateWhere(index, { source: $event })"
           :modelValue="row.source"
           :options="nodeOptions || []"
           placeholder="来源节点"
           size="xs"
+        />
+        <OptionTreeSelect
+          @update:model-value="updateWhere(index, { operator: $event })"
+          :modelValue="row.operator || '='"
+          :options="operatorOptions"
+          size="xs"
+          :wrapDisplay="false"
         />
         <OptionTreeSelect
           @update:model-value="updateWhere(index, { column: $event })"
