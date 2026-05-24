@@ -101,7 +101,7 @@ const rootGroupOptions = computed(() =>
 );
 
 const fieldTypeOptions = ["数字", "文本", "下拉", "布尔"];
-const fieldLevelOptions = ["商品级", "SKU级"];
+const fieldLevelOptions = ["平台级", "商品级", "SKU级"];
 const inputOutputOptions = ["输入", "输出"];
 const yesNoOptions = ["是", "否"];
 

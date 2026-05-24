@@ -70,7 +70,7 @@ export const CONDITION_OPERATOR_OPTIONS = [
 ];
 
 export const FIELD_TYPES = ["文本", "数字", "下拉", "布尔", "日期"];
-export const FIELD_LEVELS = ["商品级", "SKU级"];
+export const FIELD_LEVELS = ["平台级", "商品级", "SKU级"];
 export const IO_TYPES = ["输入", "输出"];
 
 export const BUILTIN_FORMULA_HELPERS = [

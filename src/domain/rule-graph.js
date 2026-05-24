@@ -159,6 +159,10 @@ export function getNodeDependencyIds(nodeData) {
       ids.push(data.columnSource);
   }
   else if (data.kind === "calc") {
+    for (const token of data.formula || []) {
+      if (token.type === "node" && token.value)
+        ids.push(token.value);
+    }
     for (const d of data.inputs || []) {
       if (d)
         ids.push(d);
@@ -235,12 +239,27 @@ export function nodeSummary(node) {
   if (d.kind === "map")
     return (d.map || []).map(r => `${r.from}→${r.to}`).join(", ");
   if (d.kind === "calc")
-    return d.expression || "";
+    return calcSummary(d);
   if (d.kind === "constant")
     return d.value ?? "";
   if (d.kind === "pick")
     return d.column || d.columnSource || "";
   return "";
+}
+
+function calcSummary(d) {
+  if (d.expression)
+    return d.expression;
+  const formula = d.formula || [];
+  if (!formula.length)
+    return "";
+  return formula.map((t) => {
+    if (t.type === "operator")
+      return { "*": "×", "/": "÷" }[t.value] || t.value;
+    if (t.type === "paren")
+      return t.value;
+    return t.value || "";
+  }).join(" ");
 }
 
 /* ---- internal ---- */
@@ -279,7 +298,7 @@ function defaultNodeData(kind) {
   if (kind === "map")
     return { ...base, map: [{ from: "", to: "" }] };
   if (kind === "calc")
-    return { ...base, expression: "" };
+    return { ...base, expression: "", formula: [] };
   if (kind === "condition")
     return { ...base, condition: "" };
   return base;

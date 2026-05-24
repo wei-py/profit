@@ -55,6 +55,7 @@ export const useCreateStore = defineStore("create", () => {
   const selectedTemplate = computed(() => configStore.getCalculationConfigById(selectedTemplateId.value));
   const currentFlow = computed(() => selectedTemplate.value?.流程JSON || "");
 
+  const platformFields = computed(() => getFields("平台级", "输入"));
   const productFields = computed(() => getFields("商品级", "输入"));
   const skuInputFields = computed(() => getFields("SKU级", "输入"));
   const skuOutputFields = computed(() => getFields("SKU级", "输出"));
@@ -99,7 +100,7 @@ export const useCreateStore = defineStore("create", () => {
   }
 
   function applyDefaultProductInputs() {
-    for (const field of productFields.value)
+    for (const field of [...platformFields.value, ...productFields.value])
       productInputs[field.字段键] = defaultValueForField(field);
   }
 
@@ -272,6 +273,7 @@ export const useCreateStore = defineStore("create", () => {
     generateSkus,
     lastCalculatedAt,
     makeDefaultSkuInputs,
+    platformFields,
     productFields,
     productId,
     productInputs,

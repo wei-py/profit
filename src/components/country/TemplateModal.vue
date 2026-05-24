@@ -157,6 +157,14 @@ function updateRuleGraph(ruleId, graphJson) {
   commitFlow();
 }
 
+function updateRuleName(ruleId, name) {
+  const rule = localRules.value.find(rule => rule.id === ruleId);
+  if (!rule)
+    return;
+  rule.name = name;
+  commitFlow();
+}
+
 function commitFlow() {
   flow.value.rules = localRules.value;
   form.流程JSON = serializeFlow(flow.value);
@@ -216,15 +224,7 @@ function deleteTemplate() {
                 <div class="flex items-center justify-between gap-1">
                   <span class="rule-drag-handle cursor-grab shrink-0 px-0.5 opacity-40">☰</span>
                   <div @click="selectRule(rule.id)" class="min-w-0 flex-1 cursor-pointer">
-                    <div class="flex items-center gap-1">
-                      <span class="text-xs font-semibold opacity-50">{{ idx + 1 }}.</span>
-                      <input
-                        v-model="rule.name"
-                        @change="commitFlow()"
-                        @click.stop
-                        class="input input-bordered input-xs min-w-0 flex-1 font-semibold"
-                      >
-                    </div>
+                    <span class="text-xs font-semibold">{{ idx + 1 }}. {{ rule.name }}</span>
                     <div class="mt-0.5 truncate opacity-50">{{ rule.graph.nodes?.length || 0 }} 个节点</div>
                   </div>
                   <button @click.stop="deleteRule(rule.id)" class="btn btn-ghost btn-xs shrink-0 text-error">✕</button>
@@ -236,6 +236,7 @@ function deleteTemplate() {
           <RuleDagEditor
             v-if="currentRule"
             @update:graph-json="updateRuleGraph(currentRule.id, $event)"
+            @update:rule-name="updateRuleName(currentRule.id, $event)"
             :key="currentRule.id"
             :fieldOptions="fieldOptions"
             :graphJson="JSON.stringify(currentRule.graph)"

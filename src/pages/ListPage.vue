@@ -693,65 +693,94 @@ function buildSkuRowsWithoutVariants(rows) {
               </button>
             </div>
           </div>
-          <div class="flex flex-wrap gap-4 items-start" data-tour="product-preset">
-            <div class="flex flex-col gap-1">
-              <label class="label py-1"><span class="label-text">国家平台</span></label>
-              <OptionTreeSelect
-                @update:model-value="handleCountrySelect($event)"
-                :modelValue="createStore.selectedCountryId"
-                :options="countryOptions"
-                placeholder="-- 选择 --"
-              />
-            </div>
-            <div v-if="createStore.selectedCountryId" class="flex flex-col gap-1">
-              <label class="label py-1"><span class="label-text">模板</span></label>
-              <OptionTreeSelect
-                @update:model-value="handleTemplateSelect($event)"
-                :modelValue="createStore.selectedTemplateId"
-                :options="templateOptions"
-                placeholder="-- 选择 --"
-              />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="label py-1"><span class="label-text">商品ID</span></label>
-              <input
-                v-model="createStore.productId"
-                class="input input-bordered input-sm w-20"
-                placeholder="P001"
-              >
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="label py-1"><span class="label-text">商品名称</span></label>
-              <input
-                v-model="createStore.productName"
-                class="input input-bordered input-sm w-28"
-                placeholder="如：T恤"
-              >
-            </div>
-          </div>
 
-          <template v-if="createStore.selectedTemplateId">
-            <div class="flex flex-col gap-4 mt-4 lg:flex-row">
-              <div class="w-full shrink-0 space-y-2 lg:w-60">
-                <div class="flex items-center justify-between" data-tour="product-fields">
-                  <div class="font-semibold text-sm">商品级字段</div>
-                  <button
-                    @click="startTour(productFieldHelpSteps)"
-                    class="btn btn-circle btn-ghost btn-xs"
-                    title="商品级字段帮助"
-                  >
-                    ?
-                  </button>
+          <div class="grid gap-3 xl:grid-cols-3">
+            <!-- 平台级 -->
+            <section class="card border border-base-300 bg-base-100">
+              <div class="card-body p-3 space-y-3">
+                <div class="font-semibold text-sm">平台级</div>
+                <div class="flex flex-col gap-1">
+                  <label class="label py-1"><span class="label-text">国家平台</span></label>
+                  <OptionTreeSelect
+                    @update:model-value="handleCountrySelect($event)"
+                    :modelValue="createStore.selectedCountryId"
+                    :options="countryOptions"
+                    placeholder="-- 选择 --"
+                  />
                 </div>
-                <FieldInput
-                  @update:model-value="createStore.productInputs[f.字段键] = $event"
-                  v-for="f in createStore.productFields"
-                  :key="f.字段键"
-                  :field="f"
-                  :modelValue="createStore.productInputs[f.字段键]"
-                  :optionConfigs="configStore['选项配置']"
-                />
-                <div class="flex flex-col gap-1 pt-3">
+                <div v-if="createStore.selectedCountryId" class="flex flex-col gap-1">
+                  <label class="label py-1"><span class="label-text">模板</span></label>
+                  <OptionTreeSelect
+                    @update:model-value="handleTemplateSelect($event)"
+                    :modelValue="createStore.selectedTemplateId"
+                    :options="templateOptions"
+                    placeholder="-- 选择 --"
+                  />
+                </div>
+                <template v-if="createStore.selectedTemplateId">
+                  <FieldInput
+                    @update:model-value="createStore.productInputs[f.字段键] = $event"
+                    v-for="f in createStore.platformFields"
+                    :key="f.字段键"
+                    :field="f"
+                    :modelValue="createStore.productInputs[f.字段键]"
+                    :optionConfigs="configStore['选项配置']"
+                  />
+                </template>
+              </div>
+            </section>
+
+            <!-- 商品级 -->
+            <section class="card border border-base-300 bg-base-100">
+              <div class="card-body p-3 space-y-3">
+                <div class="font-semibold text-sm">商品级</div>
+                <div class="flex gap-2">
+                  <div class="flex flex-col gap-1">
+                    <label class="label py-1"><span class="label-text">商品ID</span></label>
+                    <input
+                      v-model="createStore.productId"
+                      class="input input-bordered input-sm w-20"
+                      placeholder="P001"
+                    >
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label class="label py-1"><span class="label-text">商品名称</span></label>
+                    <input
+                      v-model="createStore.productName"
+                      class="input input-bordered input-sm w-28"
+                      placeholder="如：T恤"
+                    >
+                  </div>
+                </div>
+
+                <template v-if="createStore.selectedTemplateId">
+                  <div class="flex items-center justify-between" data-tour="product-fields">
+                    <div />
+                    <button
+                      @click="startTour(productFieldHelpSteps)"
+                      class="btn btn-circle btn-ghost btn-xs"
+                      title="商品级字段帮助"
+                    >
+                      ?
+                    </button>
+                  </div>
+                  <FieldInput
+                    @update:model-value="createStore.productInputs[f.字段键] = $event"
+                    v-for="f in createStore.productFields"
+                    :key="f.字段键"
+                    :field="f"
+                    :modelValue="createStore.productInputs[f.字段键]"
+                    :optionConfigs="configStore['选项配置']"
+                  />
+                </template>
+              </div>
+            </section>
+
+            <!-- SKU级 -->
+            <section class="card border border-base-300 bg-base-100">
+              <div class="card-body p-3 space-y-3">
+                <div class="font-semibold text-sm">SKU级</div>
+                <div class="flex flex-col gap-1">
                   <label class="label py-0"><span class="label-text text-xs">SKU前缀</span></label>
                   <input
                     v-model="createStore.skuPrefix"
@@ -759,8 +788,8 @@ function buildSkuRowsWithoutVariants(rows) {
                     placeholder="如: RS"
                   >
                 </div>
-                <div class="flex items-center justify-between pt-2" data-tour="product-variants">
-                  <div class="font-semibold text-sm">变体属性</div>
+                <div class="flex items-center justify-between" data-tour="product-variants">
+                  <div class="text-xs text-base-content/50">变体属性</div>
                   <button
                     @click="startTour(variantHelpSteps)"
                     class="btn btn-circle btn-ghost btn-xs"
@@ -809,109 +838,222 @@ function buildSkuRowsWithoutVariants(rows) {
                   </button>
                 </div>
               </div>
+            </section>
+          </div>
 
-              <div class="min-w-0 flex-1 overflow-x-auto">
-                <div class="flex items-center justify-between mb-1" data-tour="sku-toolbar">
-                  <span class="font-semibold text-sm">SKU 列表</span>
-                  <div class="flex gap-1 items-center text-xs">
-                    <button
-                      @click="startTour(skuHelpSteps)"
-                      class="btn btn-circle btn-ghost btn-xs"
-                      title="SKU 帮助"
-                    >
-                      ?
-                    </button>
-                    <span>表格</span>
-                    <input
-                      @change="skuViewMode = $event.target.checked ? 'card' : 'table'"
-                      :checked="skuViewMode === 'card'"
-                      class="toggle toggle-sm"
-                      type="checkbox"
-                    >
-                    <span>卡片</span>
-                    <button
-                      v-if="skuViewMode === 'card'"
-                      @click="skuCardExpanded = !skuCardExpanded"
-                      class="btn btn-ghost btn-xs"
-                      :title="skuCardExpanded ? '收起' : '展开'"
-                    >
-                      {{ skuCardExpanded ? "收起" : "展开" }}
-                    </button>
-                    <span
-                      v-if="createStore.skus.length"
-                      class="mx-1 opacity-40"
-                    >{{ skuPage }}/{{ skuTotalPages }}</span>
-                    <button @click="skuColModal = true" class="btn btn-ghost btn-xs">
-                      ⚙️ 编辑列
-                    </button>
-                  </div>
+          <template v-if="createStore.selectedTemplateId">
+            <div class="mt-4">
+              <div class="flex items-center justify-between mb-1" data-tour="sku-toolbar">
+                <span class="font-semibold text-sm">SKU 列表</span>
+                <div class="flex gap-1 items-center text-xs">
+                  <button
+                    @click="startTour(skuHelpSteps)"
+                    class="btn btn-circle btn-ghost btn-xs"
+                    title="SKU 帮助"
+                  >
+                    ?
+                  </button>
+                  <span>表格</span>
+                  <input
+                    @change="skuViewMode = $event.target.checked ? 'card' : 'table'"
+                    :checked="skuViewMode === 'card'"
+                    class="toggle toggle-sm"
+                    type="checkbox"
+                  >
+                  <span>卡片</span>
+                  <button
+                    v-if="skuViewMode === 'card'"
+                    @click="skuCardExpanded = !skuCardExpanded"
+                    class="btn btn-ghost btn-xs"
+                    :title="skuCardExpanded ? '收起' : '展开'"
+                  >
+                    {{ skuCardExpanded ? "收起" : "展开" }}
+                  </button>
+                  <span
+                    v-if="createStore.skus.length"
+                    class="mx-1 opacity-40"
+                  >{{ skuPage }}/{{ skuTotalPages }}</span>
+                  <button @click="skuColModal = true" class="btn btn-ghost btn-xs">
+                    ⚙️ 编辑列
+                  </button>
                 </div>
-                <template v-if="skuViewMode === 'table' && createStore.skus.length">
-                  <table class="table table-xs" data-tour="sku-table">
-                    <thead>
-                      <tr>
-                        <th class="bg-base-100 left-0 sticky w-10 z-10" />
-                        <th class="w-8 text-xs">反推</th>
-                        <th class="text-xs">SKU码</th>
-                        <th
-                          v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
-                          :key="a.name"
+              </div>
+              <template v-if="skuViewMode === 'table' && createStore.skus.length">
+                <table class="table table-xs" data-tour="sku-table">
+                  <thead>
+                    <tr>
+                      <th class="bg-base-100 left-0 sticky w-10 z-10" />
+                      <th class="w-8 text-xs">反推</th>
+                      <th class="text-xs">SKU码</th>
+                      <th
+                        v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
+                        :key="a.name"
+                      >
+                        {{ a.name.trim() }}
+                      </th>
+                      <th v-for="fk in skuColDisplay" :key="fk">
+                        <div class="flex gap-0 items-center">
+                          <span class="text-xs">{{ fk }}</span>
+                          <button
+                            v-if="isSkuInputCol(fk)"
+                            @click="batchSetSkuInput(fk)"
+                            class="btn btn-ghost btn-xs hover:opacity-100 opacity-30 px-0"
+                            title="统一"
+                          >
+                            ⇅
+                          </button>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody v-draggable="[pagedSkus, skuDragOpts]">
+                    <tr
+                      v-for="item in pagedSkus"
+                      :key="item.sku.key"
+                      class="sku-draggable-row"
+                      :data-drag-key="item.sku.key"
+                      :style="{ height: `${skuRowHeights[item.origIdx]}px` }"
+                    >
+                      <td class="bg-base-100 left-0 sticky z-10">
+                        <span
+                          class="sku-drag-handle flex hover:text-base-content cursor-grab items-center justify-center px-1 py-0.5 select-none text-base-content/30"
+                        >☰</span>
+                      </td>
+                      <td>
+                        <button
+                          @click="openCalcModal(item.origIdx)"
+                          class="btn btn-ghost btn-xs"
+                          title="反推计算"
                         >
-                          {{ a.name.trim() }}
-                        </th>
-                        <th v-for="fk in skuColDisplay" :key="fk">
-                          <div class="flex gap-0 items-center">
-                            <span class="text-xs">{{ fk }}</span>
-                            <button
-                              v-if="isSkuInputCol(fk)"
-                              @click="batchSetSkuInput(fk)"
-                              class="btn btn-ghost btn-xs hover:opacity-100 opacity-30 px-0"
-                              title="统一"
+                          🧮
+                        </button>
+                      </td>
+                      <td>
+                        <input
+                          v-model="item.sku.skuCode"
+                          class="input input-bordered input-xs w-20"
+                          placeholder="SKU"
+                        >
+                      </td>
+                      <td
+                        v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
+                        :key="a.name"
+                        class="text-xs"
+                      >
+                        {{ item.sku.attrs[a.name.trim()] }}
+                      </td>
+                      <td v-for="fk in skuColDisplay" :key="fk">
+                        <template v-if="isSkuInputCol(fk)">
+                          <FieldInput
+                            @update:model-value="item.sku.inputs[fk] = $event"
+                            :field="getSkuField(fk)"
+                            :modelValue="item.sku.inputs[fk]"
+                            noLabel
+                            :optionConfigs="configStore['选项配置']"
+                          />
+                        </template>
+                        <template v-else-if="fk === '图片'">
+                          <div v-if="item.sku.images" class="group h-10 relative w-10">
+                            <img
+                              @click="openImagePreview(item.sku.images)"
+                              class="border cursor-pointer h-10 object-contain bg-base-100 w-10"
+                              :src="item.sku.images"
                             >
-                              ⇅
+                            <button
+                              @click="clearImage(item.sku)"
+                              class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4"
+                            >
+                              ✕
                             </button>
                           </div>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody v-draggable="[pagedSkus, skuDragOpts]">
-                      <tr
-                        v-for="item in pagedSkus"
-                        :key="item.sku.key"
-                        class="sku-draggable-row"
-                        :data-drag-key="item.sku.key"
-                        :style="{ height: `${skuRowHeights[item.origIdx]}px` }"
+                          <label
+                            v-else
+                            class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-10 p-0 text-base-content/30 text-lg w-10"
+                            title="上传图片"
+                          >＋<input
+                            @change="handleImageUpload(item.sku, $event)"
+                            accept="image/*"
+                            class="hidden"
+                            type="file"
+                          ></label>
+                        </template>
+                        <template v-else>
+                          <span v-if="item.sku.error" class="text-error text-xs">{{
+                            item.sku.error
+                          }}</span>
+                          <template v-else-if="item.sku.results[fk] !== undefined">
+                            {{
+                              isPercentCol(fk)
+                                ? `${(item.sku.results[fk] * 100).toFixed(2)}%`
+                                : typeof item.sku.results[fk] === "number"
+                                  ? item.sku.results[fk].toFixed(2)
+                                  : item.sku.results[fk]
+                            }}
+                            <button
+                              v-if="item.sku.traces?.[fk]"
+                              @click="openTrace(item.sku, fk)"
+                              class="btn btn-ghost btn-xs ml-1 text-base-content/40"
+                            >
+                              ?
+                            </button>
+                          </template>
+                          <span v-else class="text-base-content/30">—</span>
+                        </template>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </template>
+
+              <template v-else-if="skuViewMode === 'card' && createStore.skus.length">
+                <div
+                  v-draggable="[pagedSkus, skuDragOpts]"
+                  class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+                  data-tour="sku-table"
+                >
+                  <div
+                    v-for="item in pagedSkus"
+                    :key="item.sku.key"
+                    class="sku-draggable-row bg-base-200 border border-base-300 flex flex-col gap-1 p-2 rounded text-xs"
+                    :data-drag-key="item.sku.key"
+                  >
+                    <div class="flex gap-1 items-center">
+                      <span
+                        class="sku-drag-handle cursor-grab select-none text-base-content/30"
+                        title="拖动排序"
+                      >☰</span>
+                      <span class="font-semibold text-xs truncate">{{
+                        item.sku.skuCode || "-"
+                      }}</span>
+                      <button
+                        @click="openCalcModal(item.origIdx)"
+                        class="btn btn-ghost btn-xs ml-auto"
+                        title="反推计算"
                       >
-                        <td class="bg-base-100 left-0 sticky z-10">
-                          <span
-                            class="sku-drag-handle flex hover:text-base-content cursor-grab items-center justify-center px-1 py-0.5 select-none text-base-content/30"
-                          >☰</span>
-                        </td>
-                        <td>
-                          <button
-                            @click="openCalcModal(item.origIdx)"
-                            class="btn btn-ghost btn-xs"
-                            title="反推计算"
-                          >
-                            🧮
-                          </button>
-                        </td>
-                        <td>
-                          <input
-                            v-model="item.sku.skuCode"
-                            class="input input-bordered input-xs w-20"
-                            placeholder="SKU"
-                          >
-                        </td>
-                        <td
-                          v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
-                          :key="a.name"
-                          class="text-xs"
-                        >
-                          {{ item.sku.attrs[a.name.trim()] }}
-                        </td>
-                        <td v-for="fk in skuColDisplay" :key="fk">
-                          <template v-if="isSkuInputCol(fk)">
+                        🧮
+                      </button>
+                    </div>
+                    <div
+                      v-if="createStore.variantAttributes.filter((a) => a.name.trim()).length"
+                      class="flex flex-wrap gap-1"
+                    >
+                      <span
+                        v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
+                        :key="a.name"
+                        class="badge badge-xs badge-outline"
+                      >
+                        {{ a.name.trim() }}: {{ item.sku.attrs[a.name.trim()] }}
+                      </span>
+                    </div>
+                    <template v-if="skuCardExpanded">
+                      <div
+                        v-for="fk in skuColDisplay"
+                        :key="fk"
+                        class="border-t border-base-300 pt-0.5"
+                      >
+                        <template v-if="isSkuInputCol(fk)">
+                          <div class="flex gap-1 items-center justify-between">
+                            <span class="shrink-0 w-[40%] opacity-60 truncate">{{ fk }}</span>
                             <FieldInput
                               @update:model-value="item.sku.inputs[fk] = $event"
                               :field="getSkuField(fk)"
@@ -919,37 +1061,40 @@ function buildSkuRowsWithoutVariants(rows) {
                               noLabel
                               :optionConfigs="configStore['选项配置']"
                             />
-                          </template>
-                          <template v-else-if="fk === '图片'">
-                            <div v-if="item.sku.images" class="group h-10 relative w-10">
-                              <img
-                                @click="openImagePreview(item.sku.images)"
-                                class="border cursor-pointer h-10 object-contain bg-base-100 w-10"
-                                :src="item.sku.images"
-                              >
-                              <button
-                                @click="clearImage(item.sku)"
-                                class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                            <label
-                              v-else
-                              class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-10 p-0 text-base-content/30 text-lg w-10"
-                              title="上传图片"
-                            >＋<input
-                              @change="handleImageUpload(item.sku, $event)"
-                              accept="image/*"
-                              class="hidden"
-                              type="file"
-                            ></label>
-                          </template>
-                          <template v-else>
-                            <span v-if="item.sku.error" class="text-error text-xs">{{
+                          </div>
+                        </template>
+                        <template v-else-if="fk === '图片'">
+                          <div v-if="item.sku.images" class="group h-10 relative w-10">
+                            <img
+                              @click="openImagePreview(item.sku.images)"
+                              class="border cursor-pointer h-10 object-contain bg-base-100 w-10"
+                              :src="item.sku.images"
+                            >
+                            <button
+                              @click="clearImage(item.sku)"
+                              class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <label
+                            v-else
+                            class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-8 p-0 text-base-content/30 text-lg w-8"
+                            title="上传图片"
+                          >＋<input
+                            @change="handleImageUpload(item.sku, $event)"
+                            accept="image/*"
+                            class="hidden"
+                            type="file"
+                          ></label>
+                        </template>
+                        <template v-else>
+                          <div class="flex justify-between">
+                            <span class="opacity-60">{{ fk }}</span>
+                            <span v-if="item.sku.error" class="text-error">{{
                               item.sku.error
                             }}</span>
-                            <template v-else-if="item.sku.results[fk] !== undefined">
+                            <span v-else-if="item.sku.results[fk] !== undefined">
                               {{
                                 isPercentCol(fk)
                                   ? `${(item.sku.results[fk] * 100).toFixed(2)}%`
@@ -964,141 +1109,27 @@ function buildSkuRowsWithoutVariants(rows) {
                               >
                                 ?
                               </button>
-                            </template>
+                            </span>
                             <span v-else class="text-base-content/30">—</span>
-                          </template>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </template>
-
-                <template v-else-if="skuViewMode === 'card' && createStore.skus.length">
-                  <div
-                    v-draggable="[pagedSkus, skuDragOpts]"
-                    class="gap-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
-                    data-tour="sku-table"
-                  >
-                    <div
-                      v-for="item in pagedSkus"
-                      :key="item.sku.key"
-                      class="sku-draggable-row bg-base-200 border border-base-300 flex flex-col gap-1 p-2 rounded text-xs"
-                      :data-drag-key="item.sku.key"
-                    >
-                      <div class="flex gap-1 items-center">
-                        <span
-                          class="sku-drag-handle cursor-grab select-none text-base-content/30"
-                          title="拖动排序"
-                        >☰</span>
-                        <span class="font-semibold text-xs truncate">{{
-                          item.sku.skuCode || "-"
-                        }}</span>
-                        <button
-                          @click="openCalcModal(item.origIdx)"
-                          class="btn btn-ghost btn-xs ml-auto"
-                          title="反推计算"
-                        >
-                          🧮
-                        </button>
+                          </div>
+                        </template>
                       </div>
-                      <div
-                        v-if="createStore.variantAttributes.filter((a) => a.name.trim()).length"
-                        class="flex flex-wrap gap-1"
-                      >
-                        <span
-                          v-for="a in createStore.variantAttributes.filter((a) => a.name.trim())"
-                          :key="a.name"
-                          class="badge badge-xs badge-outline"
-                        >
-                          {{ a.name.trim() }}: {{ item.sku.attrs[a.name.trim()] }}
-                        </span>
-                      </div>
-                      <template v-if="skuCardExpanded">
-                        <div
-                          v-for="fk in skuColDisplay"
-                          :key="fk"
-                          class="border-t border-base-300 pt-0.5"
-                        >
-                          <template v-if="isSkuInputCol(fk)">
-                            <div class="flex gap-1 items-center justify-between">
-                              <span class="shrink-0 w-[40%] opacity-60 truncate">{{ fk }}</span>
-                              <FieldInput
-                                @update:model-value="item.sku.inputs[fk] = $event"
-                                :field="getSkuField(fk)"
-                                :modelValue="item.sku.inputs[fk]"
-                                noLabel
-                                :optionConfigs="configStore['选项配置']"
-                              />
-                            </div>
-                          </template>
-                          <template v-else-if="fk === '图片'">
-                            <div v-if="item.sku.images" class="group h-10 relative w-10">
-                              <img
-                                @click="openImagePreview(item.sku.images)"
-                                class="border cursor-pointer h-10 object-contain bg-base-100 w-10"
-                                :src="item.sku.images"
-                              >
-                              <button
-                                @click="clearImage(item.sku)"
-                                class="-right-1 -top-1 absolute bg-base-100 btn btn-ghost btn-xs group-hover:opacity-100 h-4 min-h-0 opacity-0 p-0 rounded-full w-4"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                            <label
-                              v-else
-                              class="border border-dashed btn btn-ghost btn-xs cursor-pointer h-8 p-0 text-base-content/30 text-lg w-8"
-                              title="上传图片"
-                            >＋<input
-                              @change="handleImageUpload(item.sku, $event)"
-                              accept="image/*"
-                              class="hidden"
-                              type="file"
-                            ></label>
-                          </template>
-                          <template v-else>
-                            <div class="flex justify-between">
-                              <span class="opacity-60">{{ fk }}</span>
-                              <span v-if="item.sku.error" class="text-error">{{
-                                item.sku.error
-                              }}</span>
-                              <span v-else-if="item.sku.results[fk] !== undefined">
-                                {{
-                                  isPercentCol(fk)
-                                    ? `${(item.sku.results[fk] * 100).toFixed(2)}%`
-                                    : typeof item.sku.results[fk] === "number"
-                                      ? item.sku.results[fk].toFixed(2)
-                                      : item.sku.results[fk]
-                                }}
-                                <button
-                                  v-if="item.sku.traces?.[fk]"
-                                  @click="openTrace(item.sku, fk)"
-                                  class="btn btn-ghost btn-xs ml-1 text-base-content/40"
-                                >
-                                  ?
-                                </button>
-                              </span>
-                              <span v-else class="text-base-content/30">—</span>
-                            </div>
-                          </template>
-                        </div>
-                      </template>
-                    </div>
+                    </template>
                   </div>
-                </template>
-
-                <div v-if="!createStore.skus.length" class="mt-2 text-base-content/40 text-sm">
-                  选择模板后自动生成 SKU，或点击「生成SKU」手动刷新
                 </div>
-                <PaginationBar
-                  v-if="createStore.skus.length"
-                  v-model:currentPage="skuPage"
-                  v-model:pageSize="skuPageSize"
-                  class="justify-end mt-2"
-                  showJump
-                  :totalPages="skuTotalPages"
-                />
+              </template>
+
+              <div v-if="!createStore.skus.length" class="mt-2 text-base-content/40 text-sm">
+                选择模板后自动生成 SKU，或点击「生成SKU」手动刷新
               </div>
+              <PaginationBar
+                v-if="createStore.skus.length"
+                v-model:currentPage="skuPage"
+                v-model:pageSize="skuPageSize"
+                class="justify-end mt-2"
+                showJump
+                :totalPages="skuTotalPages"
+              />
             </div>
           </template>
         </div>

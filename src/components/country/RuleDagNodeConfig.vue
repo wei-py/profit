@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from "vue";
 import OptionTreeSelect from "@/components/common/OptionTreeSelect.vue";
 import { GRAPH_NODE_TYPES } from "@/domain/rule-graph";
 
@@ -14,6 +15,40 @@ const props = defineProps({
 const emit = defineEmits(["update:node"]);
 
 const operatorOptions = ["=", "!=", ">", ">=", "<", "<="];
+
+function formula() {
+  return props.node?.data?.formula || [];
+}
+
+const operatorDisplay = { "-": "−", "*": "×", "/": "÷", "+": "+" };
+
+const formulaLabel = computed(() => {
+  return formula().map((t) => {
+    if (t.type === "operator")
+      return ` ${(operatorDisplay[t.value] || t.value)} `;
+    if (t.type === "paren")
+      return t.value;
+    return t.value || "?";
+  }).join("");
+});
+
+function addFormulaToken(type, value = "") {
+  const list = [...formula()];
+  list.push({ type, value });
+  emitPatch({ formula: list });
+}
+
+function updateFormulaToken(index, patch) {
+  const list = [...formula()];
+  if (index < 0 || index >= list.length)
+    return;
+  list[index] = { ...list[index], ...patch };
+  emitPatch({ formula: list });
+}
+
+function removeFormulaToken(index) {
+  emitPatch({ formula: (props.node?.data?.formula || []).filter((_, i) => i !== index) });
+}
 
 function emitPatch(patch) {
   emit("update:node", { ...props.node, data: { ...props.node?.data, ...patch } });
@@ -193,13 +228,60 @@ function removeMap(index) {
     </template>
 
     <template v-else-if="node.data?.kind === 'calc'">
-      <label class="label py-0 text-xs">表达式</label>
-      <textarea
-        @input="emitPatch({ expression: $event.target.value })"
-        class="textarea textarea-bordered textarea-xs min-h-20 w-full font-mono"
-        placeholder="如：{售价} * {销售佣金费率}"
-        :value="node.data?.expression"
-      />
+      <div v-if="formula().length" class="bg-base-200 p-2 rounded text-sm font-mono min-h-8">
+        {{ formulaLabel || "..." }}
+      </div>
+
+      <div v-if="formula().length" class="space-y-1">
+        <span class="text-[10px] opacity-40">公式项</span>
+        <div v-for="(token, index) in formula()" :key="index" class="grid grid-cols-[2.5rem_1fr_auto] gap-1 items-center">
+          <span class="text-[10px] opacity-40 text-right">{{ { constant: "常量", field: "字段", node: "节点", operator: "运算", paren: "括号" }[token.type] }}</span>
+          <template v-if="token.type === 'field'">
+            <OptionTreeSelect
+              @update:model-value="updateFormulaToken(index, { value: $event })"
+              :modelValue="token.value"
+              :options="fieldOptions || []"
+              size="xs"
+            />
+          </template>
+          <template v-else-if="token.type === 'node'">
+            <OptionTreeSelect
+              @update:model-value="updateFormulaToken(index, { value: $event })"
+              :modelValue="token.value"
+              :options="nodeOptions || []"
+              size="xs"
+            />
+          </template>
+          <template v-else-if="token.type === 'constant'">
+            <input
+              @input="updateFormulaToken(index, { value: $event.target.value })"
+              class="input input-bordered input-xs w-full"
+              placeholder="0"
+              :value="token.value"
+            >
+          </template>
+          <template v-else-if="token.type === 'operator'">
+            <span class="font-mono px-1">{{ operatorDisplay[token.value] || token.value }}</span>
+          </template>
+          <template v-else-if="token.type === 'paren'">
+            <span class="font-mono px-1">{{ token.value }}</span>
+          </template>
+          <button @click="removeFormulaToken(index)" class="btn btn-ghost btn-xs">删除</button>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-0.5">
+        <span class="text-[10px] opacity-30 self-center mr-1">添加</span>
+        <button @click="addFormulaToken('paren', '(')" class="btn btn-outline btn-xs">(</button>
+        <button @click="addFormulaToken('paren', ')')" class="btn btn-outline btn-xs">)</button>
+        <button @click="addFormulaToken('operator', '+')" class="btn btn-outline btn-xs">+</button>
+        <button @click="addFormulaToken('operator', '-')" class="btn btn-outline btn-xs">−</button>
+        <button @click="addFormulaToken('operator', '*')" class="btn btn-outline btn-xs">×</button>
+        <button @click="addFormulaToken('operator', '/')" class="btn btn-outline btn-xs">÷</button>
+        <button @click="addFormulaToken('field', '')" class="btn btn-outline btn-xs">字段</button>
+        <button @click="addFormulaToken('node', '')" class="btn btn-outline btn-xs">节点</button>
+        <button @click="addFormulaToken('constant', '')" class="btn btn-outline btn-xs">常量</button>
+      </div>
     </template>
 
     <template v-else-if="node.data?.kind === 'condition'">

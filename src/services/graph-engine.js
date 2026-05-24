@@ -117,6 +117,27 @@ function executePick(data, incoming, values) {
 }
 
 function executeCalc(data, incoming, values, userInputs) {
+  // Formula token mode
+  const formula = data.formula || [];
+  if (formula.length) {
+    const parts = formula.map((t) => {
+      if (t.type === "field")
+        return String(toNumber(userInputs[t.value] ?? 0));
+      if (t.type === "node")
+        return String(toNumber(values.get(String(t.value)) ?? 0));
+      if (t.type === "constant")
+        return String(toNumber(t.value));
+      // operator / paren
+      return String(t.value);
+    });
+    const expr = parts.join(" ");
+    if (!/^[\d+\-*/().\s]+$/.test(expr))
+      throw new Error(`计算公式无法安全执行：${expr}`);
+    // eslint-disable-next-line no-new-func
+    return new Function(`"use strict"; return (${expr})`)();
+  }
+
+  // Legacy expression mode
   const expression = String(data.expression || "").trim();
   if (!expression)
     return incoming[incoming.length - 1];

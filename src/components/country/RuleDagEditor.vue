@@ -13,7 +13,7 @@ const props = defineProps({
   ruleId: String,
   ruleName: String,
 });
-const emit = defineEmits(["update:graphJson"]);
+const emit = defineEmits(["update:graphJson", "update:ruleName"]);
 
 const nodes = ref([]);
 const edges = ref([]);
@@ -152,8 +152,12 @@ function runPreview() {
 <template>
   <div class="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] bg-base-200">
     <div class="flex items-center gap-2 border-b border-base-300 bg-base-100 px-3 py-1.5">
-      <span class="truncate text-xs font-semibold">{{ ruleName || "当前规则" }}</span>
-      <span class="text-xs opacity-50">{{ nodes.length }} 个节点</span>
+      <input
+        @input="emit('update:ruleName', $event.target.value)"
+        class="input input-bordered input-xs min-w-0 flex-1 font-semibold"
+        :value="ruleName"
+      >
+      <span class="text-xs opacity-50 shrink-0">{{ nodes.length }} 个节点</span>
       <button @click="openPreviewPanel" class="btn btn-outline btn-xs ml-auto">
         试算
       </button>
