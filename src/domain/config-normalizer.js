@@ -211,18 +211,72 @@ function convertLegacyToOptionConfigs(groups = [], items = []) {
 }
 
 function normalizeCalculationConfig(rows = []) {
-  return orderByNumber(
-    normalizeRows(rows, "计算配置", ["所属国家平台", "模板编号"]).map((row, index) => ({
-      所属国家平台: normalizeId(row.所属国家平台),
-      排序: row.排序 || "",
-      模板名称: row.模板名称 || row.名称 || normalizeId(row.模板编号) || `模板${index + 1}`,
-      模板启用: isEnabled({ 启用: row.模板启用 || row.启用 }) ? "是" : "否",
-      模板编号: normalizeId(row.模板编号) || `template_${index + 1}`,
-      模板说明: row.模板说明 || row.说明 || "",
-      流程JSON: row.流程JSON || row.流程 || "",
-    })),
-    "排序",
-  );
+  rows = normalizeRows(rows, "计算配置", ["所属国家平台", "规则编号"]);
+
+  // Group rule rows by template, build flow objects
+  const rawTemplateInfo = new Map();
+
+  for (const row of rows) {
+    const templateId = normalizeId(row.模板编号) || `template_default`;
+    const platformId = normalizeId(row.所属国家平台);
+    const key = `${platformId}::${templateId}`;
+
+    if (!rawTemplateInfo.has(key)) {
+      rawTemplateInfo.set(key, {
+        rules: [],
+        所属国家平台: platformId,
+        模板名称: row.模板名称 || templateId,
+        模板启用: row.模板启用 || "是",
+        模板编号: templateId,
+        模板说明: row.模板说明 || "",
+      });
+    }
+
+    const ruleId = normalizeId(row.规则编号);
+    if (!ruleId)
+      continue;
+
+    rawTemplateInfo.get(key).rules.push({
+      enabled: !!isEnabled({ 启用: row.规则启用 !== undefined ? row.规则启用 : row.模板启用 }),
+      graph: normalizeFlowGraph(row.流程JSON),
+      id: ruleId,
+      name: row.规则名称 || ruleId,
+      order: Number(row.规则排序 || 10),
+    });
+  }
+
+  const result = [];
+  for (const [, info] of rawTemplateInfo) {
+    const rules = info.rules.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+    const flow = { rules, version: 2 };
+    result.push({
+      所属国家平台: info.所属国家平台,
+      排序: "",
+      模板名称: info.模板名称,
+      模板启用: info.模板启用,
+      模板编号: info.模板编号,
+      模板说明: info.模板说明,
+      流程JSON: JSON.stringify(flow),
+    });
+  }
+
+  return orderByNumber(result, "排序");
+}
+
+function normalizeFlowGraph(value) {
+  if (!value)
+    return { edges: [], nodes: [], version: 1 };
+  try {
+    const graph = typeof value === "object" ? value : JSON.parse(value);
+    return {
+      edges: Array.isArray(graph.edges) ? graph.edges.filter(e => e?.id && e.source && e.target) : [],
+      nodes: Array.isArray(graph.nodes) ? graph.nodes.filter(n => n?.id) : [],
+      version: Number(graph.version) || 1,
+    };
+  }
+  catch {
+    return { edges: [], nodes: [], version: 1 };
+  }
 }
 
 function normalizeLookupTables(tables = {}) {

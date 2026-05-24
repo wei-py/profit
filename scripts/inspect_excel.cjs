@@ -57,9 +57,10 @@ function buildIndexes(rows, wb) {
   );
 
   for (const row of rows.计算配置) {
-    const id = norm(row.模板编号);
-    if (id && !templates.has(id))
-      templates.set(id, row);
+    const templateId = norm(row.模板编号);
+    const key = `${norm(row.所属国家平台)}::${templateId}`;
+    if (templateId && !templates.has(key))
+      templates.set(key, row);
   }
 
   for (const row of rows.计算字段) {
@@ -108,7 +109,7 @@ function checkRequiredValues(rows) {
   const required = {
     国家平台: ["编号", "国家", "平台"],
     计算字段: ["字段名称", "类型", "所属国家平台", "层级", "输入输出"],
-    计算配置: ["所属国家平台", "模板编号", "模板名称", "流程JSON"],
+    计算配置: ["所属国家平台", "模板编号", "模板名称", "规则编号", "流程JSON"],
     选项配置: ["所属国家平台", "选项值", "选项值编号"],
   };
   for (const [sheetName, fields] of Object.entries(required)) {
@@ -125,7 +126,7 @@ function checkDuplicates(rows) {
   checkDuplicate(rows.国家平台, "国家平台", row => norm(row.编号), "编号");
   checkDuplicate(rows.计算字段, "计算字段", row => `${norm(row.所属国家平台)}::${norm(row.字段键 || row.字段名称)}`, "所属国家平台 + 字段键");
   checkDuplicate(rows.选项配置, "选项配置", row => norm(row.选项值编号), "选项值编号", "WARN");
-  checkDuplicate(rows.计算配置, "计算配置", row => `${norm(row.所属国家平台)}::${norm(row.模板编号)}`, "所属国家平台 + 模板编号");
+  checkDuplicate(rows.计算配置, "计算配置", row => `${norm(row.所属国家平台)}::${norm(row.规则编号)}`, "所属国家平台 + 规则编号");
 }
 
 function checkReferences(rows, indexes) {
@@ -147,22 +148,23 @@ function checkReferences(rows, indexes) {
 }
 
 function checkGraphs(rows, indexes, wb) {
-  rows.计算配置.forEach((template, index) => {
+  rows.计算配置.forEach((row, index) => {
     const rowNumber = index + 2;
-    const templateId = norm(template.模板编号) || `第 ${rowNumber} 行`;
-    const platformId = norm(template.所属国家平台);
-    const graph = parseGraph(template.流程JSON, rowNumber, templateId);
+    const ruleId = norm(row.规则编号) || `第 ${rowNumber} 行`;
+    const templateId = norm(row.模板编号) || "?";
+    const platformId = norm(row.所属国家平台);
+    const graph = parseGraph(row.流程JSON, rowNumber, ruleId);
     if (!graph)
       return;
     if (!Array.isArray(graph.nodes))
-      add("ERROR", "计算配置", rowNumber, `[${templateId}] 流程JSON.nodes 必须是数组`);
+      add("ERROR", "计算配置", rowNumber, `[${templateId}/${ruleId}] 流程JSON.nodes 必须是数组`);
     if (!Array.isArray(graph.edges))
-      add("ERROR", "计算配置", rowNumber, `[${templateId}] 流程JSON.edges 必须是数组`);
+      add("ERROR", "计算配置", rowNumber, `[${templateId}/${ruleId}] 流程JSON.edges 必须是数组`);
     for (const node of graph.nodes || []) {
       if (node?.data?.kind === "output" && !fieldExists(indexes, node.data.field, platformId))
-        add("WARN", "计算配置", rowNumber, `[${templateId}] 输出字段不存在或不属于该国家平台：${node.data.field}`);
+        add("WARN", "计算配置", rowNumber, `[${templateId}/${ruleId}] 输出字段不存在或不属于该国家平台：${node.data.field}`);
       if (node?.data?.kind === "lookup")
-        checkLookupNode(node, rowNumber, templateId, wb, indexes);
+        checkLookupNode(node, rowNumber, `${templateId}/${ruleId}`, wb, indexes);
     }
   });
 }

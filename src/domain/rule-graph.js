@@ -176,9 +176,12 @@ export function syncEdgesForNode(graph, nodeId) {
   if (!node)
     return;
   const depIds = getNodeDependencyIds(node.data);
+  const nodeIdSet = new Set((graph.nodes || []).map(n => n.id));
   const newEdges = [];
   const otherEdges = (graph.edges || []).filter(e => e.target !== nodeId);
   for (const sourceId of depIds) {
+    if (!nodeIdSet.has(sourceId))
+      continue;
     newEdges.push({ id: `e_${normalizeId(sourceId)}_${normalizeId(nodeId)}`, source: sourceId, target: nodeId });
   }
   graph.edges = [...otherEdges, ...newEdges];

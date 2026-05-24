@@ -68,7 +68,7 @@ function commit() {
   if (suppressSync)
     return;
   const cleanNodes = nodes.value.map(n => ({
-    data: { ...n.data },
+    data: { ...(n.data || {}) },
     id: n.id,
     position: n.position || { x: 0, y: 0 },
     type: n.type || "ruleGraph",
@@ -88,13 +88,22 @@ function addNode(kind) {
 }
 
 function updateNode(updatedNode) {
+  if (!updatedNode?.id)
+    return;
+
   const idx = nodes.value.findIndex(n => n.id === updatedNode.id);
   if (idx < 0)
     return;
-  nodes.value[idx] = updatedNode;
-  // Auto-sync edges for this node
+
+  const safeNode = {
+    ...updatedNode,
+    data: updatedNode.data || {},
+  };
+
+  nodes.value[idx] = safeNode;
+
   const graph = { edges: edges.value, nodes: nodes.value };
-  syncEdgesForNode(graph, updatedNode.id);
+  syncEdgesForNode(graph, safeNode.id);
   edges.value = dedupeEdges(graph.edges);
   commit();
 }

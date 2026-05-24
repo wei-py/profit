@@ -1,8 +1,14 @@
 import { buildWorkbookBuffer } from "@/services/excel-writer";
 
+function toPlain(value) {
+  return JSON.parse(JSON.stringify(value ?? null));
+}
+
 export function buildWorkbookBufferInWorker(config) {
   if (typeof Worker === "undefined")
     return buildWorkbookBuffer(config);
+
+  const plain = toPlain(config);
 
   return new Promise((resolve, reject) => {
     const worker = new Worker(
@@ -27,6 +33,12 @@ export function buildWorkbookBufferInWorker(config) {
       reject(new Error(event.message || "配置 Excel 导出失败"));
     };
 
-    worker.postMessage({ config });
+    try {
+      worker.postMessage({ config: plain });
+    }
+    catch {
+      worker.terminate();
+      buildWorkbookBuffer(plain).then(resolve, reject);
+    }
   });
 }

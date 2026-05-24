@@ -93,7 +93,7 @@ function readInputValue(data, userInputs) {
 function executeLookup(node, values, lookupTables, userInputs, traces) {
   const data = node.data || {};
   const table = lookupTables[data.sheet] || [];
-  const conditions = Array.isArray(data.where) ? data.where : [];
+  const conditions = (Array.isArray(data.where) ? data.where : []).filter(c => c.column && (c.source || c.input));
   const matched = table.find(row => conditions.every((condition) => {
     const sourceValue = condition.source ? values.get(condition.source) : userInputs[normalizeId(condition.input)];
     return compare(sourceValue, row?.[condition.column], condition.operator || "=");

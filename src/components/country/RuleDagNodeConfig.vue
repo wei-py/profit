@@ -25,7 +25,10 @@ function addWhere() {
 }
 
 function updateWhere(index, patch) {
-  const where = [...(props.node?.data?.where || [])];
+  const src = props.node?.data?.where || [];
+  if (index < 0 || index >= src.length)
+    return;
+  const where = [...src];
   where[index] = { ...where[index], ...patch };
   emitPatch({ where });
 }
@@ -39,7 +42,10 @@ function addMap() {
 }
 
 function updateMap(index, patch) {
-  const map = [...(props.node?.data?.map || [])];
+  const src = props.node?.data?.map || [];
+  if (index < 0 || index >= src.length)
+    return;
+  const map = [...src];
   map[index] = { ...map[index], ...patch };
   emitPatch({ map });
 }
@@ -104,6 +110,12 @@ function removeMap(index) {
       <div class="flex items-center justify-between">
         <span class="font-semibold opacity-70">WHERE 条件</span>
         <button @click="addWhere" class="btn btn-ghost btn-xs">＋</button>
+      </div>
+      <div v-if="(node.data?.where || []).length" class="grid grid-cols-[1fr_4rem_1fr_auto] gap-1 px-0.5 text-[10px] opacity-40">
+        <span>来源节点</span>
+        <span>运算</span>
+        <span>表列</span>
+        <span />
       </div>
       <div v-for="(row, index) in node.data?.where || []" :key="index" class="grid grid-cols-[1fr_4rem_1fr_auto] gap-1">
         <OptionTreeSelect

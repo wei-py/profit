@@ -13,8 +13,14 @@ export async function buildWorkbookBuffer(config) {
   wb.created = dayjs().toDate();
 
   for (const name of CONFIG_SHEET_NAMES) {
+    if (name === "计算配置") {
+      const ruleRows = flattenCalculationConfig(config[name] || []);
+      if (ruleRows.length)
+        appendSheet(wb, name, ruleRows, CONFIG_HEADERS[name]);
+      continue;
+    }
     const data = config[name] || [];
-    if (!data.length && name !== "计算配置")
+    if (!data.length)
       continue;
     const preferred
       = name === "国家平台" && config.国家平台ColOrder?.length
@@ -33,6 +39,39 @@ export async function buildWorkbookBuffer(config) {
   });
 
   return new Uint8Array(await wb.xlsx.writeBuffer());
+}
+
+function flattenCalculationConfig(templates = []) {
+  const rows = [];
+  for (const tpl of templates) {
+    const flow = parseFlow(tpl.流程JSON);
+    for (const rule of flow.rules || []) {
+      rows.push({
+        所属国家平台: tpl.所属国家平台,
+        模板名称: tpl.模板名称,
+        模板启用: tpl.模板启用,
+        模板编号: tpl.模板编号,
+        模板说明: tpl.模板说明 || "",
+        流程JSON: JSON.stringify(rule.graph),
+        规则名称: rule.name,
+        规则启用: rule.enabled ? "是" : "否",
+        规则排序: rule.order ?? "",
+        规则编号: rule.id,
+      });
+    }
+  }
+  return rows;
+}
+
+function parseFlow(value) {
+  if (!value)
+    return { rules: [], version: 2 };
+  try {
+    return typeof value === "object" ? value : JSON.parse(value);
+  }
+  catch {
+    return { rules: [], version: 2 };
+  }
 }
 
 function appendSheet(wb, name, data, preferred = []) {

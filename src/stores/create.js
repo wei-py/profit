@@ -5,6 +5,10 @@ import { executeFlow } from "@/services/graph-engine";
 import { normalizeId, nowText } from "@/utils/value";
 import { useConfigStore } from "./config";
 
+function toPlain(value) {
+  return JSON.parse(JSON.stringify(value ?? null));
+}
+
 function runBatchInWorker(flow, lookupTables, batchInputs) {
   if (typeof Worker === "undefined")
     return Promise.resolve(batchInputs.map(inputs => executeFlow(flow, lookupTables, inputs)));
@@ -24,7 +28,11 @@ function runBatchInWorker(flow, lookupTables, batchInputs) {
       worker.terminate();
       reject(new Error(event.message));
     };
-    worker.postMessage({ batchInputs, flow, lookupTables });
+    worker.postMessage({
+      batchInputs: toPlain(batchInputs),
+      flow: toPlain(flow),
+      lookupTables: toPlain(lookupTables),
+    });
   });
 }
 
