@@ -149,7 +149,7 @@ const statusText = computed(() => {
             class="font-mono font-bold text-primary"
           >{{ updateInfo.version }}</span>
         </p>
-        <p v-if="updateInfo.notes" class="text-base-content/60">
+        <p v-if="updateInfo.notes" class="max-h-48 overflow-auto whitespace-pre-line rounded bg-base-200 p-3 text-sm text-base-content/70">
           {{ updateInfo.notes }}
         </p>
 
@@ -216,7 +216,7 @@ const statusText = computed(() => {
       <h3 class="font-bold text-lg">必须更新</h3>
       <div class="py-3 space-y-2 text-sm">
         <p>检测到重要更新，当前版本已不兼容，请更新后继续使用。</p>
-        <p v-if="updateInfo.notes" class="text-base-content/60">
+        <p v-if="updateInfo.notes" class="max-h-48 overflow-auto whitespace-pre-line rounded bg-base-200 p-3 text-sm text-base-content/70">
           {{ updateInfo.notes }}
         </p>
         <p class="font-mono text-sm">
