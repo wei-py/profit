@@ -17,7 +17,6 @@ import {
   makeVariantKeyFromAttrs,
   makeVariantKeyFromRow,
   normalizeProductId,
-  normalizeVariantValues,
 } from "@/domain/product-records";
 import { useConfigStore } from "@/stores/config";
 import { useCreateStore } from "@/stores/create";
@@ -44,24 +43,6 @@ const productHelpSteps = [
     popover: {
       description: "生成 SKU、计算、保存到列表/保存修改都在这里。",
       title: "商品操作",
-    },
-  },
-];
-const productFieldHelpSteps = [
-  {
-    element: "[data-tour=\"product-fields\"]",
-    popover: {
-      description: "商品级字段会写入当前商品的所有 SKU。下拉字段会自动使用配置里的选项树。",
-      title: "商品级字段",
-    },
-  },
-];
-const variantHelpSteps = [
-  {
-    element: "[data-tour=\"product-variants\"]",
-    popover: {
-      description: "每个变体属性一行，例如颜色=红|蓝，尺码=S|M。点击生成 SKU 后会生成组合。",
-      title: "变体属性",
     },
   },
 ];
@@ -166,12 +147,13 @@ const templateOptions = computed(() =>
   })),
 );
 
-function handleCalculate() {
-  createStore.calculateAll();
+async function handleCalculate() {
+  generateSkusNow();
+  await createStore.calculateAll();
 }
 async function handleSaveToList() {
-  if (!createStore.lastCalculatedAt)
-    await createStore.calculateAll();
+  generateSkusNow();
+  await createStore.calculateAll();
   const rows = createStore.productRows();
   if (!rows.length)
     return;
@@ -206,6 +188,73 @@ function batchSetSkuInput(fieldKey) {
   for (const sku of createStore.skus) sku.inputs[fieldKey] = val;
 }
 
+function variantValueList(values) {
+  if (values === undefined || values === null || values === "")
+    return [""];
+  return String(values).split("|");
+}
+
+const skuPage = ref(1);
+const skuPageSize = ref(20);
+let skuGenerateTimer = null;
+
+function generateSkusNow() {
+  clearTimeout(skuGenerateTimer);
+  createStore.generateSkus();
+  skuPage.value = 1;
+  syncPagedSkus();
+}
+
+function scheduleGenerateSkus() {
+  if (!createStore.selectedTemplateId)
+    return;
+  clearTimeout(skuGenerateTimer);
+  skuGenerateTimer = setTimeout(() => {
+    generateSkusNow();
+  }, 200);
+}
+
+function updateVariantValue(attr, valueIndex, value) {
+  const values = variantValueList(attr.values);
+  values[valueIndex] = value;
+  attr.values = values.join("|");
+  scheduleGenerateSkus();
+}
+
+function addVariantValue(attr) {
+  const values = variantValueList(attr.values);
+  values.push("");
+  attr.values = values.join("|");
+  scheduleGenerateSkus();
+}
+
+function removeVariantValue(attr, valueIndex) {
+  const values = variantValueList(attr.values).filter(Boolean);
+  values.splice(valueIndex, 1);
+  attr.values = values.join("|");
+  scheduleGenerateSkus();
+}
+
+function updateVariantName(attr, value) {
+  attr.name = value;
+  scheduleGenerateSkus();
+}
+
+function removeVariantAttribute(i) {
+  createStore.removeVariantAttribute(i);
+  scheduleGenerateSkus();
+}
+
+function addVariantAttribute() {
+  createStore.addVariantAttribute();
+  scheduleGenerateSkus();
+}
+
+function updateSkuPrefix(value) {
+  createStore.skuPrefix = value;
+  scheduleGenerateSkus();
+}
+
 // ── Modal state ──
 const showCalcModal = ref(false);
 const calcSkuIndex = ref(-1);
@@ -216,12 +265,14 @@ const showColModal = ref(false);
 const skuColModal = ref(false);
 const skuColOrder = ref([]);
 const skuHiddenKeys = ref([]);
-const skuViewMode = ref("table");
-const recordViewMode = ref("table");
+const skuViewMode = ref(localStorage.getItem("skuViewMode") || "table");
+const recordViewMode = ref(localStorage.getItem("recordViewMode") || "table");
 const skuCardExpanded = ref(localStorage.getItem("skuCardExpanded") === "true");
 const recordCardExpanded = ref(localStorage.getItem("recordCardExpanded") === "true");
 const createPanelTitle = computed(() => (isEditingProduct.value ? "修改商品" : "新建商品"));
 
+watch(skuViewMode, v => localStorage.setItem("skuViewMode", v));
+watch(recordViewMode, v => localStorage.setItem("recordViewMode", v));
 watch(skuCardExpanded, v => localStorage.setItem("skuCardExpanded", String(v)));
 watch(recordCardExpanded, v => localStorage.setItem("recordCardExpanded", String(v)));
 
@@ -307,8 +358,6 @@ function syncPagedRecordGroups() {
 
 watch([recordGroupPages, currentPage, pageSize], syncPagedRecordGroups, { immediate: true });
 
-const skuPage = ref(1);
-const skuPageSize = ref(20);
 const skuPageOffset = computed(() => (skuPage.value - 1) * skuPageSize.value);
 const pagedSkus = ref([]);
 
@@ -322,7 +371,12 @@ function syncPagedSkus() {
 }
 
 watch(
-  [() => createStore.skus.map(sku => sku.key).join("\u001F"), skuPage, skuPageSize],
+  [() => createStore.skus.map(sku => [
+    sku.key,
+    sku.skuCode,
+    sku.error,
+    JSON.stringify(sku.results || {}),
+  ].join("\u001E")).join("\u001F"), skuPage, skuPageSize],
   syncPagedSkus,
   { immediate: true },
 );
@@ -694,11 +748,11 @@ function buildSkuRowsWithoutVariants(rows) {
             </div>
           </div>
 
-          <div class="grid gap-3 xl:grid-cols-3">
+          <div class="space-y-4">
             <!-- 平台级 -->
-            <section class="card border border-base-300 bg-base-100">
-              <div class="card-body p-3 space-y-3">
-                <div class="font-semibold text-sm">平台级</div>
+            <section class="border-t border-base-300 pt-3 first:border-t-0 first:pt-0">
+              <div class="font-semibold text-sm mb-2">平台级</div>
+              <div class="flex flex-wrap gap-3 items-end">
                 <div class="flex flex-col gap-1">
                   <label class="label py-1"><span class="label-text">国家平台</span></label>
                   <OptionTreeSelect
@@ -718,131 +772,128 @@ function buildSkuRowsWithoutVariants(rows) {
                   />
                 </div>
                 <template v-if="createStore.selectedTemplateId">
-                  <FieldInput
-                    @update:model-value="createStore.productInputs[f.字段键] = $event"
-                    v-for="f in createStore.platformFields"
-                    :key="f.字段键"
-                    :field="f"
-                    :modelValue="createStore.productInputs[f.字段键]"
-                    :optionConfigs="configStore['选项配置']"
-                  />
+                  <div v-for="f in createStore.platformFields" :key="f.字段键" class="min-w-44">
+                    <FieldInput
+                      @update:model-value="createStore.productInputs[f.字段键] = $event"
+                      :field="f"
+                      :modelValue="createStore.productInputs[f.字段键]"
+                      :optionConfigs="configStore['选项配置']"
+                    />
+                  </div>
                 </template>
               </div>
             </section>
 
             <!-- 商品级 -->
-            <section class="card border border-base-300 bg-base-100">
-              <div class="card-body p-3 space-y-3">
-                <div class="font-semibold text-sm">商品级</div>
-                <div class="flex gap-2">
-                  <div class="flex flex-col gap-1">
-                    <label class="label py-1"><span class="label-text">商品ID</span></label>
-                    <input
-                      v-model="createStore.productId"
-                      class="input input-bordered input-sm w-20"
-                      placeholder="P001"
-                    >
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <label class="label py-1"><span class="label-text">商品名称</span></label>
-                    <input
-                      v-model="createStore.productName"
-                      class="input input-bordered input-sm w-28"
-                      placeholder="如：T恤"
-                    >
-                  </div>
+            <section class="border-t border-base-300 pt-3">
+              <div class="font-semibold text-sm mb-2">商品级</div>
+              <div class="flex flex-wrap gap-3 items-end">
+                <div class="flex flex-col gap-1">
+                  <label class="label py-1"><span class="label-text">商品ID</span></label>
+                  <input
+                    v-model="createStore.productId"
+                    class="input input-bordered input-sm w-20"
+                    placeholder="P001"
+                  >
                 </div>
-
+                <div class="flex flex-col gap-1">
+                  <label class="label py-1"><span class="label-text">商品名称</span></label>
+                  <input
+                    v-model="createStore.productName"
+                    class="input input-bordered input-sm w-28"
+                    placeholder="如：T恤"
+                  >
+                </div>
                 <template v-if="createStore.selectedTemplateId">
-                  <div class="flex items-center justify-between" data-tour="product-fields">
-                    <div />
-                    <button
-                      @click="startTour(productFieldHelpSteps)"
-                      class="btn btn-circle btn-ghost btn-xs"
-                      title="商品级字段帮助"
-                    >
-                      ?
-                    </button>
+                  <div v-for="f in createStore.productFields" :key="f.字段键" class="min-w-44">
+                    <FieldInput
+                      @update:model-value="createStore.productInputs[f.字段键] = $event"
+                      :field="f"
+                      :modelValue="createStore.productInputs[f.字段键]"
+                      :optionConfigs="configStore['选项配置']"
+                    />
                   </div>
-                  <FieldInput
-                    @update:model-value="createStore.productInputs[f.字段键] = $event"
-                    v-for="f in createStore.productFields"
-                    :key="f.字段键"
-                    :field="f"
-                    :modelValue="createStore.productInputs[f.字段键]"
-                    :optionConfigs="configStore['选项配置']"
-                  />
                 </template>
               </div>
             </section>
 
             <!-- SKU级 -->
-            <section class="card border border-base-300 bg-base-100">
-              <div class="card-body p-3 space-y-3">
-                <div class="font-semibold text-sm">SKU级</div>
-                <div class="flex flex-col gap-1">
-                  <label class="label py-0"><span class="label-text text-xs">SKU前缀</span></label>
-                  <input
-                    v-model="createStore.skuPrefix"
-                    class="input input-bordered input-sm w-20"
-                    placeholder="如: RS"
-                  >
-                </div>
-                <div class="flex items-center justify-between" data-tour="product-variants">
-                  <div class="text-xs text-base-content/50">变体属性</div>
-                  <button
-                    @click="startTour(variantHelpSteps)"
-                    class="btn btn-circle btn-ghost btn-xs"
-                    title="变体帮助"
-                  >
-                    ?
-                  </button>
-                </div>
+            <section class="border-t border-base-300 pt-3">
+              <div class="font-semibold text-sm mb-2">SKU级</div>
+              <div class="flex flex-col gap-1 mb-3 max-w-28">
+                <label class="label py-0"><span class="label-text text-xs">SKU前缀</span></label>
+                <input
+                  @input="updateSkuPrefix($event.target.value)"
+                  class="input input-bordered input-sm w-20"
+                  placeholder="如: RS"
+                  :value="createStore.skuPrefix"
+                >
+              </div>
+
+              <div class="text-xs text-base-content/50 mb-1">变体属性</div>
+
+              <div class="grid grid-cols-[8rem_minmax(18rem,1fr)_4rem] gap-1 px-1 text-[10px] text-base-content/40 mb-1">
+                <span>属性名</span>
+                <span>属性值</span>
+                <span>操作</span>
+              </div>
+
+              <div class="space-y-1 mb-3">
                 <div
                   v-for="(attr, i) in createStore.variantAttributes"
                   :key="i"
-                  class="flex gap-1 items-center"
+                  class="grid grid-cols-[8rem_minmax(18rem,1fr)_4rem] gap-1 items-center"
                 >
                   <input
-                    v-model="attr.name"
-                    class="input input-bordered input-sm w-16"
-                    placeholder="颜色"
+                    @input="updateVariantName(attr, $event.target.value)"
+                    class="input input-bordered input-sm"
+                    placeholder="属性"
+                    :value="attr.name"
                   >
-                  <input
-                    v-model="attr.values"
-                    @input="attr.values = normalizeVariantValues(attr.values)"
-                    class="flex-1 input input-bordered input-sm min-w-0"
-                    placeholder="红|蓝"
-                  >
+                  <div class="flex flex-wrap gap-1 items-center">
+                    <template v-for="(value, valueIndex) in variantValueList(attr.values)" :key="valueIndex">
+                      <span class="inline-flex items-center gap-0">
+                        <input
+                          @input="updateVariantValue(attr, valueIndex, $event.target.value)"
+                          class="input input-bordered input-xs w-20"
+                          placeholder="值"
+                          :value="value"
+                        >
+                        <button @click="removeVariantValue(attr, valueIndex)" class="btn btn-ghost btn-xs px-1 text-base-content/40 hover:text-error">×</button>
+                      </span>
+                    </template>
+                    <button @click="addVariantValue(attr)" class="btn btn-ghost btn-xs">
+                      + 值
+                    </button>
+                  </div>
                   <button
-                    @click="createStore.removeVariantAttribute(i)"
-                    class="btn btn-ghost btn-sm h-9 min-h-9 px-2 text-error"
+                    @click="removeVariantAttribute(i)"
+                    class="btn btn-ghost btn-sm text-error"
                   >
-                    ✕
+                    删除
                   </button>
                 </div>
-                <button @click="createStore.addVariantAttribute" class="btn btn-ghost btn-xs">
+              </div>
+              <div class="flex gap-2 mt-3" data-tour="product-actions">
+                <button @click="addVariantAttribute" class="btn btn-ghost btn-sm">
                   ＋ 变体属性
                 </button>
-                <div class="flex gap-2 pt-3" data-tour="product-actions">
-                  <button @click="createStore.generateSkus()" class="btn btn-sm">生成SKU</button>
-                  <button
-                    @click="handleCalculate"
-                    class="btn btn-primary btn-sm"
-                    :disabled="createStore.calculating"
-                  >
-                    计算
-                  </button>
-                  <button @click="handleSaveToList" class="btn btn-sm btn-success">
-                    {{ isEditingProduct ? "保存修改" : "保存到列表" }}
-                  </button>
-                </div>
+                <button
+                  @click="handleCalculate"
+                  class="btn btn-primary btn-sm"
+                  :disabled="createStore.calculating"
+                >
+                  计算
+                </button>
+                <button @click="handleSaveToList" class="btn btn-sm btn-success">
+                  {{ isEditingProduct ? "保存修改" : "保存到列表" }}
+                </button>
               </div>
             </section>
           </div>
 
           <template v-if="createStore.selectedTemplateId">
-            <div class="mt-4">
+            <div class="mt-4 border-t border-base-300 pt-3">
               <div class="flex items-center justify-between mb-1" data-tour="sku-toolbar">
                 <span class="font-semibold text-sm">SKU 列表</span>
                 <div class="flex gap-1 items-center text-xs">
@@ -1120,7 +1171,7 @@ function buildSkuRowsWithoutVariants(rows) {
               </template>
 
               <div v-if="!createStore.skus.length" class="mt-2 text-base-content/40 text-sm">
-                选择模板后自动生成 SKU，或点击「生成SKU」手动刷新
+                填写变体属性后会自动生成 SKU；没有变体时会生成一个默认 SKU。
               </div>
               <PaginationBar
                 v-if="createStore.skus.length"
