@@ -47,6 +47,7 @@ export const useCreateStore = defineStore("create", () => {
 
   const variantAttributes = ref([]);
   const skuPrefix = ref("");
+  const skuStart = ref(1);
   const skus = reactive([]);
 
   const calculating = ref(false);
@@ -83,6 +84,7 @@ export const useCreateStore = defineStore("create", () => {
     productId.value = "";
     productName.value = "";
     skuPrefix.value = "";
+    skuStart.value = 1;
     clearObject(productInputs);
     variantAttributes.value = [];
     skus.splice(0, skus.length);
@@ -179,7 +181,8 @@ export const useCreateStore = defineStore("create", () => {
   }
 
   function makeSkuRow({ attrs, index, key, oldInputs, parts }) {
-    const num = String(index + 1).padStart(3, "0");
+    const start = Math.max(1, Number(skuStart.value) || 1);
+    const num = String(start + index).padStart(3, "0");
     const suffix = parts.length ? `-${parts.join("-")}` : "";
     return {
       attrs,
@@ -291,6 +294,7 @@ export const useCreateStore = defineStore("create", () => {
     skuInputFields,
     skuOutputFields,
     skuPrefix,
+    skuStart,
     skus,
     updateSkuField,
     updateSkuInput,

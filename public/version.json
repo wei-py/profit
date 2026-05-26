@@ -5,7 +5,7 @@
       "url": "https://profit-admin.xu-wei.space/api/files/releases%2Fmac%2Fprofit_1.0.2_aarch64.dmg"
     }
   },
-  "notes": "1. 修复选择器搜索的内容后点击没有完整的路径",
+  "notes": "1. 添加税率使用 \n 2. 添加 sku 前缀起始值自定义叠加\n 3. 优化条件规则的使用\n 4. 添加查看规则字段的运算过程\n 5. 使用远程链接 https://profit-admin.xu-wei.space/api/files/%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6/default.xlsx",
   "platforms": {
     "darwin-aarch64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUkxc2dvSzVkeGVqcnBaSGcvWTR4VldYOW5nRnhYUm5QWmFrRFdJQVVjZFpmYkNkZjFpRkp4Tmh0VnJUUGxWWDJkUDQ3TFdiL2JyL1R1eGhjVUhDenpjaU5mamZKdGdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5MTk5Mjc3CWZpbGU6cHJvZml0LmFwcC50YXIuZ3oKYVFZRllnU0pwS1BPdzZ1dHpUOHpHK1RvanQxaGZLM1NkK2R1b1pscGFNSHBzY0xvaDFIOWRuQS9yZVNNWlFMMVFjdStsMXdzMCs5cGlVL05PTmtTRGc9PQo=",

@@ -35,9 +35,10 @@ function executeGraph(graphValue, inputs, lookupTables, traces) {
   const nodeById = new Map(graph.nodes.map(node => [node.id, node]));
 
   try {
-    for (const node of topologicalSort(graph)) {
+    const sorted = topologicalSort(graph);
+    for (const node of sorted) {
       const incoming = graph.edges.filter(edge => edge.target === node.id).map(edge => values.get(edge.source));
-      const value = executeNode(node, incoming, values, lookupTables, inputs, traces);
+      const value = executeNode(node, incoming, values, lookupTables, inputs, traces, nodeById);
       values.set(node.id, value);
       if (node.data.kind === "output") {
         const field = normalizeId(node.data.field || node.data.label);
@@ -46,20 +47,18 @@ function executeGraph(graphValue, inputs, lookupTables, traces) {
       }
     }
 
+    const sortedIds = sorted.map(n => n.id);
     for (const node of graph.nodes) {
       if (node.data.kind !== "output")
         continue;
       const field = normalizeId(node.data.field || node.data.label);
       if (!field)
         continue;
-      const upstreamIds = new Set();
-      collectUpstream(graph, node.id, upstreamIds);
-      for (const uid of upstreamIds) {
-        if (traces[uid]) {
-          traces[field] = traces[uid];
-          break;
-        }
-      }
+      const upstream = new Set();
+      collectUpstream(graph, node.id, upstream);
+      const orderedLines = sortedIds.filter(id => upstream.has(id) && traces[id]).map(id => traces[id]);
+      if (orderedLines.length)
+        traces[field] = orderedLines.join("\n");
     }
   }
   catch (error) {
@@ -74,28 +73,55 @@ function executeGraph(graphValue, inputs, lookupTables, traces) {
   return { errors, results };
 }
 
-function executeNode(node, incoming, values, lookupTables, userInputs, traces) {
+function executeNode(node, incoming, values, lookupTables, userInputs, traces, nodeById) {
   const data = node.data || {};
+  const label = data.label || node.id;
+  let value;
   switch (data.kind) {
     case "input":
-      return readInputValue(data, userInputs);
+      value = readInputValue(data, userInputs);
+      traces[node.id] = `[${label}] 输入：${data.field || data.label} = ${value ?? ""}`;
+      break;
     case "constant":
-      return data.value ?? "";
+      value = data.value ?? "";
+      traces[node.id] = `[${label}] 常量：${value}`;
+      break;
     case "lookup":
-      return executeLookup(node, values, lookupTables, userInputs, traces);
-    case "map":
-      return executeMap(data, incoming[0]);
-    case "pick":
-      return executePick(data, incoming, values);
+      value = executeLookup(node, values, lookupTables, userInputs, traces);
+      break;
+    case "map": {
+      const raw = incoming[0];
+      value = executeMap(data, raw);
+      const fromText = String(raw ?? "");
+      const toText = String(value ?? "");
+      traces[node.id] = `[${label}] 映射：${fromText} → ${toText}`;
+      break;
+    }
+    case "pick": {
+      value = executePick(data, incoming, values);
+      const col = String((data.columnSource ? values.get(data.columnSource) : data.column) ?? "").trim();
+      traces[node.id] = `[${label}] 取字段：${col} = ${value ?? ""}`;
+      break;
+    }
     case "calc":
-      return executeCalc(data, incoming, values, userInputs);
-    case "condition":
-      return executeCondition(data, incoming, values);
+      value = executeCalc(data, incoming, values, userInputs, traces, node, nodeById, label);
+      break;
+    case "condition": {
+      value = executeCondition(data, incoming, values);
+      const condVal = String(data.conditionSource ? values.get(data.conditionSource) : incoming[0] ?? "");
+      const branch = compare(condVal, data.compareValue ?? "", data.compareOperator || "=") ? "成立" : "不成立";
+      traces[node.id] = `[${label}] 条件：${condVal} ${data.compareOperator || "="} ${data.compareValue ?? ""} → ${branch}，返回 ${value ?? ""}`;
+      break;
+    }
     case "output":
-      return incoming.length ? incoming[incoming.length - 1] : data.value;
+      value = incoming.length ? incoming[incoming.length - 1] : data.value;
+      traces[node.id] = `[${label}] 输出：${data.field || label} = ${value ?? ""}`;
+      break;
     default:
-      return incoming.length ? incoming[incoming.length - 1] : undefined;
+      value = incoming.length ? incoming[incoming.length - 1] : undefined;
+      break;
   }
+  return value;
 }
 
 function readInputValue(data, userInputs) {
@@ -122,7 +148,13 @@ function executeLookup(node, values, lookupTables, userInputs, traces) {
     const sourceValue = condition.source ? values.get(condition.source) : userInputs[normalizeId(condition.input)];
     return compare(sourceValue, row?.[condition.column], condition.operator || "=");
   }));
-  traces[node.id] = matched ? `命中 ${data.sheet}（${condDetail}）` : `未命中 ${data.sheet}（${condDetail}）`;
+  const label = data.label || node.id;
+  if (matched) {
+    traces[node.id] = `[${label}] 查表：${data.sheet}\n  条件：${condDetail}\n  结果：命中`;
+  }
+  else {
+    traces[node.id] = `[${label}] 查表：${data.sheet}\n  条件：${condDetail}\n  结果：未命中`;
+  }
   return matched || null;
 }
 
@@ -145,8 +177,7 @@ function executePick(data, incoming, values) {
   return key ? row[key] : undefined;
 }
 
-function executeCalc(data, incoming, values, userInputs) {
-  // Formula token mode
+function executeCalc(data, incoming, values, userInputs, traces, node, nodeById, label) {
   const formula = data.formula || [];
   if (formula.length) {
     const parts = formula.map((t) => {
@@ -156,17 +187,28 @@ function executeCalc(data, incoming, values, userInputs) {
         return String(toNumber(values.get(String(t.value)) ?? 0));
       if (t.type === "constant")
         return String(toNumber(t.value));
-      // operator / paren
       return String(t.value);
     });
     const expr = parts.join(" ");
     if (!/^[\d+\-*/().\s]+$/.test(expr))
       throw new Error(`计算公式无法安全执行：${expr}`);
     // eslint-disable-next-line no-new-func
-    return new Function(`"use strict"; return (${expr})`)();
+    const result = new Function(`"use strict"; return (${expr})`)();
+    const desc = formula.map((t) => {
+      if (t.type === "field")
+        return `${t.value}=${userInputs[t.value] ?? 0}`;
+      if (t.type === "node") {
+        const srcNode = nodeById.get(String(t.value));
+        return `${srcNode?.data?.label || t.value}=${values.get(String(t.value)) ?? 0}`;
+      }
+      if (t.type === "constant")
+        return t.value;
+      return t.value;
+    }).join(" ");
+    traces[node.id] = `[${label}] 计算：${desc}\n  公式：${expr}\n  结果：${result}`;
+    return result;
   }
 
-  // Legacy expression mode
   const expression = String(data.expression || "").trim();
   if (!expression)
     return incoming[incoming.length - 1];
@@ -177,7 +219,9 @@ function executeCalc(data, incoming, values, userInputs) {
   if (!/^[\d+\-*/().\s]+$/.test(compiled))
     throw new Error(`计算表达式不安全或无法识别：${expression}`);
   // eslint-disable-next-line no-new-func
-  return new Function(`"use strict"; return (${compiled})`)();
+  const result = new Function(`"use strict"; return (${compiled})`)();
+  traces[node.id] = `[${label}] 计算：${expression}\n  代入：${compiled}\n  结果：${result}`;
+  return result;
 }
 
 function executeCondition(data, incoming, values) {

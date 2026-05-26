@@ -255,6 +255,11 @@ function updateSkuPrefix(value) {
   scheduleGenerateSkus();
 }
 
+function updateSkuStart(value) {
+  createStore.skuStart = Math.max(1, Number(value) || 1);
+  scheduleGenerateSkus();
+}
+
 // ── Modal state ──
 const showCalcModal = ref(false);
 const calcSkuIndex = ref(-1);
@@ -820,14 +825,25 @@ function buildSkuRowsWithoutVariants(rows) {
             <!-- SKU级 -->
             <section class="border-t border-base-300 pt-3">
               <div class="font-semibold text-sm mb-2">SKU级</div>
-              <div class="flex flex-col gap-1 mb-3 max-w-28">
+              <div class="flex flex-col gap-1 mb-3 max-w-56">
                 <label class="label py-0"><span class="label-text text-xs">SKU前缀</span></label>
-                <input
-                  @input="updateSkuPrefix($event.target.value)"
-                  class="input input-bordered input-sm w-20"
-                  placeholder="如: RS"
-                  :value="createStore.skuPrefix"
-                >
+                <div class="flex gap-1 items-center">
+                  <input
+                    @input="updateSkuPrefix($event.target.value)"
+                    class="input input-bordered input-sm w-20"
+                    placeholder="如: RS"
+                    :value="createStore.skuPrefix"
+                  >
+                  <span class="text-xs text-base-content/40">起始</span>
+                  <input
+                    @input="updateSkuStart($event.target.value)"
+                    class="input input-bordered input-sm w-16"
+                    placeholder="1"
+                    type="number"
+                    min="1"
+                    :value="createStore.skuStart"
+                  >
+                </div>
               </div>
 
               <div class="text-xs text-base-content/50 mb-1">变体属性</div>
