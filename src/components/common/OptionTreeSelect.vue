@@ -117,6 +117,42 @@ function rowToFlatNode(row, pathLabels, pathValues, level) {
   };
 }
 
+function rowToSearchNode(row) {
+  const chain = [];
+  const seen = new Set();
+  let current = row;
+
+  while (current) {
+    const nodeId = (current.选项值编号 || "").trim();
+    if (!nodeId || seen.has(nodeId))
+      break;
+    seen.add(nodeId);
+    chain.unshift(current);
+
+    const parentId = (current.父级选项值编号 || "").trim();
+    if (!parentId || parentId === rootId.value)
+      break;
+    current = index.value.rowById.get(parentId);
+  }
+
+  const pathValues = chain.map(r => (r.选项值 || "").trim()).filter(Boolean);
+  const pathLabels = chain.map(r => r.显示名 || r.选项值).filter(Boolean);
+  const nodeId = (row.选项值编号 || "").trim();
+  const val = (row.选项值 || "").trim();
+  const label = row.显示名 || val;
+
+  return {
+    hasChildren: index.value.childrenByParent.has(nodeId),
+    key: nodeId || pathValues.join("\u001F"),
+    label,
+    level: Math.max(pathValues.length - 1, 0),
+    nodeId,
+    pathLabels,
+    pathValues,
+    value: val,
+  };
+}
+
 // -- visible nodes --
 
 const visibleNodes = computed(() => {
@@ -149,16 +185,7 @@ const visibleNodes = computed(() => {
         continue;
       if (!`${val} ${nid}`.toLowerCase().includes(kw))
         continue;
-      result.push({
-        hasChildren: false,
-        key: nid || `search_${result.length}`,
-        label: val,
-        level: 0,
-        nodeId: nid,
-        pathLabels: [val],
-        pathValues: [val],
-        value: val,
-      });
+      result.push(rowToSearchNode(row));
     }
     return result;
   }

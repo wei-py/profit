@@ -1,9 +1,14 @@
+import { dedupeOptionConfigs } from "../domain/option-config-dedupe";
 import { buildWorkbookBuffer } from "../services/excel-writer";
 
 globalThis.onmessage = async (event) => {
   try {
     const { config } = event.data || {};
-    const buffer = await buildWorkbookBuffer(config);
+    const dedupedConfig = {
+      ...config,
+      选项配置: dedupeOptionConfigs(config.选项配置 || []),
+    };
+    const buffer = await buildWorkbookBuffer(dedupedConfig);
 
     globalThis.postMessage(
       { buffer, success: true },

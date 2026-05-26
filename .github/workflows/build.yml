@@ -12,9 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
-        with: { version: 9 }
+        with: {version: 9}
       - uses: actions/setup-node@v6
-        with: { node-version: 22, cache: pnpm }
+        with: {node-version: 22, cache: pnpm}
       - uses: dtolnay/rust-toolchain@stable
       - name: Restore updater private key
         env:
@@ -38,9 +38,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
-        with: { version: 9 }
+        with: {version: 9}
       - uses: actions/setup-node@v6
-        with: { node-version: 22, cache: pnpm }
+        with: {node-version: 22, cache: pnpm}
       - uses: dtolnay/rust-toolchain@stable
       - run: pnpm install --frozen-lockfile
       - run: node scripts/sync-version.cjs
@@ -66,9 +66,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
-        with: { version: 9 }
+        with: {version: 9}
       - uses: actions/setup-node@v6
-        with: { node-version: 22, cache: pnpm }
+        with: {node-version: 22, cache: pnpm}
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v7
         with:

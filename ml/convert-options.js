@@ -1,5 +1,6 @@
-/** 将源 Excel 的类目树，转换成截图里的“选项值”格式 Excel。 安装依赖： npm i exceljs 使用方式： node convert-options.js input.xlsx output.xlsx 巴西_美客多 只生成“商品类目”，不生成“广告类型”和“是/否”： node convert-options.js input.xlsx output.xlsx 巴西_美客多 --no-static 修改商品类目的根节点名称： node convert-options.js input.xlsx output.xlsx 巴西_美客多 --root=商品类目 */
+/** 将源 Excel/JSON 的类目树，转换成截图里的“选项值”格式 Excel。 安装依赖： npm i exceljs 使用方式： node convert-options.js input.xlsx output.xlsx 巴西_美客多 node convert-options.js input.json output.xlsx 巴西_美客多 只生成“商品类目”，不生成“广告类型”和“是/否”： node convert-options.js input.xlsx output.xlsx 巴西_美客多 --no-static 修改商品类目的根节点名称： node convert-options.js input.xlsx output.xlsx 巴西_美客多 --root=商品类目 */
 
+import { readFile } from "node:fs/promises";
 import ExcelJS from "exceljs";
 
 function cellText(value) {
@@ -62,7 +63,7 @@ function parseArgs(argv) {
 
   if (!input || !output) {
     console.error(
-      "用法: node convert-options.js input.xlsx output.xlsx [所属国家平台] [--no-static] [--root=商品类目]",
+      "用法: node convert-options.js input.xlsx|input.json output.xlsx [所属国家平台] [--no-static] [--root=商品类目]",
     );
     process.exit(1);
   }
@@ -76,15 +77,7 @@ function parseArgs(argv) {
   };
 }
 
-async function main() {
-  const {
-    categoryRoot,
-    includeStatic,
-    input,
-    output,
-    platform,
-  } = parseArgs(process.argv);
-
+async function readExcelNodes(input) {
   const sourceWb = new ExcelJS.Workbook();
   await sourceWb.xlsx.readFile(input);
 
@@ -138,14 +131,14 @@ async function main() {
   }
 
   const nodes = [];
-  const byId = new Map();
+  const seenIds = new Set();
 
   for (let r = 2; r <= sourceWs.rowCount; r++) {
     const row = sourceWs.getRow(r);
 
     const id = cellText(row.getCell(idCol).value);
 
-    if (!id || byId.has(id)) {
+    if (!id || seenIds.has(id)) {
       continue;
     }
 
@@ -163,7 +156,74 @@ async function main() {
     };
 
     nodes.push(node);
-    byId.set(id, node);
+    seenIds.add(id);
+  }
+
+  return nodes;
+}
+
+async function readJsonNodes(input) {
+  const raw = await readFile(input, "utf8");
+  const data = JSON.parse(raw);
+
+  if (!Array.isArray(data)) {
+    throw new Error("JSON 根节点必须是数组");
+  }
+
+  const nodes = [];
+  const seenIds = new Set();
+  let sourceRow = 1;
+
+  function walk(list, parentId = "") {
+    for (const item of list) {
+      const id = cellText(item?.id);
+
+      if (!id || seenIds.has(id)) {
+        continue;
+      }
+
+      nodes.push({
+        id,
+        optionValue: cellText(item.chCatName) || cellText(item.catName) || id,
+        parentId,
+        sourceRow: sourceRow++,
+      });
+
+      seenIds.add(id);
+
+      if (Array.isArray(item.children) && item.children.length) {
+        walk(item.children, id);
+      }
+    }
+  }
+
+  walk(data);
+
+  return nodes;
+}
+
+async function readSourceNodes(input) {
+  if (input.toLowerCase().endsWith(".json")) {
+    return readJsonNodes(input);
+  }
+
+  return readExcelNodes(input);
+}
+
+async function main() {
+  const {
+    categoryRoot,
+    includeStatic,
+    input,
+    output,
+    platform,
+  } = parseArgs(process.argv);
+
+  const nodes = await readSourceNodes(input);
+  const byId = new Map();
+
+  for (const node of nodes) {
+    byId.set(node.id, node);
   }
 
   /** 用 id / parentId 还原父子关系。 例子： id = MLB1747, parentId = MLB5726 表示： MLB1747 是 MLB5726 的子级 */

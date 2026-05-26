@@ -1,17 +1,17 @@
 {
-  "version": "1.5.3",
   "force": false,
-  "notes": "- 计算配置改为规则级 DAG 流程，支持一个模板包含多个规则\n- 规则编辑器从画布改为普通表单布局，提升下拉选择和节点配置体验\n- 计算节点改为可视化公式构造器，支持字段、节点、常量、运算符和括号组合\n- 新建商品页重构为平台级、商品级、SKU级三段横向布局\n- 新增平台级字段层级，商品ID和商品名称归入商品级\n- SKU 变体属性改为小表格编辑，属性值支持逐个输入和删除，不再手写分隔符\n- SKU 根据变体属性和 SKU 前缀自动生成，移除手动生成 SKU 按钮\n- 修复 SKU 前缀变化、计算结果变化后列表不刷新的问题\n- 商品页表格/卡片视图切换增加本地持久化\n- 更新弹窗日志支持换行显示，并优化长日志滚动展示\n- 修复配置导出和商品批量计算的 DataCloneError",
-  "pub_date": "2026-05-22 00:21",
   "manual": {
     "darwin-aarch64": {
       "url": "https://profit-admin.xu-wei.space/api/files/releases%2Fmac%2Fprofit_1.0.2_aarch64.dmg"
     }
   },
+  "notes": "1. 修复选择器搜索的内容后点击没有完整的路径",
   "platforms": {
     "darwin-aarch64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTMUkxc2dvSzVkeGVqcnBaSGcvWTR4VldYOW5nRnhYUm5QWmFrRFdJQVVjZFpmYkNkZjFpRkp4Tmh0VnJUUGxWWDJkUDQ3TFdiL2JyL1R1eGhjVUhDenpjaU5mamZKdGdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5MTk5Mjc3CWZpbGU6cHJvZml0LmFwcC50YXIuZ3oKYVFZRllnU0pwS1BPdzZ1dHpUOHpHK1RvanQxaGZLM1NkK2R1b1pscGFNSHBzY0xvaDFIOWRuQS9yZVNNWlFMMVFjdStsMXdzMCs5cGlVL05PTmtTRGc9PQo=",
       "url": "https://profit-admin.xu-wei.space/api/files/releases%2Fmac%2Fprofit.app.tar.gz"
     }
-  }
+  },
+  "pub_date": "2026-05-24 15:00",
+  "version": "1.5.3"
 }

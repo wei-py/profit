@@ -33,12 +33,14 @@ const toast = ref("");
 
 const currentPath = computed(() => {
   const m = route.params.pathMatch;
-  if (Array.isArray(m)) return m.join("/");
+  if (Array.isArray(m))
+    return m.join("/");
   return m || "";
 });
 
 const breadcrumb = computed(() => {
-  if (!currentPath.value) return [];
+  if (!currentPath.value)
+    return [];
   return currentPath.value.split("/").map((name, i, arr) => ({
     name,
     path: arr.slice(0, i + 1).join("/"),
@@ -75,27 +77,36 @@ function navigateToBreadcrumb(breadPath) {
 }
 
 function formatSize(bytes) {
-  if (!bytes) return "-";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (!bytes)
+    return "-";
+  if (bytes < 1024)
+    return `${bytes} B`;
+  if (bytes < 1024 * 1024)
+    return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function typeLabel(item) {
-  if (item.type === "folder") return "文件夹";
+  if (item.type === "folder")
+    return "文件夹";
   if (item.mime_type) {
-    if (item.mime_type.startsWith("image/")) return "图片";
-    if (item.mime_type.includes("pdf")) return "PDF";
-    if (item.mime_type.includes("spreadsheet") || item.mime_type.includes("excel")) return "Excel";
-    if (item.mime_type.startsWith("text/")) return "文本";
+    if (item.mime_type.startsWith("image/"))
+      return "图片";
+    if (item.mime_type.includes("pdf"))
+      return "PDF";
+    if (item.mime_type.includes("spreadsheet") || item.mime_type.includes("excel"))
+      return "Excel";
+    if (item.mime_type.startsWith("text/"))
+      return "文本";
   }
   return "文件";
 }
 
 function timeLabel(t) {
-  if (!t) return "-";
+  if (!t)
+    return "-";
   const normalized = t.includes("T") ? t : t.replace(" ", "T");
-  const d = normalized.endsWith("Z") ? new Date(normalized) : new Date(normalized + "Z");
+  const d = normalized.endsWith("Z") ? new Date(normalized) : new Date(`${normalized}Z`);
   const local = new Date(d.getTime() + 8 * 3600 * 1000);
   return local.toISOString().replace("T", " ").slice(0, 16);
 }
@@ -135,7 +146,8 @@ function triggerUpload() { uploadInput.value?.click(); }
 
 async function handleFileSelect(e) {
   const file = e.target.files?.[0];
-  if (!file) return;
+  if (!file)
+    return;
   await doUpload(file);
   e.target.value = "";
 }
@@ -164,7 +176,8 @@ async function doUpload(file, overwrite = false) {
 async function confirmOverwrite() {
   const file = conflictFile.value;
   conflictFile.value = null;
-  if (file) await doUpload(file, true);
+  if (file)
+    await doUpload(file, true);
 }
 
 function onDragOver(e) { e.preventDefault(); dropActive.value = true; }
@@ -173,7 +186,8 @@ async function onDrop(e) {
   e.preventDefault();
   dropActive.value = false;
   const file = e.dataTransfer?.files?.[0];
-  if (file) await doUpload(file);
+  if (file)
+    await doUpload(file);
 }
 
 function startRename(item) {
@@ -188,10 +202,12 @@ async function confirmRename() {
   const id = editingId.value;
   const name = editName.value.trim();
   editingId.value = null;
-  if (!id || !name) return;
+  if (!id || !name)
+    return;
   try {
     const resp = await renameFile(id, name);
-    if (resp.success) await fetchItems();
+    if (resp.success)
+      await fetchItems();
     else error.value = resp.error || "重命名失败";
   }
   catch (e) { error.value = e.message || "网络错误"; }
@@ -199,8 +215,10 @@ async function confirmRename() {
 
 function cancelRename() { editingId.value = null; editName.value = ""; }
 function handleRenameKey(e) {
-  if (e.key === "Enter") confirmRename();
-  if (e.key === "Escape") cancelRename();
+  if (e.key === "Enter")
+    confirmRename();
+  if (e.key === "Escape")
+    cancelRename();
 }
 
 async function handleTogglePublic(item) {
@@ -228,10 +246,12 @@ function handleDelete(item) { deleteTarget.value = item; }
 async function confirmDelete() {
   const item = deleteTarget.value;
   deleteTarget.value = null;
-  if (!item) return;
+  if (!item)
+    return;
   try {
     const resp = await deleteFile(item.id);
-    if (resp.success) await fetchItems();
+    if (resp.success)
+      await fetchItems();
     else error.value = resp.error || "删除失败";
   }
   catch (e) { error.value = e.message || "网络错误"; }
@@ -278,7 +298,12 @@ async function confirmDelete() {
           📁 新建文件夹
         </button>
         <button @click="triggerUpload" class="btn btn-xs sm:btn-sm btn-ghost">⬆ 上传文件</button>
-        <input @change="handleFileSelect" ref="uploadInput" class="hidden" type="file">
+        <input
+          @change="handleFileSelect"
+          ref="uploadInput"
+          class="hidden"
+          type="file"
+        >
         <span class="text-xs text-base-content/50 ml-2">共 {{ items.length }} 项</span>
       </div>
       <button @click="fetchItems" class="btn btn-xs sm:btn-sm btn-ghost">刷新</button>
@@ -354,8 +379,20 @@ async function confirmDelete() {
             <td>
               <div v-if="item.type === 'folder'" class="text-base-content/30 text-xs">-</div>
               <div v-else class="flex items-center gap-1">
-                <input @change="handleTogglePublic(item)" :checked="item.is_public === 1" class="toggle toggle-sm" type="checkbox">
-                <button v-if="item.is_public === 1" @click="copyLink(item)" class="btn btn-xs btn-ghost btn-circle" title="复制链接">🔗</button>
+                <input
+                  @change="handleTogglePublic(item)"
+                  :checked="item.is_public === 1"
+                  class="toggle toggle-sm"
+                  type="checkbox"
+                >
+                <button
+                  v-if="item.is_public === 1"
+                  @click="copyLink(item)"
+                  class="btn btn-xs btn-ghost btn-circle"
+                  title="复制链接"
+                >
+                  🔗
+                </button>
               </div>
             </td>
             <td class="text-xs text-base-content/50">{{ timeLabel(item.updated_at) }}</td>

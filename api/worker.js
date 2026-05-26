@@ -471,44 +471,47 @@ function normalizeFileSegment(name) {
 }
 
 async function resolveFolderId(env, pathStr) {
-  if (!pathStr) return null;
+  if (!pathStr)
+    return null;
   const segs = (pathStr || "").split("/").filter(Boolean);
   let parentId = null;
   for (const seg of segs) {
     const folder = parentId
       ? await env.DB.prepare(
-        "SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = 'folder'",
-      )
-        .bind(parentId, seg)
-        .first()
+          "SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = 'folder'",
+        )
+          .bind(parentId, seg)
+          .first()
       : await env.DB.prepare(
-        "SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = 'folder'",
-      )
-        .bind(seg)
-        .first();
-    if (!folder) return null;
+          "SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = 'folder'",
+        )
+          .bind(seg)
+          .first();
+    if (!folder)
+      return null;
     parentId = folder.id;
   }
   return parentId;
 }
 
 async function ensureFolderPath(env, pathStr) {
-  if (!pathStr) return null;
+  if (!pathStr)
+    return null;
   const segs = (pathStr || "").split("/").filter(Boolean);
   let parentId = null;
   for (const seg of segs) {
     const safe = normalizeFileSegment(seg);
     const folder = parentId
       ? await env.DB.prepare(
-        "SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = 'folder'",
-      )
-        .bind(parentId, safe)
-        .first()
+          "SELECT id FROM files WHERE parent_id = ? AND name = ? AND type = 'folder'",
+        )
+          .bind(parentId, safe)
+          .first()
       : await env.DB.prepare(
-        "SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = 'folder'",
-      )
-        .bind(safe)
-        .first();
+          "SELECT id FROM files WHERE parent_id IS NULL AND name = ? AND type = 'folder'",
+        )
+          .bind(safe)
+          .first();
     if (folder) {
       parentId = folder.id;
     }
@@ -533,7 +536,8 @@ async function getFolderPath(env, folderId) {
     )
       .bind(currentId)
       .first();
-    if (!folder) break;
+    if (!folder)
+      break;
     parts.unshift(normalizeFileSegment(folder.name));
     currentId = folder.parent_id || null;
   }
@@ -548,9 +552,11 @@ async function buildR2Key(env, parentId, filename) {
 }
 
 async function moveR2Object(env, oldKey, newKey, mimeType) {
-  if (!oldKey || oldKey === newKey) return;
+  if (!oldKey || oldKey === newKey)
+    return;
   const obj = await env.FILES.get(oldKey);
-  if (!obj) return;
+  if (!obj)
+    return;
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
   await env.FILES.put(newKey, obj.body, {
@@ -562,7 +568,7 @@ async function moveR2Object(env, oldKey, newKey, mimeType) {
 async function handleFilesList(request, env) {
   if (!checkAdmin(request, env))
     return json({ error: "未授权" }, 401);
-  const { path: pathStr, parent_id } = await request.json().catch(() => ({}));
+  const { parent_id, path: pathStr } = await request.json().catch(() => ({}));
   const pid = pathStr ? await resolveFolderId(env, pathStr) : (parent_id || null);
 
   let query;
@@ -678,11 +684,11 @@ async function handleFilesUpload(request, env) {
     return json({
       file: {
         id: existing.id,
+        is_public: isPublic,
         mime_type: mimeType,
         name: fileName,
         r2_key: r2Key,
         size: file.size,
-        is_public: isPublic,
       },
       success: true,
     });
@@ -700,7 +706,7 @@ async function handleFilesUpload(request, env) {
     .run();
 
   return json({
-    file: { id: fileId, mime_type: mimeType, name: fileName, r2_key: r2Key, size: file.size, is_public: isPublic },
+    file: { id: fileId, is_public: isPublic, mime_type: mimeType, name: fileName, r2_key: r2Key, size: file.size },
     success: true,
   });
 }

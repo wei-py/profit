@@ -139,31 +139,22 @@ Phase 2（后续按需）：
 
 <!--14. admin 移动端的字体太小了-->
 
-
 <!--16. admin 的删除没有用呀，还有是可以去修改过期时间、激活码、状态、剩余的, api 你看看需要跟进吗-->
 <!--20. 为什么点击立即更新没有反应呢，最外层的问号可以查看版本号-->
 <!--pnpm tauri build --bundles dmg-->
 
-
-
 <!--22. CI/CD-->
-
 
 <!--ADMIN_API_BASE=https://profit-admin.xu-wei.space
 ADMIN_SECRET=你的 admin secret
 TAURI_SIGNING_PRIVATE_KEY=src-tauri/profit-updater.key 的完整内容
 TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容。-->
 
-
-
-
-
 <!--23. 修改一下 agent.md 加上，我使用opencode，plan 模式是gpt5.5 build 模式是 deepseek v4 pro, gpt5.5 需要详细的告诉 deepseek 后续的工作-->
 
 <!--24. 选项配置不需要编号，因为有所属国家平台了， 计算字段里的字段键也可以不要了，也是因为有所属国家平台了，模板参数里的模板编号改为所属模板-->
 
 <!--25. 配置页面字段和拖拽和 excel 里的排序有关联的，保存配置的时候同步一下，对了，现在 excel 里没有排序这一列，你看看实现一下-->
-
 
 <!--27.  父级选项组改为父级选项值编号， 选项值编号（应该是这样子的“动物与宠物 / 鸟 / 鸟 / 鹌鹑”），通过选项值编号，这个有唯一性，选项值可能有一样的
 28. 选项组编号-->
@@ -175,7 +166,6 @@ TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容
 <!--31. 所有涉及日期的代码改为使用 dayjs 还有 运算的改为使用 xe-utils 呀-->
 <!--26. 选项值在第 2 列-->
 <!--32. 测试是不是默认使用远程链接-->
-
 
 <!--- 保存配置改为 Web Worker 导出，减少卡顿 \n- 保存按钮增加 loading 状态 \n- 默认自动加载远程配置 \n- 发布上传自动使用本地 notes 和 force \n- 选项来源支持全部显示、单树编辑和重命名同步 \n- 查表大表分页编辑优化 \n- 查表单元格使用 pretext 优化显示 \n- 公共分页组件改为 daisyUI 风格，支持输入页码和跳转-->
 
@@ -198,7 +188,6 @@ TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容
 
 不是我的意思是，[Image 1] ，不只是只有一个规则，一个规则下有多个节点（输入节点...输出节点），但是现在逻辑是没有支持多个规则切换画布，把所有的节点放到一个规则画布下不合理，而且这个ui排版也不合理，左侧是规则列表 ，中顶部是新增节点，右侧是节点列表
 
-
 售价
 
 运费
@@ -209,19 +198,16 @@ TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容
 
 支付手续费 售价 × 4.8%
 
-
 总费用 佣金 + 运费 + 手续费
 
 净利润 售价 − 总费用 − 成本价
 
 利润率 净利润 ÷ 售价
 
-
 平台级
 
 商品级
 
 sku 级
-
 
 表格和卡片 切换后，没有持久化， 切到配置页面，后回来就变成了表格了

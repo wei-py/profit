@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import ExcelJS from "exceljs";
 import { CONFIG_HEADERS, CONFIG_SHEET_NAMES, META_SHEET_NAME } from "@/constants/schema";
+import { dedupeOptionConfigs } from "@/domain/option-config-dedupe";
 import { displayWidth } from "@/utils/value";
 
 const MIN_W = 8;
@@ -8,34 +9,39 @@ const MAX_W = 34;
 const PAD = 2;
 
 export async function buildWorkbookBuffer(config) {
+  const exportConfig = {
+    ...config,
+    选项配置: dedupeOptionConfigs(config.选项配置 || []),
+  };
+
   const wb = new ExcelJS.Workbook();
   wb.creator = "profit-tool";
   wb.created = dayjs().toDate();
 
   for (const name of CONFIG_SHEET_NAMES) {
     if (name === "计算配置") {
-      const ruleRows = flattenCalculationConfig(config[name] || []);
+      const ruleRows = flattenCalculationConfig(exportConfig[name] || []);
       if (ruleRows.length)
         appendSheet(wb, name, ruleRows, CONFIG_HEADERS[name]);
       continue;
     }
-    const data = config[name] || [];
+    const data = exportConfig[name] || [];
     if (!data.length)
       continue;
     const preferred
-      = name === "国家平台" && config.国家平台ColOrder?.length
-        ? config.国家平台ColOrder
+      = name === "国家平台" && exportConfig.国家平台ColOrder?.length
+        ? exportConfig.国家平台ColOrder
         : CONFIG_HEADERS[name] || [];
     appendSheet(wb, name, data, preferred);
   }
 
-  for (const [name, data] of Object.entries(config.lookupTables || {})) {
+  for (const [name, data] of Object.entries(exportConfig.lookupTables || {})) {
     if (data?.length)
       appendSheet(wb, name, data);
   }
 
   appendMetaSheet(wb, {
-    国家平台HiddenCols: config.国家平台HiddenCols || [],
+    国家平台HiddenCols: exportConfig.国家平台HiddenCols || [],
   });
 
   return new Uint8Array(await wb.xlsx.writeBuffer());

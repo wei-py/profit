@@ -1,7 +1,7 @@
-import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
+import { ref } from "vue";
 
 const CURRENT_VERSION = __APP_VERSION__;
 
@@ -18,8 +18,10 @@ async function getPlatformKey() {
 }
 
 function resolveManualUrl(data, platformKey) {
-  if (data?.manual?.[platformKey]?.url) return data.manual[platformKey].url;
-  if (!data?.platforms?.[platformKey]?.manual?.url) return null;
+  if (data?.manual?.[platformKey]?.url)
+    return data.manual[platformKey].url;
+  if (!data?.platforms?.[platformKey]?.manual?.url)
+    return null;
   return data.platforms[platformKey].manual.url;
 }
 
@@ -105,8 +107,10 @@ export function useVersionCheck() {
   }
 
   function formatBytes(bytes) {
-    if (!bytes) return "0 B";
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (!bytes)
+      return "0 B";
+    if (bytes < 1024 * 1024)
+      return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
@@ -161,12 +165,12 @@ export function useVersionCheck() {
   return {
     checkVersion,
     currentVersion: CURRENT_VERSION,
+    downloadedBytes,
     downloadPercent,
     downloadTotal,
-    downloadedBytes,
     error,
-    formatBytes,
     forceUpdate,
+    formatBytes,
     hasUpdater,
     loading,
     platformKey,

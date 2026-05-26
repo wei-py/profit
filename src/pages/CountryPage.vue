@@ -10,6 +10,7 @@ import TemplateModal from "@/components/country/TemplateModal.vue";
 import { useFileIO } from "@/composables/useFileIO";
 import { useTour } from "@/composables/useTour";
 import { useConfigStore } from "@/stores/config";
+import { normalizeId } from "@/utils/value";
 
 const store = useConfigStore();
 const { openConfigExcel, restoreRemoteUrl, saveConfigExcel } = useFileIO();
@@ -293,19 +294,32 @@ function onOptionGroupsDragEnd(evt) {
   isDraggingOptGroups.value = false;
 }
 
+function isRowInGroup(row, rootId) {
+  const nodeId = (row.选项值编号 || "").trim();
+  return nodeId === rootId || nodeId.startsWith(`${rootId} / `);
+}
+
 function reorderOptionGroupsForCurrentCountry() {
   if (!cpId.value)
     return;
 
   const localNames = new Set(localOptGroups.value.map(g => (g.名称 || "").trim()).filter(Boolean));
-  const otherOpts = store["选项配置"].filter(row => !localNames.has((row.选项值编号 || "").trim()));
+  const otherOpts = store["选项配置"].filter((row) => {
+    if (normalizeId(row.所属国家平台) !== normalizeId(cpId.value))
+      return true;
+    const nodeId = (row.选项值编号 || "").trim();
+    for (const rootId of localNames) {
+      if (nodeId === rootId || nodeId.startsWith(`${rootId} / `))
+        return false;
+    }
+    return true;
+  });
   const orderedOpts = [];
 
   for (const group of localOptGroups.value) {
     const rootId = (group.名称 || "").trim();
-    const prefix = `${rootId} / `;
     const groupRows = store["选项配置"]
-      .filter(r => (r.选项值编号 || "").trim() === rootId || (r.选项值编号 || "").trim().startsWith(prefix))
+      .filter(r => isRowInGroup(r, rootId))
       .sort((a, b) => orderRows(a, b));
     orderedOpts.push(...groupRows.map((r) => {
       r.排序 = group.排序;

@@ -1,6 +1,6 @@
 这份文档本质上是在讲 **Profit App 如何从"改版本号"一路发布到"用户自动更新"**。核心可以记成一句话：
 
-**`package.json.version` 是版本号源头；构建时同步版本并签名；发布时上传安装包和 `releases/version.json`；App 通过远端 `releases/version.json` 判断和执行更新。** 
+**`package.json.version` 是版本号源头；构建时同步版本并签名；发布时上传安装包和 `releases/version.json`；App 通过远端 `releases/version.json` 判断和执行更新。**
 
 ---
 
