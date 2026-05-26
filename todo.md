@@ -211,3 +211,6 @@ TAURI_SIGNING_PRIVATE_KEY 应该是 src-tauri/profit-updater.key 的完整内容
 sku 级
 
 表格和卡片 切换后，没有持久化， 切到配置页面，后回来就变成了表格了
+
+
+能不能把这个 https://daisyui.com/theme-generator/ 给到用户自己配theme呢
