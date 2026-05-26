@@ -48,7 +48,7 @@ export function normalizeFields(rows = []) {
     ...row,
     启用: row.启用 || "是",
     字段名称: row.字段名称 || row.字段键,
-    字段键: normalizeId(row.字段键 || row.字段名称),
+    字段键: normalizeId(row.字段名称),
     层级: row.层级 || "SKU级",
     类型: row.类型 || "文本",
     输入输出: row.输入输出 || "输入",

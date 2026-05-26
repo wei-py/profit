@@ -90,7 +90,7 @@ function executeNode(node, incoming, values, lookupTables, userInputs, traces) {
     case "calc":
       return executeCalc(data, incoming, values, userInputs);
     case "condition":
-      return executeCondition(data, incoming);
+      return executeCondition(data, incoming, values);
     case "output":
       return incoming.length ? incoming[incoming.length - 1] : data.value;
     default:
@@ -180,11 +180,14 @@ function executeCalc(data, incoming, values, userInputs) {
   return new Function(`"use strict"; return (${compiled})`)();
 }
 
-function executeCondition(data, incoming) {
-  const condition = String(data.condition || "").trim();
-  if (!condition)
-    return incoming[0];
-  return incoming[0] ? incoming[1] : incoming[2];
+function executeCondition(data, incoming, values) {
+  const conditionValue = data.conditionSource ? values.get(data.conditionSource) : incoming[0];
+  const compareValue = data.compareValue ?? "";
+  const operator = data.compareOperator || "=";
+  const matched = compare(conditionValue, compareValue, operator);
+  const trueValue = data.trueSource ? values.get(data.trueSource) : incoming[1];
+  const falseValue = data.falseSource ? values.get(data.falseSource) : incoming[2];
+  return matched ? trueValue : falseValue;
 }
 
 function compare(left, right, operator) {

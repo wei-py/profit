@@ -67,6 +67,7 @@ watch(
     if (!v)
       return;
     showTreeDefaultPicker.value = false;
+    for (const key of Object.keys(form)) delete form[key];
     if (props.fieldIdx >= 0) {
       const fields = store.getFieldsByCountry(props.cpId);
       Object.assign(form, JSON.parse(JSON.stringify(fields[props.fieldIdx])));
@@ -124,7 +125,7 @@ function save() {
     form.选项组 = "";
   }
 
-  form.字段键 = normalizeId(form.字段键 || form.字段名称);
+  form.字段键 = normalizeId(form.字段名称);
 
   if (props.fieldIdx >= 0) {
     const fields = store.getFieldsByCountry(props.cpId);

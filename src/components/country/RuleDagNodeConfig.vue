@@ -285,7 +285,43 @@ function removeMap(index) {
     </template>
 
     <template v-else-if="node.data?.kind === 'condition'">
-      <label class="label py-0 text-xs">条件说明</label>
+      <label class="label py-0 text-xs">条件来源</label>
+      <OptionTreeSelect
+        @update:model-value="emitPatch({ conditionSource: $event })"
+        :modelValue="node.data?.conditionSource"
+        :options="nodeOptions || []"
+        placeholder="选择来源节点"
+        size="xs"
+      />
+      <div class="grid grid-cols-[1fr_auto] gap-1">
+        <label class="label py-0 text-xs">运算符</label>
+        <label class="label py-0 text-xs">比较值</label>
+        <OptionTreeSelect
+          @update:model-value="emitPatch({ compareOperator: $event })"
+          :modelValue="node.data?.compareOperator || '='"
+          :options="operatorOptions"
+          size="xs"
+          :wrapDisplay="false"
+        />
+        <input @input="emitPatch({ compareValue: $event.target.value })" class="input input-bordered input-xs w-full" :value="node.data?.compareValue">
+      </div>
+      <label class="label py-0 text-xs">成立时取值</label>
+      <OptionTreeSelect
+        @update:model-value="emitPatch({ trueSource: $event })"
+        :modelValue="node.data?.trueSource"
+        :options="nodeOptions || []"
+        placeholder="选择来源节点"
+        size="xs"
+      />
+      <label class="label py-0 text-xs">不成立时取值</label>
+      <OptionTreeSelect
+        @update:model-value="emitPatch({ falseSource: $event })"
+        :modelValue="node.data?.falseSource"
+        :options="nodeOptions || []"
+        placeholder="选择来源节点"
+        size="xs"
+      />
+      <label class="label py-0 text-xs">说明</label>
       <input @input="emitPatch({ condition: $event.target.value })" class="input input-bordered input-xs w-full" :value="node.data?.condition">
     </template>
 

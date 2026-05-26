@@ -172,6 +172,14 @@ export function getNodeDependencyIds(nodeData) {
     if (data.source)
       ids.push(data.source);
   }
+  else if (data.kind === "condition") {
+    if (data.conditionSource)
+      ids.push(data.conditionSource);
+    if (data.trueSource)
+      ids.push(data.trueSource);
+    if (data.falseSource)
+      ids.push(data.falseSource);
+  }
   return ids;
 }
 
@@ -244,6 +252,8 @@ export function nodeSummary(node) {
     return d.value ?? "";
   if (d.kind === "pick")
     return d.column || d.columnSource || "";
+  if (d.kind === "condition")
+    return d.condition || "条件";
   return "";
 }
 
@@ -300,7 +310,7 @@ function defaultNodeData(kind) {
   if (kind === "calc")
     return { ...base, expression: "", formula: [] };
   if (kind === "condition")
-    return { ...base, condition: "" };
+    return { ...base, condition: "", compareOperator: "=", compareValue: "", conditionSource: "", falseSource: "", trueSource: "" };
   return base;
 }
 
