@@ -219,7 +219,7 @@ const selectedLabel = computed(() => {
   if (hasGenericOptions.value) {
     const node = findGenericNodeByValue(genericRootNodes.value, props.modelValue);
     if (node)
-      return node.pathLabels.join(" > ");
+      return node.pathLabels.join(" / ");
     return "";
   }
 
@@ -242,7 +242,7 @@ const selectedLabel = computed(() => {
       break;
     }
   }
-  return labels.join(" > ");
+  return labels.join(" / ");
 });
 
 const displayText = computed(() => {

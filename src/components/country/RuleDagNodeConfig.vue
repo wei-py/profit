@@ -123,7 +123,7 @@ function removeMap(index) {
       <OptionTreeSelect
         @update:model-value="emitPatch({ valueMode: $event })"
         :modelValue="node.data?.valueMode || 'value'"
-        :options="['value', 'cascadePath']"
+        :options="[{ label: '原始值', value: 'value' }, { label: '完整路径（/）', value: 'cascadePath' }, { label: '最后一级', value: 'lastLevel' }]"
         size="xs"
       />
     </template>

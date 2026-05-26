@@ -1,5 +1,5 @@
 import { normalizeFlow, normalizeGraph } from "@/domain/rule-graph";
-import { isBlank, normalizeId, toNumber } from "@/utils/value";
+import { normalizeId, toNumber } from "@/utils/value";
 
 export function executeFlow(flowValue, lookupTables = {}, userInputs = {}) {
   const flow = normalizeFlow(flowValue);
@@ -45,6 +45,22 @@ function executeGraph(graphValue, inputs, lookupTables, traces) {
           results[field] = value;
       }
     }
+
+    for (const node of graph.nodes) {
+      if (node.data.kind !== "output")
+        continue;
+      const field = normalizeId(node.data.field || node.data.label);
+      if (!field)
+        continue;
+      const upstreamIds = new Set();
+      collectUpstream(graph, node.id, upstreamIds);
+      for (const uid of upstreamIds) {
+        if (traces[uid]) {
+          traces[field] = traces[uid];
+          break;
+        }
+      }
+    }
   }
   catch (error) {
     errors.push(error.message);
@@ -85,8 +101,12 @@ function executeNode(node, incoming, values, lookupTables, userInputs, traces) {
 function readInputValue(data, userInputs) {
   const field = normalizeId(data.field || data.label);
   const value = userInputs[field];
-  if (data.valueMode === "cascadePath" && Array.isArray(value))
-    return value.join(" / ");
+  if (data.valueMode === "cascadePath" || data.valueMode === "lastLevel") {
+    if (Array.isArray(value))
+      return data.valueMode === "lastLevel" ? value[value.length - 1] : value.join(" / ");
+    const parts = String(value ?? "").split(/\s*\/\s*/).filter(Boolean);
+    return data.valueMode === "lastLevel" ? parts[parts.length - 1] || "" : parts.join(" / ");
+  }
   return value;
 }
 
@@ -94,26 +114,35 @@ function executeLookup(node, values, lookupTables, userInputs, traces) {
   const data = node.data || {};
   const table = lookupTables[data.sheet] || [];
   const conditions = (Array.isArray(data.where) ? data.where : []).filter(c => c.column && (c.source || c.input));
+  const condDetail = conditions.map((c) => {
+    const v = c.source ? values.get(c.source) : userInputs[normalizeId(c.input)];
+    return `${c.column}=${v ?? ""}`;
+  }).join(", ");
   const matched = table.find(row => conditions.every((condition) => {
     const sourceValue = condition.source ? values.get(condition.source) : userInputs[normalizeId(condition.input)];
     return compare(sourceValue, row?.[condition.column], condition.operator || "=");
   }));
-  traces[node.id] = matched ? `命中 ${data.sheet}` : `未命中 ${data.sheet}`;
+  traces[node.id] = matched ? `命中 ${data.sheet}（${condDetail}）` : `未命中 ${data.sheet}（${condDetail}）`;
   return matched || null;
 }
 
 function executeMap(data, inputValue) {
   const rows = Array.isArray(data.map) ? data.map : [];
-  const matched = rows.find(row => String(row.from) === String(inputValue));
+  const key = String(inputValue ?? "").trim();
+  const matched = rows.find(row => String(row.from ?? "").trim() === key);
   return matched ? matched.to : inputValue;
 }
 
 function executePick(data, incoming, values) {
   const row = data.rowSource ? values.get(data.rowSource) : incoming.find(value => value && typeof value === "object" && !Array.isArray(value));
-  const column = data.columnSource ? values.get(data.columnSource) : data.column;
-  if (!row || isBlank(column))
+  const rawColumn = data.columnSource ? values.get(data.columnSource) : data.column;
+  const column = String(rawColumn ?? "").trim();
+  if (!row || !column)
     return undefined;
-  return row[column];
+  if (row[column] !== undefined)
+    return row[column];
+  const key = Object.keys(row).find(k => String(k).trim() === column);
+  return key ? row[key] : undefined;
 }
 
 function executeCalc(data, incoming, values, userInputs) {
@@ -170,6 +199,16 @@ function compare(left, right, operator) {
   if (operator === "<=")
     return toNumber(left) <= toNumber(right);
   return String(left ?? "") === String(right ?? "");
+}
+
+function collectUpstream(graph, nodeId, visited) {
+  if (visited.has(nodeId))
+    return;
+  visited.add(nodeId);
+  for (const edge of graph.edges) {
+    if (edge.target === nodeId)
+      collectUpstream(graph, edge.source, visited);
+  }
 }
 
 function topologicalSort(graph) {
