@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { vDraggable } from "vue-draggable-plus";
 import ColEditorModal from "@/components/common/ColEditorModal.vue";
+import ConfirmModal from "@/components/country/ConfirmModal.vue";
 import CountryModal from "@/components/country/CountryModal.vue";
 import FieldModal from "@/components/country/FieldModal.vue";
 import OptionGroupModal from "@/components/country/OptionGroupModal.vue";
@@ -13,7 +14,7 @@ import { useConfigStore } from "@/stores/config";
 import { normalizeId } from "@/utils/value";
 
 const store = useConfigStore();
-const { openConfigExcel, restoreRemoteUrl, saveConfigExcel } = useFileIO();
+const { clearConfigCache, openConfigExcel, restoreRemoteUrl, saveConfigExcel } = useFileIO();
 const { startTour } = useTour();
 const CORE_KEYS = ["编号", "国家", "平台", "货币", "货币符号", "汇率", "启用"];
 
@@ -367,6 +368,7 @@ const editingOptGroupId = ref("");
 const showTplModal = ref(false);
 const editingTplIdx = ref(-1);
 const showConfigColModal = ref(false);
+const showClearCacheConfirm = ref(false);
 
 const isDraggingCp = ref(false);
 const dragExpandedId = ref(null);
@@ -448,6 +450,11 @@ async function handleSaveConfigExcel() {
   }
 }
 
+async function confirmClearConfigCache() {
+  await clearConfigCache();
+  showClearCacheConfirm.value = false;
+}
+
 function onBeforeUnload(e) {
   if (!store.dirty)
     return;
@@ -509,6 +516,9 @@ onBeforeUnmount(() => {
           <span v-if="savingConfig" class="loading loading-spinner loading-xs" />
           <span>{{ savingConfig ? "保存中" : "保存配置" }}</span>
           <span v-if="store.dirty && !savingConfig"> *</span>
+        </button>
+        <button @click="showClearCacheConfirm = true" class="btn btn-ghost btn-sm" title="清除本地配置草稿和上次打开路径">
+          清缓存
         </button>
         <button @click="openConfigColEditor" class="btn btn-ghost btn-sm">⚙️ 编辑列</button>
         <button v-if="!showAddCol" @click="showAddCol = true" class="btn btn-ghost btn-sm">
@@ -814,6 +824,13 @@ onBeforeUnmount(() => {
     :hiddenKeys="store.国家平台HiddenCols"
     :items="allConfigColumns"
     :open="showConfigColModal"
+  />
+
+  <ConfirmModal
+    @close="showClearCacheConfirm = false"
+    @ok="confirmClearConfigCache"
+    message="确认清除配置缓存？会移除本地草稿和上次打开的配置路径，不会删除当前 Excel 文件。"
+    :open="showClearCacheConfirm"
   />
 
   <RemoteUrlModal @close="showRemoteModal = false" :open="showRemoteModal" />

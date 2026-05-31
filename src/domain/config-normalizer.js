@@ -268,6 +268,7 @@ function normalizeFlowGraph(value) {
     return { edges: [], nodes: [], version: 1 };
   try {
     const graph = typeof value === "object" ? value : JSON.parse(value);
+    fixLegacyTaxAmountFormula(graph);
     return {
       edges: Array.isArray(graph.edges) ? graph.edges.filter(e => e?.id && e.source && e.target) : [],
       nodes: Array.isArray(graph.nodes) ? graph.nodes.filter(n => n?.id) : [],
@@ -276,6 +277,27 @@ function normalizeFlowGraph(value) {
   }
   catch {
     return { edges: [], nodes: [], version: 1 };
+  }
+}
+
+function fixLegacyTaxAmountFormula(graph) {
+  const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+  const outputsTaxAmount = nodes.some(node => node?.data?.kind === "output" && normalizeId(node.data.field || node.data.label) === "税额");
+  if (!outputsTaxAmount)
+    return;
+
+  for (const node of nodes) {
+    if (node?.data?.kind !== "calc" || !Array.isArray(node.data.formula))
+      continue;
+    const hasPrice = node.data.formula.some(token => token?.type === "field" && normalizeId(token.value) === "售价");
+    const hasPercentConstant = node.data.formula.some(token => token?.type === "constant" && String(token.value).trim() === "0.01");
+    if (!hasPrice || !hasPercentConstant)
+      continue;
+    node.data.formula = node.data.formula.map(token => (
+      token?.type === "field" && normalizeId(token.value) === "税额"
+        ? { ...token, value: "税率" }
+        : token
+    ));
   }
 }
 

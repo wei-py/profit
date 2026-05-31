@@ -44,7 +44,7 @@ export const useConfigStore = defineStore("config", () => {
       const config = readWorkbookBuffer(buffer);
       applyConfig(config);
       workbook.value = buffer;
-      restoreDraft();
+      restoreDraft(opts.sourceMtime || 0);
     }
     catch (e) {
       error.value = e.message;
@@ -306,7 +306,7 @@ export const useConfigStore = defineStore("config", () => {
     dirty.value = false;
   }
 
-  function restoreDraft() {
+  function restoreDraft(sourceMtime = 0) {
     try {
       const raw = localStorage.getItem(draftKey());
       if (!raw)
@@ -314,6 +314,11 @@ export const useConfigStore = defineStore("config", () => {
       const payload = JSON.parse(raw);
       if (!payload?.config)
         return false;
+      const draftSavedAt = Number(payload.savedAt || 0);
+      if (sourceMtime && draftSavedAt && draftSavedAt <= sourceMtime) {
+        clearDraft();
+        return false;
+      }
       applyConfig(payload.config);
       dirty.value = true;
       return true;
@@ -333,9 +338,23 @@ export const useConfigStore = defineStore("config", () => {
     dirty.value = false;
   }
 
+  function clearAllDrafts() {
+    try {
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith("profit_config_draft:"))
+          localStorage.removeItem(key);
+      }
+    }
+    catch {
+      // ignore
+    }
+    dirty.value = false;
+  }
+
   return {
     buildOptionCascade,
     clear,
+    clearAllDrafts,
     clearDirty,
     clearDraft,
     deleteCalculationConfig,

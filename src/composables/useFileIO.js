@@ -12,7 +12,7 @@ export function useFileIO() {
   // ── Tauri 实现 ──
   async function tauriOpen(filterName, ext) {
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const { readFile } = await import("@tauri-apps/plugin-fs");
+    const { readFile, stat } = await import("@tauri-apps/plugin-fs");
     const selected = await open({
       filters: [
         {
@@ -26,9 +26,11 @@ export function useFileIO() {
     if (!selected)
       return null;
     const p = typeof selected === "string" ? selected : selected.path;
+    const info = await stat(p);
     return {
       bytes: await readFile(p),
       path: p,
+      sourceMtime: toTimeValue(info.mtime),
     };
   }
   async function tauriSave(name, ext, buffer) {
@@ -74,6 +76,7 @@ export function useFileIO() {
         return {
           bytes: new Uint8Array(await file.arrayBuffer()),
           path: file.name,
+          sourceMtime: file.lastModified || 0,
         };
       }
       catch (e) {
@@ -92,6 +95,7 @@ export function useFileIO() {
             ? {
                 bytes: new Uint8Array(await file.arrayBuffer()),
                 path: file.name,
+                sourceMtime: file.lastModified || 0,
               }
             : null,
         );
@@ -163,12 +167,27 @@ export function useFileIO() {
     }
   }
 
+  async function clearSavedConfigPaths() {
+    localStorage.removeItem("lastConfigPath");
+    localStorage.removeItem("lastRemoteUrl");
+    if (isTauri()) {
+      try {
+        const { load } = await import("@tauri-apps/plugin-store");
+        const store = await load("settings.json", { autoSave: true });
+        await store.delete("lastConfigPath");
+        await store.delete("lastRemoteUrl");
+        await store.save();
+      }
+      catch {}
+    }
+  }
+
   // ── 公共接口 ──
   async function openConfigExcel() {
     const result = isTauri() ? await tauriOpen("打开配置 Excel", "xlsx") : await browserOpen();
     if (!result)
       return { success: false };
-    await configStore.loadFromBuffer(result.bytes, result.path);
+    await configStore.loadFromBuffer(result.bytes, result.path, { sourceMtime: result.sourceMtime });
     await saveLastPath("lastConfigPath", result.path);
     return { success: true };
   }
@@ -213,7 +232,8 @@ export function useFileIO() {
       if (!resp.ok)
         throw new Error(`HTTP ${resp.status}`);
       const buffer = await resp.arrayBuffer();
-      await configStore.loadFromBuffer(buffer, null, { remote: true, remoteUrl: url });
+      const sourceMtime = toTimeValue(resp.headers.get("Last-Modified"));
+      await configStore.loadFromBuffer(buffer, null, { remote: true, remoteUrl: url, sourceMtime });
       await saveLastPath("lastRemoteUrl", url);
       return { success: true };
     }
@@ -228,6 +248,14 @@ export function useFileIO() {
     const { remoteUrl } = await getLastPaths();
     if (remoteUrl)
       configStore.remoteUrl = remoteUrl;
+  }
+
+  async function clearConfigCache() {
+    configStore.clearAllDrafts();
+    await clearSavedConfigPaths();
+    configStore.setFilePath("");
+    configStore.remoteUrl = "";
+    configStore.isRemote = false;
   }
 
   async function openListExcel() {
@@ -271,9 +299,10 @@ export function useFileIO() {
     if (isTauri()) {
       if (paths.config) {
         try {
-          const { readFile } = await import("@tauri-apps/plugin-fs");
+          const { readFile, stat } = await import("@tauri-apps/plugin-fs");
+          const info = await stat(paths.config);
           const bytes = await readFile(paths.config);
-          await configStore.loadFromBuffer(bytes, paths.config);
+          await configStore.loadFromBuffer(bytes, paths.config, { sourceMtime: toTimeValue(info.mtime) });
           return { source: "local", success: true };
         }
         catch {
@@ -295,6 +324,7 @@ export function useFileIO() {
   }
 
   return {
+    clearConfigCache,
     openConfigExcel,
     openListExcel,
     openRemoteConfigExcel,
@@ -303,4 +333,13 @@ export function useFileIO() {
     saveConfigExcel,
     saveListExcel,
   };
+}
+
+function toTimeValue(value) {
+  if (!value)
+    return 0;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? value : 0;
+  const time = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
 }
